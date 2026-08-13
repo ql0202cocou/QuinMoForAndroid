@@ -81,6 +81,8 @@ jobs:
     name: Publish Release
     if: github.event.inputs.publish != 'y'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs: build
     steps:
       - name: Checkout
