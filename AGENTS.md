@@ -90,7 +90,7 @@ Manual/device verification is the norm for behavior changes (proxy configs, VPN 
 
 All releases are manual via GitHub Actions (`workflow_dispatch`):
 
-- `.github/workflows/release.yml` — jobs: (1) `libcore` builds `libcore.aar` on ubuntu-latest with Go ^1.25, cached in `actions/cache` keyed by hashes of the workflows + build scripts + `libcore/` contents (changing any of those busts the cache); (2) `build` runs `./run init action gradle` then `./gradlew app:assembleOssRelease` and uploads APKs; (3) `publish` pushes them to a GitHub release with `ghr` (skipped when input `publish=y`); (4) `play` builds `bundlePlayRelease` (skipped when input `play=y`).
+- `.github/workflows/release.yml` — jobs: (1) `libcore` builds `libcore.aar` on ubuntu-latest with Go ^1.25, cached in `actions/cache` keyed by hashes of the workflows + build scripts + `libcore/` contents (changing any of those busts the cache), then uploaded as the `libcore-aar` artifact; (2) `build` downloads the artifact, runs `./run init action gradle` then `./gradlew app:assembleOssRelease` and uploads APKs; (3) `publish` pushes them to a GitHub release with `ghr` (skipped when input `publish=y`); (4) `play` builds `bundlePlayRelease` (skipped when input `play=y`).
 - `.github/workflows/preview.yml` — same libcore caching, builds `app:assemblePreviewRelease` (uses `PRE_VERSION_NAME` from `nb4a.properties`, APKs named `NekoBox-pre-*.apk`).
 - F-Droid builds use `buildScript/fdroid/prebuild.sh` (just builds the core) plus the `fdroid` flavor.
 - The Google Play version has been controlled by a third party since May 2024 and is not open source — do not treat it as a distribution target (see `README.md`).
