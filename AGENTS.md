@@ -63,7 +63,7 @@ Full build from a clean checkout:
 
 - If you did not touch `libcore/`, the Go core rebuild can be skipped as long as `app/libs/libcore.aar` exists.
 - Gradle tasks follow `assemble<Flavor><BuildType>`, e.g. `assembleFdroidRelease`, `bundlePlayRelease`, `assemblePreviewRelease`. Helper tasks `assemble<Arm64|Arm|X64|X86>FdroidRelease` also exist.
-- Release signing: put `KEYSTORE_PASS`, `ALIAS_NAME`, `ALIAS_PASS` in `local.properties` (gitignored) or the base64-encoded `LOCAL_PROPERTIES` env var; the committed `release.keystore` is used. Without them, release builds are unsigned.
+- Release signing: the keystore `release.keystore` (alias `ql0202cocou`) is **not committed** — it lives locally and is gitignored. Passwords go in `local.properties` (`KEYSTORE_PASS`, `ALIAS_NAME`, `ALIAS_PASS`) or the base64-encoded `LOCAL_PROPERTIES` env var. In CI the workflows decode `secrets.KEYSTORE_BASE64` into `release.keystore` before building. Without credentials, release builds are unsigned.
 - Env var `nkmr_minify=0` disables minify/resource-shrinking for release builds.
 
 ## Code style guidelines
@@ -97,8 +97,8 @@ All releases are manual via GitHub Actions (`workflow_dispatch`):
 
 ## Security considerations
 
-- `release.keystore` is committed; its passwords must come from `local.properties` / `LOCAL_PROPERTIES` / env vars — never hard-code them.
-- Never commit `local.properties`, `app/libs/`, `app/src/main/assets/sing-box/`, or `/nkmr` (all gitignored).
+- `release.keystore` (alias `ql0202cocou`) is gitignored and never committed — the public repo must not contain the private signing key. CI receives it via the `KEYSTORE_BASE64` secret; passwords come from `local.properties` / `LOCAL_PROPERTIES` / env vars — never hard-code them.
+- Never commit `local.properties`, `release.keystore`, `app/libs/`, `app/src/main/assets/sing-box/`, or `/nkmr` (all gitignored).
 - The app defines a signature-level permission `${applicationId}.SERVICE` guarding its IPC/AIDL surface — keep `protectionLevel="signature"` when touching the manifest.
 - `VpnService` traffic, plugin binaries (`GuardedProcessPool`) and user-supplied configs/subscriptions are trust boundaries: validate parsed input in `fmt/` parsers and don't log credentials/keys.
 - geoip/geosite databases are downloaded from GitHub at build time; builds are therefore network-dependent and sensitive to upstream release changes. The gomobile toolchain and all core Go sources are vendored under `libcore/` and no longer fetched at build time.
