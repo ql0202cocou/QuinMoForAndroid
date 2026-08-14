@@ -29,6 +29,7 @@ data class VmessQRCode(
     var sni: String = "",
     var alpn: String = "",
     var fp: String = "",
+    var verify_cert: Boolean = true,
 )
 
 fun StandardV2RayBean.isTLS(): Boolean {
@@ -349,6 +350,7 @@ fun parseV2RayN(link: String): VMessBean {
             if (bean.sni.isNullOrBlank()) bean.sni = bean.host
             bean.alpn = vmessQRCode.alpn
             bean.utlsFingerprint = vmessQRCode.fp
+            if (!vmessQRCode.verify_cert) bean.allowInsecure = true
         }
     }
 
@@ -423,6 +425,7 @@ fun VMessBean.toV2rayN(): String {
         sni = bean.sni
         alpn = bean.alpn.replace("\n", ",")
         fp = bean.utlsFingerprint
+        verify_cert = !bean.allowInsecure
     }.let {
         NGUtil.encode(Gson().toJson(it))
     }

@@ -50,7 +50,7 @@ object RawUpdater : GroupUpdater() {
         if (link.startsWith("content://")) {
             val contentText = app.contentResolver.openInputStream(link.toUri())
                 ?.bufferedReader()
-                ?.readText()
+                ?.use { it.readText() }
 
             proxies = contentText?.let { parseRaw(contentText) }
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
@@ -364,7 +364,7 @@ object RawUpdater : GroupUpdater() {
                                         (opt.value as? List<Any>)?.joinToString("\n")
 
                                     "skip-cert-verify" -> bean.allowInsecure =
-                                        opt.value as? Boolean == true
+                                        opt.value.toString() == "true"
 
                                     "client-fingerprint" -> bean.utlsFingerprint =
                                         opt.value as String
