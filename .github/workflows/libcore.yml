@@ -1,0 +1,33 @@
+on:
+  workflow_call:
+jobs:
+  libcore:
+    name: Native Build (LibCore)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: LibCore Cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: app/libs/libcore.aar
+          # exclusions keep the post-job key re-evaluation off the gitignored build outputs
+          key: libcore-${{ hashFiles('.github/workflows/libcore.yml', 'run', 'buildScript/**', 'libcore/**', '!libcore/.build/**', '!libcore/libcore.aar') }}
+      - name: Install Golang
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ^1.25
+          cache-dependency-path: libcore/go.sum
+      - name: Native Build
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: ./run lib core
+      - name: Upload LibCore
+        uses: actions/upload-artifact@v4
+        with:
+          name: libcore-aar
+          path: app/libs/libcore.aar
+          # the .aar is already a zip; artifact only hands off between jobs in one run
+          compression-level: 0
+          retention-days: 1
