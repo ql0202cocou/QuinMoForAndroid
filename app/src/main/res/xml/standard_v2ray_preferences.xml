@@ -76,6 +76,15 @@
             app:key="security"
             app:title="@string/security"
             app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="0"
+            app:entries="@array/proxy_core_v2ray_entry"
+            app:entryValues="@array/proxy_core_v2ray_value"
+            app:icon="@drawable/ic_baseline_stream_24"
+            app:key="profileCore"
+            app:persistent="false"
+            app:title="@string/proxy_core"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
     <PreferenceCategory

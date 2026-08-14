@@ -7,7 +7,7 @@
 **NekoBox for Android** is an Android universal proxy client built on the [sing-box](https://github.com/SagerNet/sing-box) core. This repository is an independently maintained fork of [MatsuriDayo/NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid) (upstream is unmaintained; the fork relationship is documented only in `README.md`).
 
 - License: GPL-3.0. Package name: `moe.nb4a` (namespace `io.nekohasekai.sagernet`).
-- Supported protocols: SOCKS(4/4a/5), HTTP(S), SSH, Shadowsocks, VMess, Trojan, VLESS, AnyTLS, ShadowTLS, TUIC, Hysteria 1/2, WireGuard — plus external-plugin protocols Trojan-Go, NaïveProxy and Mieru, which run as separate plugin APKs discovered via the `io.nekohasekai.sagernet.plugin.ACTION_NATIVE_PLUGIN` intent.
+- Supported protocols: SOCKS(4/4a/5), HTTP(S), SSH, Shadowsocks, VMess, Trojan, VLESS, AnyTLS, ShadowTLS, TUIC, Hysteria 1/2, WireGuard — plus external-plugin protocols Trojan-Go, NaïveProxy and Mieru, which run as separate plugin APKs discovered via the `io.nekohasekai.sagernet.plugin.ACTION_NATIVE_PLUGIN` intent. Additionally the app bundles two proxy cores as built-in plugins (see `app/executableSo/`): **Xray** (default core for VLESS profiles, for newer REALITY compatibility) and **mihomo** (default core for AnyTLS profiles); the core is selectable per profile in the profile editor.
 - Documentation/README is bilingual (Chinese/English); code comments are in English.
 
 ## Technology stack
@@ -17,7 +17,7 @@ Two-stage hybrid build — a **Go core** bound into the **Kotlin Android app**:
 | Layer | Tech |
 |---|---|
 | Android app (`app/`) | Kotlin + Java, Android Gradle Plugin 8.8.1, Kotlin 2.0.21, Gradle 8.10.2 (wrapper), KSP 2.0.21-1.0.27, Java 8 source/target, compileSdk/targetSdk 35, minSdk 21, NDK 25.0.8775105 |
-| Proxy core (`libcore/`) | Go (go.mod targets 1.23.x; CI uses Go ^1.25), wraps sing-box, compiled with gomobile (vendored MatsuriDayo fork, binaries named `gomobile-matsuri`/`gobind-matsuri`) into `app/libs/libcore.aar` |
+| Proxy core (`libcore/`) | Go (go.mod targets 1.24.x; CI uses Go ^1.25), wraps sing-box, compiled with gomobile (vendored MatsuriDayo fork, binaries named `gomobile-matsuri`/`gobind-matsuri`) into `app/libs/libcore.aar` |
 | Build glue | `buildSrc/` (shared Gradle helper `setupApp()`), `buildScript/` (bash build scripts) |
 
 Key app dependencies: AndroidX (appcompat, navigation, preference, work, Room 2.6.1 via KSP), Material Components, kotlinx-coroutines, Gson, OkHttp, snakeyaml, Kryo, Roomigrant (generates Room migrations from `app/schemas/`), zxing-lite (QR scan), editorkit (config editor). ViewBinding, BuildConfig and AIDL are enabled.
@@ -34,18 +34,19 @@ Key app dependencies: AndroidX (appcompat, navigation, preference, work, Room 2.
   - `src/main/java/moe/matsuri/nb4a/` — NekoBox-specific layer: `NativeInterface.kt` (implements the gomobile-generated `BoxPlatformInterface`/`NB4AInterface` from libcore, bridges to `VpnService`), `proxy/` (newer protocols: anytls, shadowtls, neko, custom config), `SingBoxOptions.java` (generated structs mirroring sing-box options).
   - `src/main/java/com/github/shadowsocks/` — code vendored from shadowsocks-android.
   - `libs/` — gitignored; `libcore.aar` is placed here by the core build and consumed via `implementation(fileTree("libs"))`.
-  - `executableSo/` — extra jniLibs source dir. `schemas/` — Room schema JSON (checked in; keep in sync when entities change).
+  - `executableSo/` — extra jniLibs source dir hosting the built-in plugin cores (`libxray.so` / `libmihomo.so` per ABI, gitignored, downloaded by `buildScript/lib/plugins.sh`; resolved via `PluginManager.initNativeInternal`). `schemas/` — Room schema JSON (checked in; keep in sync when entities change).
 - `libcore/` — Go module wrapping sing-box for Android. `box.go` exposes `BoxInstance`; `platform_java.go`/`platform_box.go` implement the platform interface; `assets*.go` load geoip/geosite (xz-compressed); subpackages: `device/`, `ech/`, `procfs/`, `stun/`.
-  - All core sources are **vendored in-tree** (nested Go modules, committed as plain directories): `libcore/sing-box/` (upstream SagerNet/sing-box v1.12.19 + neko patches — see `libcore/sing-box/NEKO.md` for the patch list, maintained by this fork since upstream NekoBox is unmaintained), `libcore/libneko/` (neko-specific Go code), `libcore/gomobile/` (MatsuriDayo/gomobile @ master2 build tool, installed by `libcore/init.sh`). `go.mod` `replace`s point at `./sing-box` and `./libneko`; no external checkouts are needed.
+  - All core sources are **vendored in-tree** (nested Go modules, committed as plain directories): `libcore/sing-box/` (upstream SagerNet/sing-box v1.13.18 + neko patches — see `libcore/sing-box/NEKO.md` for the patch list, maintained by this fork since upstream NekoBox is unmaintained), `libcore/libneko/` (neko-specific Go code), `libcore/gomobile/` (MatsuriDayo/gomobile @ master2 build tool, installed by `libcore/init.sh`). `go.mod` `replace`s point at `./sing-box` and `./libneko`; no external checkouts are needed.
   - Build tags (set in `build.sh`): `with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api`.
-- `buildSrc/src/main/kotlin/Helpers.kt` — `setupApp()` / `setupCommon()`: SDK levels, ABI splits (armeabi-v7a/arm64-v8a/x86/x86_64 plus a universal all-ABI APK), product flavors **`oss` / `fdroid` / `play` / `preview`** (dimension `vendor`), release signing, lint config, APK renaming (`NekoBox-<version>-<abi>.apk`).
+- `buildSrc/src/main/kotlin/Helpers.kt` — `setupApp()` / `setupCommon()`: SDK levels, ABI splits (arm64-v8a/x86_64 plus a universal all-ABI APK), product flavors **`oss` / `fdroid` / `play` / `preview`** (dimension `vendor`), release signing, lint config, APK renaming (`NekoBox-<version>-<abi>.apk`).
 - `buildScript/` — bash entry points invoked through the `./run` dispatcher (`./run a b c` resolves to `buildScript/a/b/c.sh`):
   - `./run lib core` → init gomobile, report available Go module updates (check-only), build `libcore.aar` into `app/libs/`.
+  - `./run lib plugins` → download the pinned Xray/mihomo Android binaries (versions pinned in `buildScript/lib/plugins.sh`) into `app/executableSo/`.
   - `./run init action gradle` → CI prep (downloads geoip/geosite assets).
   - `buildScript/lib/assets.sh` → downloads `geoip.db`/`geosite.db` (xz) into `app/src/main/assets/sing-box/` (gitignored).
   - `buildScript/init/env.sh` / `env_ndk.sh` → locate Android SDK/NDK and set per-ABI clang env vars.
 - `nb4a.properties` — release metadata: `PACKAGE_NAME`, `VERSION_NAME`, `PRE_VERSION_NAME`, `VERSION_CODE` (multiplied by 5 in `buildSrc` to leave room for ABI offsets). Bump versions here, not in Gradle files.
-- `.github/workflows/` — `release.yml` and `preview.yml` (both manual `workflow_dispatch`; see Deployment).
+- `.github/workflows/` — `release.yml` and `preview.yml` (both manual `workflow_dispatch`) plus the shared `libcore.yml` they call; see Deployment.
 
 ## Build
 
@@ -55,11 +56,12 @@ Full build from a clean checkout:
 
 ```bash
 ./run lib core                     # builds libcore.aar -> app/libs/ (Go + gomobile, slow first time)
+./run lib plugins                  # downloads xray/mihomo binaries -> app/executableSo/
 ./gradlew app:assembleOssDebug     # or app:assembleOssRelease
 ```
 
 - `./run lib core` prints outdated Go modules (`go list -m -u`, check-only) before compiling. Upgrades are done **manually together with the sing-box base** — the sing-box ecosystem modules (sing, sing-quic, sing-tun, quic-go, sing-mux, …) are version-locked to each other, so a blind `go get -u` breaks the build.
-- CI caches `app/libs/libcore.aar` keyed by hashes of `libcore/` contents (vendored sources included). A cache hit skips the core build entirely; clear the Actions cache to force a rebuild.
+- CI caches `app/libs/libcore.aar` keyed by the core build inputs (see `.github/workflows/libcore.yml`). A cache hit skips the core build entirely; clear the Actions cache to force a rebuild.
 
 - If you did not touch `libcore/`, the Go core rebuild can be skipped as long as `app/libs/libcore.aar` exists.
 - Gradle tasks follow `assemble<Flavor><BuildType>`, e.g. `assembleFdroidRelease`, `bundlePlayRelease`, `assemblePreviewRelease`. Helper tasks `assemble<Arm64|Arm|X64|X86>FdroidRelease` also exist.
@@ -90,8 +92,9 @@ Manual/device verification is the norm for behavior changes (proxy configs, VPN 
 
 All releases are manual via GitHub Actions (`workflow_dispatch`):
 
-- `.github/workflows/release.yml` — jobs: (1) `libcore` builds `libcore.aar` on ubuntu-latest with Go ^1.25, cached in `actions/cache` keyed by hashes of the workflows + build scripts + `libcore/` contents (changing any of those busts the cache), then uploaded as the `libcore-aar` artifact; (2) `build` downloads the artifact, runs `./run init action gradle` then `./gradlew app:assembleOssRelease` and uploads APKs; (3) `publish` pushes them to a GitHub release with `ghr` (skipped when input `publish=y`); (4) `play` builds `bundlePlayRelease` (skipped when input `play=y`).
-- `.github/workflows/preview.yml` — same libcore caching, builds `app:assemblePreviewRelease` (uses `PRE_VERSION_NAME` from `nb4a.properties`, APKs named `NekoBox-pre-*.apk`).
+- `.github/workflows/libcore.yml` — reusable (`workflow_call`) job shared by both workflows below: builds `libcore.aar` once, caches it keyed on the core build inputs (the workflow itself, `run`, `buildScript/`, `libcore/`), and hands it to the consumer jobs as the short-lived `libcore-aar` artifact.
+- `.github/workflows/release.yml` — jobs: (1) `libcore` (see above); (2) `build` runs `./run init action gradle` then `./gradlew app:assembleOssRelease` and uploads APKs; (3) `publish` pushes them to a GitHub release with `ghr` (skipped when input `publish=y`); (4) `play` builds `bundlePlayRelease` (skipped when input `play=y`).
+- `.github/workflows/preview.yml` — same shape, builds `app:assemblePreviewRelease` (uses `PRE_VERSION_NAME` from `nb4a.properties`, APKs named `NekoBox-pre-*.apk`).
 - F-Droid builds use `buildScript/fdroid/prebuild.sh` (just builds the core) plus the `fdroid` flavor.
 - The Google Play version has been controlled by a third party since May 2024 and is not open source — do not treat it as a distribution target (see `README.md`).
 

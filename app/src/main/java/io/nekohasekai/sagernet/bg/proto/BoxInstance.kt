@@ -16,12 +16,16 @@ import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.naive.buildNaiveConfig
 import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean
 import io.nekohasekai.sagernet.fmt.trojan_go.buildTrojanGoConfig
+import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
+import io.nekohasekai.sagernet.fmt.v2ray.buildXrayConfig
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.plugin.PluginManager
 import kotlinx.coroutines.*
 import libcore.BoxInstance
 import libcore.Libcore
 import moe.matsuri.nb4a.net.LocalResolverImpl
+import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
+import moe.matsuri.nb4a.proxy.anytls.buildMihomoConfig
 import java.io.File
 
 abstract class BoxInstance(
@@ -82,6 +86,16 @@ abstract class BoxInstance(
                                 cacheFiles.add(this)
                             }
                         }
+                    }
+
+                    is VMessBean -> {
+                        initPlugin("xray-plugin")
+                        pluginConfigs[port] = profile.type to buildXrayConfig(bean, port)
+                    }
+
+                    is AnyTLSBean -> {
+                        initPlugin("mihomo-plugin")
+                        pluginConfigs[port] = profile.type to buildMihomoConfig(bean, port)
                     }
                 }
             }
@@ -192,6 +206,38 @@ abstract class BoxInstance(
                         if (bean.protocol == HysteriaBean.PROTOCOL_FAKETCP) {
                             commands.addAll(0, listOf("su", "-c"))
                         }
+
+                        processes.start(commands)
+                    }
+
+                    bean is VMessBean -> {
+                        val configFile = File(
+                            cacheDir, "xray_" + SystemClock.elapsedRealtime() + ".json"
+                        )
+                        configFile.parentFile?.mkdirs()
+                        configFile.writeText(config)
+                        cacheFiles.add(configFile)
+
+                        val commands = mutableListOf(
+                            initPlugin("xray-plugin").path, "run", "-c", configFile.absolutePath
+                        )
+
+                        processes.start(commands)
+                    }
+
+                    bean is AnyTLSBean -> {
+                        val configFile = File(
+                            cacheDir, "mihomo_" + SystemClock.elapsedRealtime() + ".yaml"
+                        )
+                        configFile.parentFile?.mkdirs()
+                        configFile.writeText(config)
+                        cacheFiles.add(configFile)
+
+                        val commands = mutableListOf(
+                            initPlugin("mihomo-plugin").path,
+                            "-d", app.noBackupFilesDir.absolutePath,
+                            "-f", configFile.absolutePath
+                        )
 
                         processes.start(commands)
                     }

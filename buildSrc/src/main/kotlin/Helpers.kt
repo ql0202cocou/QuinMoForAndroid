@@ -170,9 +170,7 @@ fun Project.setupApp() {
             reset()
             isEnable = true
             isUniversalApk = true
-            include("armeabi-v7a")
             include("arm64-v8a")
-            include("x86")
             include("x86_64")
         }
 
@@ -207,7 +205,7 @@ fun Project.setupApp() {
             }
         }
 
-        for (abi in listOf("Arm64", "Arm", "X64", "X86")) {
+        for (abi in listOf("Arm64", "X64")) {
             tasks.create("assemble" + abi + "FdroidRelease") {
                 dependsOn("assembleFdroidRelease")
             }

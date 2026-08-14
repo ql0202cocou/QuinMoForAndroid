@@ -3,7 +3,6 @@
     <string name="app_desc">适用于 Android 之通用代理工具, 使用 Kotlin 编写。</string>
     <string name="project">项目</string>
     <string name="github">源代码</string>
-    <string name="telegram">Telegram 更新频道</string>
     <string name="oss_licenses">开放源代码协议</string>
     <string name="app_version">版本</string>
     <string name="logcat">导出调试信息</string>
@@ -72,6 +71,7 @@
     <string name="password">密码</string>
     <string name="enc_method">加密方式</string>
     <string name="protocol">协议</string>
+    <string name="proxy_core">核心</string>
     <string name="protocol_param">协议参数</string>
     <string name="obfs">混淆</string>
     <string name="obfs_param">混淆参数</string>
@@ -225,8 +225,6 @@
     <string name="file_manager_missing">您的设备缺少 Android 标准文件选择器, 请安装一个, 如 Material Files.</string>
     <string name="need_reload">重载代理服务以应用修改</string>
     <string name="theme">主题颜色</string>
-    <string name="donate">捐款</string>
-    <string name="donate_info">猫猫很可爱 请给猫猫钱</string>
     <string name="extra_headers">附加标头</string>
     <string name="username">用户名</string>
     <string name="key_opt">密码 (可选)</string>
@@ -456,7 +454,6 @@
     <string name="enable_clash_api_summary">在 127.0.0.1:9090 提供 clash api 和 yacd 仪表板</string>
     <string name="xtls_flow">Flow（VLESS 子协议）</string>
     <string name="log_level">日志级别</string>
-    <string name="ads">推广</string>
     <string name="need_restart">重新启动应用程序以应用更改</string>
     <string name="use_selector">启用 selector （免重载切换节点）</string>
     <string name="front_proxy">前置代理</string>
@@ -489,11 +486,6 @@
     <string name="network_change_reset_connections">当网络发生变化时重置出站连接</string>
     <string name="wake_reset_connections">当设备从睡眠状态唤醒时重置出站连接</string>
     <string name="preview_version_hint">本应用为预览版，可能存在诸多问题。若您不愿参与测试，请前往GitHub下载正式发布版本！</string>
-    <string name="check_update_preview">检查预览版更新</string>
-    <string name="check_update_release">检查正式版更新</string>
-    <string name="update_dialog_title">发现新版本</string>
-    <string name="update_dialog_message">当前版本：%1$s\n可升级版本：%2$s\n是否前往下载？</string>
-    <string name="check_update_no">检查成功，但没有更新。</string>
     <string name="reset_settings">恢复默认设置</string>
     <string name="reset_settings_message">恢复默认设置，但节点、分组等数据将保留。如需完全清除数据，请在系统设置中直接清除应用数据。</string>
     <string name="minimize">最小化</string>

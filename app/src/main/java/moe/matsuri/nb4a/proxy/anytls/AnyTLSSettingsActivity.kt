@@ -2,9 +2,13 @@ package moe.matsuri.nb4a.proxy.anytls
 
 import android.os.Bundle
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ui.profile.ProfileSettingsActivity
@@ -35,6 +39,25 @@ class AnyTLSSettingsActivity : ProfileSettingsActivity<AnyTLSBean>() {
         pbm.fromCacheAll(this)
     }
 
+    // entity-level core selection (not part of the bean)
+    private var coreSelection = ProxyEntity.CORE_AUTO
+
+    override suspend fun saveAndExit() {
+        if (DataStore.editingId == 0L) {
+            val profile = ProfileManager.createProfile(
+                DataStore.editingGroup, createEntity().apply { serialize() }
+            )
+            if (profile.core != coreSelection) {
+                profile.core = coreSelection
+                ProfileManager.updateProfile(profile)
+            }
+            finish()
+            return
+        }
+        proxyEntity?.core = coreSelection
+        super.saveAndExit()
+    }
+
     override fun PreferenceFragmentCompat.createPreferences(
         savedInstanceState: Bundle?,
         rootKey: String?
@@ -46,6 +69,15 @@ class AnyTLSSettingsActivity : ProfileSettingsActivity<AnyTLSBean>() {
         }
         findPreference<EditTextPreference>("password")!!.apply {
             summaryProvider = PasswordSummaryProvider
+        }
+
+        coreSelection = proxyEntity?.core ?: ProxyEntity.CORE_AUTO
+        findPreference<ListPreference>("profileCore")!!.apply {
+            value = coreSelection.toString()
+            setOnPreferenceChangeListener { _, newValue ->
+                coreSelection = (newValue as String).toInt()
+                true
+            }
         }
     }
 }

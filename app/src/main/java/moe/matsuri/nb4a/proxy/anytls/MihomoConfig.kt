@@ -1,0 +1,37 @@
+package moe.matsuri.nb4a.proxy.anytls
+
+import io.nekohasekai.sagernet.database.DataStore
+import moe.matsuri.nb4a.utils.listByLineOrComma
+import org.yaml.snakeyaml.Yaml
+
+// Builds a mihomo client config for an AnyTLS profile:
+// a local socks listener chained from sing-box, and the profile as proxy.
+fun buildMihomoConfig(bean: AnyTLSBean, port: Int): String {
+    val proxy = LinkedHashMap<String, Any?>()
+    proxy["name"] = "anytls-out"
+    proxy["type"] = "anytls"
+    proxy["server"] = bean.serverAddress
+    proxy["port"] = bean.serverPort
+    proxy["password"] = bean.password
+    proxy["udp"] = true
+    if (bean.sni.isNotBlank()) proxy["sni"] = bean.sni
+    if (bean.alpn.isNotBlank()) proxy["alpn"] = bean.alpn.listByLineOrComma()
+    if (bean.allowInsecure || DataStore.globalAllowInsecure) proxy["skip-cert-verify"] = true
+    if (bean.utlsFingerprint.isNotBlank()) proxy["client-fingerprint"] = bean.utlsFingerprint
+
+    val listener = LinkedHashMap<String, Any?>()
+    listener["name"] = "socks-in"
+    listener["type"] = "socks"
+    listener["listen"] = "127.0.0.1"
+    listener["port"] = port
+    listener["udp"] = true
+
+    val config = LinkedHashMap<String, Any?>()
+    config["log-level"] = if (DataStore.logLevel > 0) "debug" else "warning"
+    config["mode"] = "rule"
+    config["listeners"] = listOf(listener)
+    config["proxies"] = listOf(proxy)
+    config["rules"] = listOf("MATCH,anytls-out")
+
+    return Yaml().dump(config)
+}

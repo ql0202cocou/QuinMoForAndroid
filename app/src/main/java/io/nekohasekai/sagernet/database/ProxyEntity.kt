@@ -54,6 +54,8 @@ data class ProxyEntity(
     var ping: Int = 0,
     var uuid: String = "",
     var error: String? = null,
+    // 0 = auto (by protocol), 1 = sing-box, 2 = xray, 3 = mihomo
+    @ColumnInfo(defaultValue = "0") var core: Int = 0,
     var socksBean: SOCKSBean? = null,
     var httpBean: HttpBean? = null,
     var ssBean: ShadowsocksBean? = null,
@@ -96,6 +98,12 @@ data class ProxyEntity(
 
         const val TYPE_CHAIN = 8
 
+        // core selection (ProxyEntity.core)
+        const val CORE_AUTO = 0
+        const val CORE_SING_BOX = 1
+        const val CORE_XRAY = 2
+        const val CORE_MIHOMO = 3
+
         val chainName by lazy { app.getString(R.string.proxy_chain) }
 
         @JvmField
@@ -119,7 +127,7 @@ data class ProxyEntity(
     }
 
     override fun serializeToBuffer(output: ByteBufferOutput) {
-        output.writeInt(0)
+        output.writeInt(1)
 
         output.writeLong(id)
         output.writeLong(groupId)
@@ -137,6 +145,7 @@ data class ProxyEntity(
         output.writeBytes(data)
 
         output.writeBoolean(dirty)
+        output.writeInt(core)
     }
 
     override fun deserializeFromBuffer(input: ByteBufferInput) {
@@ -155,6 +164,9 @@ data class ProxyEntity(
         putByteArray(input.readBytes(input.readVarInt(true)))
 
         dirty = input.readBoolean()
+        if (version >= 1) {
+            core = input.readInt()
+        }
     }
 
 
@@ -303,12 +315,23 @@ data class ProxyEntity(
         } to name
     }
 
+    fun resolvedCore(): Int {
+        if (core != CORE_AUTO) return core
+        return when (type) {
+            TYPE_VMESS -> if (vmessBean!!.isVLESS) CORE_XRAY else CORE_SING_BOX
+            TYPE_ANYTLS -> CORE_MIHOMO
+            else -> CORE_SING_BOX
+        }
+    }
+
     fun needExternal(): Boolean {
         return when (type) {
             TYPE_TROJAN_GO -> true
             TYPE_MIERU -> true
             TYPE_NAIVE -> true
+            TYPE_VMESS -> resolvedCore() == CORE_XRAY
             TYPE_HYSTERIA -> !hysteriaBean!!.canUseSingBox()
+            TYPE_ANYTLS -> resolvedCore() == CORE_MIHOMO
             TYPE_NEKO -> true
             else -> false
         }
