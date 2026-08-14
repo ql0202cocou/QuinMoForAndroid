@@ -24,7 +24,6 @@
 <string name="add_profile">Добавить профиль</string>
 <string name="add_profile_methods_manual_settings">Ручные настройки</string>
 <string name="add_profile_methods_scan_qr_code">Отсканировать QR-код</string>
-<string name="ads">Реклама</string>
 <string name="allow_access">Разрешить подключения из локальной сети</string>
 <string name="allow_access_sum">Привязать входящие серверы к 0.0.0.0</string>
 <string name="allow_insecure">Разрешить небезопасное подключение</string>
@@ -75,9 +74,6 @@
 <string name="chain_settings">Настройки цепочки</string>
 <string name="character_counter_content_description">Введено символов: %1$d из %2$d</string>
 <string name="character_counter_overflowed_content_description">Превышено ограничение на количество символов (%1$d из %2$d)</string>
-<string name="check_update_no">Обновления не найдены.</string>
-<string name="check_update_preview">Проверить наличие обновлений предварительной версии</string>
-<string name="check_update_release">Проверить наличие обновлений релизнойной версии</string>
 <string name="circular_reference">Циклическая ссылка</string>
 <string name="circular_reference_sum">Маршрут не может содержать сам себя.</string>
 <string name="clear_logcat">Очистить журнал</string>
@@ -131,8 +127,6 @@
 <string name="domain_strategy_for_direct">Правило домена для Прямого</string>
 <string name="domain_strategy_for_remote">Правило домена для Удаленного</string>
 <string name="domain_strategy_for_server">Правило домена для Адреса сервера</string>
-<string name="donate">Пожертвовать</string>
-<string name="donate_info">Я люблю деньги</string>
 <string name="download">Скачать</string>
 <string name="early_data_header_name">Имя заголовка ранних данных</string>
 <string name="ech_config">Конфигурация ECH</string>
@@ -442,7 +436,6 @@
 <string name="subscriptions">Подписки</string>
 <string name="tcp_connections">%d TCP-соединений</string>
 <string name="tcp_keep_alive_interval">Интервал доставки пакетов TCP keep-alive</string>
-<string name="telegram">Канал обновлений в Telegram</string>
 <string name="test_concurrency">Число параллельных подключений</string>
 <string name="theme">Тема</string>
 <string name="tile_title">Переключатель</string>
@@ -462,8 +455,6 @@
 <string name="unsaved_changes_prompt">Есть несохраненные изменения. Сохранить?</string>
 <string name="update_all_subscription">Обновить все подписки</string>
 <string name="update_current_subscription">Обновить подписку текущей группы</string>
-<string name="update_dialog_message">Текущая версия: %1$s\nДоступная версия: %2$s\nХотите загрузить её?</string>
-<string name="update_dialog_title">Доступна новая версия</string>
 <string name="update_settings">Обновить настройки</string>
 <string name="update_subscription_warning">Прокси-сервер не подключен, вы уверены, что хотите продолжить обновление?</string>
 <string name="update_when_connected_only">Обновлять только при подключении</string>
