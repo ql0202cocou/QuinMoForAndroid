@@ -13,7 +13,8 @@ jobs:
         with:
           path: app/libs/libcore.aar
           # exclusions keep the post-job key re-evaluation off the gitignored build outputs
-          key: libcore-${{ hashFiles('.github/workflows/libcore.yml', 'run', 'buildScript/**', 'libcore/**', '!libcore/.build/**', '!libcore/libcore.aar') }}
+          # (buildScript/nkmr is a symlink to the gitignored /nkmr, broken on CI runners)
+          key: libcore-${{ hashFiles('.github/workflows/libcore.yml', 'run', 'buildScript/**', '!buildScript/nkmr', 'libcore/**', '!libcore/.build/**', '!libcore/libcore.aar') }}
       - name: Install Golang
         if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/setup-go@v5
