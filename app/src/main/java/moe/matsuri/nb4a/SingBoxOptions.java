@@ -22,6 +22,13 @@ public class SingBoxOptions {
 
     // base
 
+    // plain reflective gson used as delegate by the custom serializer below
+    private static final Gson gsonPlain = new GsonBuilder()
+            .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+            .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+            .disableHtmlEscaping()
+            .create();
+
     private static final Gson gsonSingbox = new GsonBuilder()
             .registerTypeHierarchyAdapter(SingBoxOption.class, new SingBoxOptionSerializer())
             .setPrettyPrinting()
@@ -69,21 +76,12 @@ public class SingBoxOptions {
     public static class SingBoxOptionSerializer implements JsonSerializer<SingBoxOption> {
         @Override
         public JsonElement serialize(SingBoxOption src, Type typeOfSrc, JsonSerializationContext context) {
-            // 拿到原始的 delegate（默认序列化器）
-            TypeAdapter<?> delegate = gsonSingbox.getDelegateAdapter(
-                    new TypeAdapterFactory() {
-                        @Override
-                        public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
-                            return null; // 返回 null，表示只作为“跳过当前自定义”的 marker
-                        }
-                    },
-                    TypeToken.get(src.getClass())
-            );
             Map<String, Object> map;
             if (src instanceof CustomSingBoxOption) {
                 map = ((CustomSingBoxOption) src).getBasicMap();
             } else {
-                map = gsonSingbox.fromJson(((TypeAdapter<SingBoxOption>) delegate).toJson(src), Map.class);
+                // plain reflection: never routes back into this serializer
+                map = gsonPlain.fromJson(gsonPlain.toJson(src), Map.class);
             }
             if (src._hack_config_map != null && !src._hack_config_map.isEmpty()) {
                 Util.INSTANCE.mergeMap(map, src._hack_config_map);
