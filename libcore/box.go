@@ -33,6 +33,12 @@ func init() {
 var mainInstanceAccess sync.Mutex
 var mainInstance *BoxInstance
 
+func getMainInstance() *BoxInstance {
+	mainInstanceAccess.Lock()
+	defer mainInstanceAccess.Unlock()
+	return mainInstance
+}
+
 func VersionBox() string {
 	version := []string{
 		"sing-box: " + constant.Version,
@@ -60,9 +66,7 @@ func VersionBox() string {
 func ResetAllConnections(system bool) {
 	if system {
 		// conntrack was removed in sing-box 1.13; ResetNetwork closes all connections
-		mainInstanceAccess.Lock()
-		main := mainInstance
-		mainInstanceAccess.Unlock()
+		main := getMainInstance()
 		if main != nil {
 			main.Network().ResetNetwork()
 		}
@@ -233,9 +237,7 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 		return speedtest.UrlTest(boxapi.CreateProxyHttpClient(i.Box, connectionTracker), link, timeout, speedtest.UrlTestStandard_RTT)
 	}
 	// test direct
-	mainInstanceAccess.Lock()
-	main := mainInstance
-	mainInstanceAccess.Unlock()
+	main := getMainInstance()
 	if main == nil {
 		return speedtest.UrlTest(boxapi.CreateProxyHttpClient(nil, nil), link, timeout, speedtest.UrlTestStandard_RTT)
 	}

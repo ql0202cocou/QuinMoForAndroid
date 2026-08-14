@@ -82,7 +82,6 @@
             app:entryValues="@array/proxy_core_v2ray_value"
             app:icon="@drawable/ic_baseline_stream_24"
             app:key="profileCore"
-            app:persistent="false"
             app:title="@string/proxy_core"
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>

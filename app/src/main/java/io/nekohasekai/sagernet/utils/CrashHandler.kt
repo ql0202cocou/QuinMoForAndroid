@@ -12,6 +12,7 @@ import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ui.BlankActivity
+import moe.matsuri.nb4a.utils.Util
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
@@ -103,7 +104,7 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
             for (pair in PublicDatabase.kvPairDao.all()) {
                 report += "\n"
                 // may contain credentials, keep them out of the sharable report
-                report += pair.key + ": " + if (pair.key == Key.GLOBAL_CUSTOM_CONFIG) "<redacted>" else pair.toString()
+                report += pair.key + ": " + if (pair.key == Key.GLOBAL_CUSTOM_CONFIG) "<redacted>" else Util.redactSecrets(pair.toString())
             }
         } catch (e: Exception) {
             report += "Export settings failed: " + formatThrowable(e)

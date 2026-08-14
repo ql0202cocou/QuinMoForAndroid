@@ -9,8 +9,21 @@ set -e
 XRAY_VERSION="v26.3.27"
 MIHOMO_VERSION="v1.19.29"
 
+ABIS="arm64-v8a x86_64"
 DIR=app/executableSo
+STAMP="$DIR/.versions"
+WANT="xray=$XRAY_VERSION mihomo=$MIHOMO_VERSION"
+
+# skip when the installed cores already match the pinned versions
+if [ "$(cat "$STAMP" 2>/dev/null)" = "$WANT" ] \
+  && [ -f "$DIR/arm64-v8a/libxray.so" ] && [ -f "$DIR/x86_64/libxray.so" ] \
+  && [ -f "$DIR/arm64-v8a/libmihomo.so" ] && [ -f "$DIR/x86_64/libmihomo.so" ]; then
+  echo ">> plugin cores up to date ($WANT)"
+  exit 0
+fi
+
 mkdir -p $DIR/arm64-v8a $DIR/x86_64
+rm -f "$STAMP"
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -29,39 +42,47 @@ check_elf() {
     echo "$1 is not an ELF binary"; exit 1; }
 }
 
-#### Xray (arm64-v8a / x86_64)
+upstream_arch() {
+  # $1: abi, $2: the upstream's name for arm64-v8a (both use amd64 for x86_64)
+  if [ "$1" = x86_64 ]; then echo amd64; else echo "$2"; fi
+}
 
-for abi in arm64-v8a x86_64; do
-  case $abi in
-    arm64-v8a) xray_abi=arm64-v8a ;;
-    x86_64) xray_abi=amd64 ;;
-  esac
-  zip="Xray-android-$xray_abi.zip"
-  curl -fLSsO "https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION/$zip"
-  dgst=$(curl -fLSs "https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION/$zip.dgst")
-  check_sha256 "$zip" "$dgst"
-  unzip -o -q "$zip" xray
-  check_elf xray
-  cp xray "$OLDPWD/$DIR/$abi/libxray.so"
-  rm -f xray "$zip"
-done
+fetch_xray() {
+  local abi zip dgst
+  for abi in $ABIS; do
+    zip="Xray-android-$(upstream_arch $abi arm64-v8a).zip"
+    curl -fLSsO "https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION/$zip"
+    dgst=$(curl -fLSs "https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION/$zip.dgst")
+    check_sha256 "$zip" "$dgst"
+    unzip -o -q "$zip" xray
+    check_elf xray
+    cp xray "$OLDPWD/$DIR/$abi/libxray.so"
+    rm -f xray "$zip"
+  done
+}
 
-#### mihomo (arm64-v8a / x86_64)
 # upstream publishes no checksums; verify gzip integrity + ELF magic instead
+fetch_mihomo() {
+  local abi gz bin
+  for abi in $ABIS; do
+    gz="mihomo-android-$(upstream_arch $abi arm64-v8)-$MIHOMO_VERSION.gz"
+    curl -fLSsO "https://github.com/MetaCubeX/mihomo/releases/download/$MIHOMO_VERSION/$gz"
+    gzip -t "$gz"
+    gunzip -f "$gz"
+    bin="${gz%.gz}"
+    check_elf "$bin"
+    cp "$bin" "$OLDPWD/$DIR/$abi/libmihomo.so"
+    rm -f "$bin"
+  done
+}
 
-for abi in arm64-v8a x86_64; do
-  case $abi in
-    arm64-v8a) mihomo_abi=arm64-v8 ;;
-    x86_64) mihomo_abi=amd64 ;;
-  esac
-  gz="mihomo-android-$mihomo_abi-$MIHOMO_VERSION.gz"
-  curl -fLSsO "https://github.com/MetaCubeX/mihomo/releases/download/$MIHOMO_VERSION/$gz"
-  gzip -t "$gz"
-  gunzip -f "$gz"
-  bin="${gz%.gz}"
-  check_elf "$bin"
-  cp "$bin" "$OLDPWD/$DIR/$abi/libmihomo.so"
-  rm -f "$bin"
-done
+# the two upstreams are independent; download them concurrently
+fetch_xray & xray_pid=$!
+fetch_mihomo & mihomo_pid=$!
+status=0
+wait $xray_pid || status=1
+wait $mihomo_pid || status=1
+[ $status -eq 0 ] || exit 1
 
+echo "$WANT" > "$OLDPWD/$STAMP"
 echo ">> plugin cores installed to $DIR (xray $XRAY_VERSION, mihomo $MIHOMO_VERSION)"

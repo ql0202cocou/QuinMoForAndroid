@@ -33,6 +33,7 @@ import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
@@ -106,6 +107,9 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             runOnDefaultDispatcher {
                 if (editingId == 0L) {
                     DataStore.editingGroup = DataStore.selectedGroupForImport()
+                    DataStore.profileCacheStore.putString(
+                        Key.PROFILE_CORE, ProxyEntity.CORE_AUTO.toString()
+                    )
                     createEntity().applyDefaultValues().init()
                 } else {
                     if (proxyEntity == null) {
@@ -115,6 +119,9 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                         return@runOnDefaultDispatcher
                     }
                     DataStore.editingGroup = proxyEntity!!.groupId
+                    DataStore.profileCacheStore.putString(
+                        Key.PROFILE_CORE, proxyEntity!!.core.toString()
+                    )
                     (proxyEntity!!.requireBean() as T).init()
                 }
 
@@ -133,9 +140,14 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     open suspend fun saveAndExit() {
 
         val editingId = DataStore.editingId
+        // entity-level field, not part of the bean; seeded in onCreate
+        val profileCore = DataStore.profileCacheStore.getString(Key.PROFILE_CORE)
+            ?.toIntOrNull() ?: ProxyEntity.CORE_AUTO
         if (editingId == 0L) {
             val editingGroup = DataStore.editingGroup
-            ProfileManager.createProfile(editingGroup, createEntity().apply { serialize() })
+            ProfileManager.createProfile(
+                editingGroup, createEntity().apply { serialize() }, profileCore
+            )
         } else {
             if (proxyEntity == null) {
                 finish()
@@ -144,7 +156,10 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             if (proxyEntity!!.id == DataStore.selectedProxy) {
                 SagerNet.stopService()
             }
-            ProfileManager.updateProfile(proxyEntity!!.apply { (requireBean() as T).serialize() })
+            ProfileManager.updateProfile(proxyEntity!!.apply {
+                core = profileCore
+                (requireBean() as T).serialize()
+            })
         }
         finish()
 

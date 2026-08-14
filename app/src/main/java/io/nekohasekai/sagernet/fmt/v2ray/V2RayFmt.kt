@@ -523,6 +523,30 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
     return builder.toLink(if (isTrojan) "trojan" else "vless")
 }
 
+// WS early-data convention shared by all cores: "?ed=N" embedded in the path,
+// overridden by the explicit wsMaxEarlyData/earlyDataHeaderName fields.
+class WsEarlyData(val path: String, val maxEarlyData: Int?, val headerName: String?)
+
+fun StandardV2RayBean.resolveWsEarlyData(): WsEarlyData {
+    val pathHasEd = path.contains("?ed=")
+    val basePath = if (pathHasEd) {
+        path.substringBefore("?ed=")
+    } else {
+        path.takeIf { it.isNotBlank() } ?: "/"
+    }
+    val maxEarlyData = wsMaxEarlyData.takeIf { it > 0 }
+        ?: if (pathHasEd) path.substringAfter("?ed=").toIntOrNull() ?: 2048 else null
+    val headerName = earlyDataHeaderName.takeIf { it.isNotBlank() }
+        ?: if (pathHasEd) "Sec-WebSocket-Protocol" else null
+    return WsEarlyData(basePath, maxEarlyData, headerName)
+}
+
+// TLS fingerprint policy shared by all cores: REALITY requires uTLS, defaulting to chrome.
+fun StandardV2RayBean.effectiveUtlsFingerprint(): String? {
+    if (!utlsFingerprint.isNullOrBlank()) return utlsFingerprint
+    return if (!realityPubKey.isNullOrBlank()) "chrome" else null
+}
+
 fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportOptions? {
     when (bean.type) {
         "tcp" -> {
@@ -538,21 +562,10 @@ fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportO
                     headers["Host"] = bean.host
                 }
 
-                if (bean.path.contains("?ed=")) {
-                    path = bean.path.substringBefore("?ed=")
-                    max_early_data = bean.path.substringAfter("?ed=").toIntOrNull() ?: 2048
-                    early_data_header_name = "Sec-WebSocket-Protocol"
-                } else {
-                    path = bean.path.takeIf { it.isNotBlank() } ?: "/"
-                }
-
-                if (bean.wsMaxEarlyData > 0) {
-                    max_early_data = bean.wsMaxEarlyData
-                }
-
-                if (bean.earlyDataHeaderName.isNotBlank()) {
-                    early_data_header_name = bean.earlyDataHeaderName
-                }
+                val ed = bean.resolveWsEarlyData()
+                path = ed.path
+                ed.maxEarlyData?.let { max_early_data = it }
+                ed.headerName?.let { early_data_header_name = it }
             }
         }
 
@@ -600,16 +613,15 @@ fun buildSingBoxOutboundTLS(bean: StandardV2RayBean): OutboundTLSOptions? {
         if (bean.sni.isNotBlank()) server_name = bean.sni
         if (bean.alpn.isNotBlank()) alpn = bean.alpn.listByLineOrComma()
         if (bean.certificates.isNotBlank()) certificate = bean.certificates
-        var fp = bean.utlsFingerprint
         if (bean.realityPubKey.isNotBlank()) {
             reality = OutboundRealityOptions().apply {
                 enabled = true
                 public_key = bean.realityPubKey
                 short_id = bean.realityShortId
             }
-            if (fp.isNullOrBlank()) fp = "chrome"
         }
-        if (fp.isNotBlank()) {
+        val fp = bean.effectiveUtlsFingerprint()
+        if (!fp.isNullOrBlank()) {
             utls = OutboundUTLSOptions().apply {
                 enabled = true
                 fingerprint = fp

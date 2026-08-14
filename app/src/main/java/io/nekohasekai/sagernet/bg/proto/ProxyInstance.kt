@@ -8,6 +8,7 @@ import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import kotlinx.coroutines.runBlocking
 import moe.matsuri.nb4a.utils.JavaUtil
+import moe.matsuri.nb4a.utils.Util
 
 class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = null) :
     BoxInstance(profile) {
@@ -24,7 +25,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         super.buildConfig()
         lastSelectorGroupId = super.config.selectorGroupId
         // configs contain credentials; redact them before writing to the exportable log
-        if (notTmp) Logs.d(redactSecrets(config.config))
+        if (notTmp) Logs.d(Util.redactSecrets(config.config))
         if (notTmp && BuildConfig.DEBUG) Logs.d(JavaUtil.gson.toJson(config.trafficMap))
     }
 
@@ -38,7 +39,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         super.init()
         pluginConfigs.forEach { (_, plugin) ->
             val (_, content) = plugin
-            Logs.d(redactSecrets(content))
+            Logs.d(Util.redactSecrets(content))
         }
     }
 
@@ -63,22 +64,4 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         }
     }
 
-    private companion object {
-
-        // JSON "key": "value" pairs whose value is a credential
-        val SENSITIVE_JSON_VALUE = Regex(
-            """("(?:password|uuid|private_key|pre_shared_key|auth|auth_str|token|secret|key|authorization|cookie)"\s*:\s*)"(?:\\.|[^"\\])*["]""",
-            RegexOption.IGNORE_CASE
-        )
-
-        // scheme://user:password@host embedded in string values (e.g. naive "proxy" URL)
-        val URL_USERINFO_PASSWORD = Regex("""(://[^"\s:@/]+):[^"\s@/]*@""")
-
-        fun redactSecrets(json: String): String {
-            var result = SENSITIVE_JSON_VALUE.replace(json) { it.groupValues[1] + "\"***\"" }
-            result = URL_USERINFO_PASSWORD.replace(result) { it.groupValues[1] + ":***@" }
-            return result
-        }
-
-    }
 }

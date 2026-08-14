@@ -108,6 +108,13 @@ abstract class BoxInstance(
         val cacheDir = File(SagerNet.application.cacheDir, "tmpcfg")
         cacheDir.mkdirs()
 
+        fun writeCacheFile(prefix: String, ext: String, content: String): File {
+            val file = File(cacheDir, prefix + "_" + SystemClock.elapsedRealtime() + "." + ext)
+            file.writeText(content)
+            cacheFiles.add(file)
+            return file
+        }
+
         for ((chain) in config.externalIndex) {
             chain.entries.forEachIndexed { index, (port, profile) ->
                 val bean = profile.requireBean()
@@ -120,12 +127,7 @@ abstract class BoxInstance(
                     }
 
                     bean is TrojanGoBean -> {
-                        val configFile = File(
-                            cacheDir, "trojan_go_" + SystemClock.elapsedRealtime() + ".json"
-                        )
-                        configFile.parentFile?.mkdirs()
-                        configFile.writeText(config)
-                        cacheFiles.add(configFile)
+                        val configFile = writeCacheFile("trojan_go", "json", config)
 
                         val commands = mutableListOf(
                             initPlugin("trojan-go-plugin").path, "-config", configFile.absolutePath
@@ -135,13 +137,7 @@ abstract class BoxInstance(
                     }
 
                     bean is MieruBean -> {
-                        val configFile = File(
-                            cacheDir, "mieru_" + SystemClock.elapsedRealtime() + ".json"
-                        )
-
-                        configFile.parentFile?.mkdirs()
-                        configFile.writeText(config)
-                        cacheFiles.add(configFile)
+                        val configFile = writeCacheFile("mieru", "json", config)
 
                         val envMap = mutableMapOf<String, String>()
                         envMap["MIERU_CONFIG_JSON_FILE"] = configFile.absolutePath
@@ -155,25 +151,12 @@ abstract class BoxInstance(
                     }
 
                     bean is NaiveBean -> {
-                        val configFile = File(
-                            cacheDir, "naive_" + SystemClock.elapsedRealtime() + ".json"
-                        )
-
-                        configFile.parentFile?.mkdirs()
-                        configFile.writeText(config)
-                        cacheFiles.add(configFile)
+                        val configFile = writeCacheFile("naive", "json", config)
 
                         val envMap = mutableMapOf<String, String>()
 
                         if (bean.certificates.isNotBlank()) {
-                            val certFile = File(
-                                cacheDir, "naive_" + SystemClock.elapsedRealtime() + ".crt"
-                            )
-
-                            certFile.parentFile?.mkdirs()
-                            certFile.writeText(bean.certificates)
-                            cacheFiles.add(certFile)
-
+                            val certFile = writeCacheFile("naive", "crt", bean.certificates)
                             envMap["SSL_CERT_FILE"] = certFile.absolutePath
                         }
 
@@ -185,13 +168,7 @@ abstract class BoxInstance(
                     }
 
                     bean is HysteriaBean -> {
-                        val configFile = File(
-                            cacheDir, "hysteria_" + SystemClock.elapsedRealtime() + ".json"
-                        )
-
-                        configFile.parentFile?.mkdirs()
-                        configFile.writeText(config)
-                        cacheFiles.add(configFile)
+                        val configFile = writeCacheFile("hysteria", "json", config)
 
                         val commands = mutableListOf(
                             initPlugin("hysteria-plugin").path,
@@ -211,12 +188,7 @@ abstract class BoxInstance(
                     }
 
                     bean is VMessBean -> {
-                        val configFile = File(
-                            cacheDir, "xray_" + SystemClock.elapsedRealtime() + ".json"
-                        )
-                        configFile.parentFile?.mkdirs()
-                        configFile.writeText(config)
-                        cacheFiles.add(configFile)
+                        val configFile = writeCacheFile("xray", "json", config)
 
                         val commands = mutableListOf(
                             initPlugin("xray-plugin").path, "run", "-c", configFile.absolutePath
@@ -226,12 +198,7 @@ abstract class BoxInstance(
                     }
 
                     bean is AnyTLSBean -> {
-                        val configFile = File(
-                            cacheDir, "mihomo_" + SystemClock.elapsedRealtime() + ".yaml"
-                        )
-                        configFile.parentFile?.mkdirs()
-                        configFile.writeText(config)
-                        cacheFiles.add(configFile)
+                        val configFile = writeCacheFile("mihomo", "yaml", config)
 
                         val commands = mutableListOf(
                             initPlugin("mihomo-plugin").path,

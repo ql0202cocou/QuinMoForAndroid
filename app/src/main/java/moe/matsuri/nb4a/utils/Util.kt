@@ -200,4 +200,28 @@ object Util {
         val encoded = match?.groupValues?.get(1) ?: ""
         return URLDecoder.decode(encoded, StandardCharsets.UTF_8.name())
     }
+
+    // JSON "key": "value" pairs whose value is a credential
+    // (trailing ["] is a literal quote; a raw string cannot end with ")
+    private val SENSITIVE_JSON_VALUE = Regex(
+        """("(?:password|uuid|private_key|pre_shared_key|auth|auth_str|token|secret|key|authorization|cookie)"\s*:\s*)"(?:\\.|[^"\\])*["]""",
+        RegexOption.IGNORE_CASE
+    )
+
+    // YAML "key: value" lines whose value is a credential (e.g. mihomo configs)
+    private val SENSITIVE_YAML_VALUE = Regex(
+        """^(\s*(?:password|uuid|private-key|pre-shared-key|auth|auth-str|token|secret|key|authorization|cookie)\s*:\s*).+$""",
+        setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)
+    )
+
+    // scheme://user:password@host embedded in string values (e.g. naive "proxy" URL)
+    private val URL_USERINFO_PASSWORD = Regex("""(://[^"\s:@/]+):[^"\s@/]*@""")
+
+    // keep credentials out of the exportable log / crash report
+    fun redactSecrets(text: String): String {
+        var result = SENSITIVE_JSON_VALUE.replace(text) { it.groupValues[1] + "\"***\"" }
+        result = SENSITIVE_YAML_VALUE.replace(result) { it.groupValues[1] + "***" }
+        result = URL_USERINFO_PASSWORD.replace(result) { it.groupValues[1] + ":***@" }
+        return result
+    }
 }

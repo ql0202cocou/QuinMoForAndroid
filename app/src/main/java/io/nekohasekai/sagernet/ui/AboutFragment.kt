@@ -30,6 +30,8 @@ import moe.matsuri.nb4a.plugin.Plugins
 import androidx.core.net.toUri
 import io.nekohasekai.sagernet.SagerNet
 
+private const val REPO_URL = "https://github.com/ql0202cocou/NekoBoxForAndroid"
+
 class AboutFragment : ToolbarFragment(R.layout.layout_about) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -77,7 +79,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .subText(SagerNet.appVersionNameForDisplay)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://github.com/ql0202cocou/NekoBoxForAndroid/releases"
+                                        "$REPO_URL/releases"
                                     )
                                 }
                                 .build())
@@ -151,10 +153,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .icon(R.drawable.ic_baseline_sanitizer_24)
                                 .text(R.string.github)
                                 .setOnClickAction {
-                                    requireContext().launchCustomTab(
-                                        "https://github.com/ql0202cocou/NekoBoxForAndroid"
-
-                                    )
+                                    requireContext().launchCustomTab(REPO_URL)
                                 }
                                 .build())
                         .build())

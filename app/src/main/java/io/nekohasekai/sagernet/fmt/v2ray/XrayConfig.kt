@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.fmt.v2ray
 
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.ktx.toStringPretty
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import org.json.JSONArray
 import org.json.JSONObject
@@ -60,7 +61,7 @@ fun buildXrayConfig(bean: VMessBean, port: Int): String {
             })
         })
         put("outbounds", JSONArray().apply { put(outbound) })
-    }.toString(2)
+    }.toStringPretty()
 }
 
 private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
@@ -70,17 +71,10 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
             "ws" -> {
                 put("network", "ws")
                 put("wsSettings", JSONObject().apply {
-                    if (bean.path.contains("?ed=")) {
-                        put("path", bean.path.substringBefore("?ed="))
-                        put("maxEarlyData", bean.path.substringAfter("?ed=").toIntOrNull() ?: 2048)
-                        put("earlyDataHeaderName", "Sec-WebSocket-Protocol")
-                    } else {
-                        put("path", bean.path.takeIf { it.isNotBlank() } ?: "/")
-                    }
-                    if (bean.wsMaxEarlyData > 0) put("maxEarlyData", bean.wsMaxEarlyData)
-                    if (bean.earlyDataHeaderName.isNotBlank()) {
-                        put("earlyDataHeaderName", bean.earlyDataHeaderName)
-                    }
+                    val ed = bean.resolveWsEarlyData()
+                    put("path", ed.path)
+                    ed.maxEarlyData?.let { put("maxEarlyData", it) }
+                    ed.headerName?.let { put("earlyDataHeaderName", it) }
                     if (bean.host.isNotBlank()) {
                         put("headers", JSONObject().apply { put("Host", bean.host) })
                     }
@@ -141,15 +135,14 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
         }
 
         // security
-        val fp = bean.utlsFingerprint.takeIf { it.isNotBlank() }
-            ?: if (bean.realityPubKey.isNotBlank()) "chrome" else ""
+        val fp = bean.effectiveUtlsFingerprint()
         if (bean.realityPubKey.isNotBlank()) {
             put("security", "reality")
             put("realitySettings", JSONObject().apply {
                 if (bean.sni.isNotBlank()) put("serverName", bean.sni)
                 put("publicKey", bean.realityPubKey)
                 if (bean.realityShortId.isNotBlank()) put("shortId", bean.realityShortId)
-                if (fp.isNotBlank()) put("fingerprint", fp)
+                fp?.let { put("fingerprint", it) }
             })
         } else if (bean.security == "tls") {
             put("security", "tls")
@@ -161,7 +154,7 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
                 if (bean.allowInsecure || DataStore.globalAllowInsecure) {
                     put("allowInsecure", true)
                 }
-                if (fp.isNotBlank()) put("fingerprint", fp)
+                fp?.let { put("fingerprint", it) }
                 if (bean.certificates.isNotBlank()) {
                     put("certificates", JSONArray().apply {
                         put(JSONObject().apply {

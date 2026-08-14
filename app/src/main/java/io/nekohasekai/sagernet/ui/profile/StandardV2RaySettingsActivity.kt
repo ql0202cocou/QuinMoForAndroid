@@ -7,9 +7,6 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.database.DataStore
-import io.nekohasekai.sagernet.database.ProfileManager
-import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
@@ -68,27 +65,6 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
 
     override fun StandardV2RayBean.serialize() {
         pbm.fromCacheAll(this)
-    }
-
-    // entity-level core selection (not part of the bean), vmess/vless only
-    private var coreSelection = ProxyEntity.CORE_AUTO
-
-    override suspend fun saveAndExit() {
-        if (tmpBean is VMessBean) {
-            if (DataStore.editingId == 0L) {
-                val profile = ProfileManager.createProfile(
-                    DataStore.editingGroup, createEntity().apply { serialize() }
-                )
-                if (profile.core != coreSelection) {
-                    profile.core = coreSelection
-                    ProfileManager.updateProfile(profile)
-                }
-                finish()
-                return
-            }
-            proxyEntity?.core = coreSelection
-        }
-        super.saveAndExit()
     }
 
     private lateinit var securityCategory: PreferenceCategory
@@ -171,17 +147,7 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
         }
 
         // core selection only applies to vmess/vless
-        findPreference<ListPreference>("profileCore")!!.apply {
-            isVisible = isVmess || isVless
-            if (isVisible) {
-                coreSelection = proxyEntity?.core ?: ProxyEntity.CORE_AUTO
-                value = coreSelection.toString()
-                setOnPreferenceChangeListener { _, newValue ->
-                    coreSelection = (newValue as String).toInt()
-                    true
-                }
-            }
-        }
+        findPreference<ListPreference>(Key.PROFILE_CORE)!!.isVisible = isVmess || isVless
     }
 
     private fun updateView(network: String) {
