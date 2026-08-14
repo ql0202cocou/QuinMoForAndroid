@@ -1,11 +1,13 @@
 # Neko patches on sing-box
 
-This directory is a vendored copy of `MatsuriDayo/sing-box` at commit
-`aed32ee3066cdbc7d471e3e0415c5134088962df` (`1.12.19-neko-1`), i.e. upstream
-[SagerNet/sing-box](https://github.com/SagerNet/sing-box) **v1.12.19** plus the
-NekoBox patch set. Upstream NekoBox is unmaintained; this fork maintains the
-patches itself. When rebasing onto a newer upstream sing-box release, re-apply
-or drop each patch below after checking whether upstream has fixed the issue.
+This directory is a vendored copy of upstream
+[SagerNet/sing-box](https://github.com/SagerNet/sing-box) **v1.13.18** plus the
+NekoBox patch set (`1.13.18-neko-1`). The patches originate from
+`MatsuriDayo/sing-box` (`aed32ee3066cdbc7d471e3e0415c5134088962df`,
+`1.12.19-neko-1`); upstream NekoBox is unmaintained, so this fork maintains and
+rebases the patches itself. When rebasing onto a newer upstream sing-box
+release, re-apply or drop each patch below after checking whether upstream has
+fixed the issue.
 
 Functional neko commits (on top of the 1.12.x upstream base):
 
