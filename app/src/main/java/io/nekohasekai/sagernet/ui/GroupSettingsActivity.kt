@@ -51,6 +51,7 @@ class GroupSettingsActivity(
         DataStore.landingProxy = landingProxy
         DataStore.frontProxyTmp = if (frontProxy >= 0) 3 else 0
         DataStore.landingProxyTmp = if (landingProxy >= 0) 3 else 0
+        DataStore.proxyServerNameserver = proxyServerNameserver
 
         val subscription = subscription ?: SubscriptionBean().applyDefaultValues()
         DataStore.subscriptionLink = subscription.link
@@ -70,6 +71,7 @@ class GroupSettingsActivity(
 
         frontProxy = if (DataStore.frontProxyTmp == 3) DataStore.frontProxy else -1
         landingProxy = if (DataStore.landingProxyTmp == 3) DataStore.landingProxy else -1
+        proxyServerNameserver = DataStore.proxyServerNameserver.trim()
 
         val isSubscription = type == GroupType.SUBSCRIPTION
         if (isSubscription) {

@@ -41,6 +41,13 @@
         app:title="@string/landing_proxy"
         app:useSimpleSummaryProvider="true" />
 
+    <EditTextPreference
+        app:dialogMessage="@string/proxy_server_nameserver_sum"
+        app:icon="@drawable/baseline_public_24"
+        app:key="proxyServerNameserver"
+        app:title="@string/proxy_server_nameserver"
+        app:useSimpleSummaryProvider="true" />
+
     <PreferenceCategory
         app:key="groupSubscription"
         app:title="@string/subscription_settings">

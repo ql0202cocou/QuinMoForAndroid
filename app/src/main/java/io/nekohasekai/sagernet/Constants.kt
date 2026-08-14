@@ -68,6 +68,7 @@ object Key {
     const val PROFILE_ID = "profileId"
     const val PROFILE_NAME = "profileName"
     const val PROFILE_GROUP = "profileGroup"
+    const val PROFILE_CORE = "profileCore"
     const val PROFILE_CURRENT = "profileCurrent"
 
     const val SERVER_ADDRESS = "serverAddress"
@@ -136,6 +137,7 @@ object Key {
     const val GROUP_IS_SELECTOR = "groupIsSelector"
     const val GROUP_FRONT_PROXY = "groupFrontProxy"
     const val GROUP_LANDING_PROXY = "groupLandingProxy"
+    const val PROXY_SERVER_NAMESERVER = "proxyServerNameserver"
 
     const val GROUP_SUBSCRIPTION = "groupSubscription"
     const val SUBSCRIPTION_LINK = "subscriptionLink"

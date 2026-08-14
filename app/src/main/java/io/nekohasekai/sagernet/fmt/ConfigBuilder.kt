@@ -132,6 +132,13 @@ fun buildConfig(
     val userDNSRuleList = mutableListOf<DNSRule_DefaultOptions>()
     val domainListDNSDirectForce = mutableListOf<String>()
     val bypassDNSBeans = hashSetOf<AbstractBean>()
+    // per-group nameserver: resolve this group's node server domains with it
+    val groupNameserver = if (forTest) {
+        null
+    } else {
+        group?.proxyServerNameserver?.trim()?.takeIf { it.isNotBlank() }
+    }
+    val groupNsDomains = LinkedHashSet<String>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST
     val remoteDns = DataStore.remoteDns.split("\n")
@@ -272,6 +279,12 @@ fun buildConfig(
 
             profileList.forEachIndexed { index, proxyEntity ->
                 val bean = proxyEntity.requireBean()
+
+                if (groupNameserver != null &&
+                    bean.serverAddress.isNotBlank() && !bean.serverAddress.isIpAddress()
+                ) {
+                    groupNsDomains += bean.serverAddress
+                }
 
                 // tagOut: v2ray outbound tag for a profile
                 // profile2 (in) (global)   tag g-(id)
@@ -742,6 +755,22 @@ fun buildConfig(
                     server = "dns-direct"
                 })
             }
+        }
+
+        // per-group nameserver: this group's node server domains resolve via it
+        if (!forTest && groupNameserver != null && groupNsDomains.isNotEmpty()) {
+            dns.servers.add(DNSServerOptions().apply {
+                address = groupNameserver
+                tag = "dns-group"
+                detour = TAG_DIRECT
+                address_resolver = "dns-local"
+                strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
+            })
+            // top priority DNS rule
+            dns.rules.add(0, DNSRule_DefaultOptions().apply {
+                domain = groupNsDomains.toList()
+                server = "dns-group"
+            })
         }
 
         if (!forTest) _hack_custom_config = DataStore.globalCustomConfig

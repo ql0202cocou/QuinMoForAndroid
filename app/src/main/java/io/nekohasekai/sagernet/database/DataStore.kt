@@ -239,6 +239,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serverCustomOutbound by profileCacheStore.string(Key.SERVER_CUSTOM_OUTBOUND)
 
     var groupName by profileCacheStore.string(Key.GROUP_NAME)
+    var proxyServerNameserver by profileCacheStore.string(Key.PROXY_SERVER_NAMESERVER)
     var groupType by profileCacheStore.stringToInt(Key.GROUP_TYPE)
     var groupOrder by profileCacheStore.stringToInt(Key.GROUP_ORDER)
     var groupIsSelector by profileCacheStore.boolean(Key.GROUP_IS_SELECTOR)
