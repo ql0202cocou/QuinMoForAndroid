@@ -59,7 +59,9 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
             return packageName
         }
 
-        error("unknown uid $uid")
+        // unknown uid (isolated process, or a race before PackageCache loads):
+        // the Go side ignores errors anyway, so don't throw across the gomobile boundary
+        return ""
     }
 
     override fun uidByPackageName(packageName: String): Int {

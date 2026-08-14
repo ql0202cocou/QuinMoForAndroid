@@ -93,7 +93,8 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
                         if (withTimeoutOrNull(1000) { exitChannel.receive() } != null) return@withContext
                         process.destroyForcibly()           // Force to kill the process if it's still alive
                     }
-                    exitChannel.receive()
+                    // don't hang forever if the process ignores destroy()
+                    withTimeoutOrNull(5000) { exitChannel.receive() }
                 }                                           // otherwise process already exited, nothing to be done
             }
         }

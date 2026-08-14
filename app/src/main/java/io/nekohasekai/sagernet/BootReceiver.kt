@@ -23,6 +23,15 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        // exported receiver: ignore anything outside the declared intent-filter
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED -> Unit
+
+            else -> return
+        }
+
         runOnDefaultDispatcher {
             SubscriptionUpdater.reconfigureUpdater()
         }

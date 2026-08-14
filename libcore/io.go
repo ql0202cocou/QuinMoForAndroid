@@ -4,11 +4,11 @@ import (
 	"archive/zip"
 	"io"
 	"os"
-        "path/filepath"
+	"path/filepath"
 
-	"github.com/ulikunitz/xz"
 	"github.com/sagernet/sing/common"
-        E "github.com/sagernet/sing/common/exceptions"
+	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/ulikunitz/xz"
 )
 
 func Unxz(archive string, path string) error {
@@ -16,19 +16,21 @@ func Unxz(archive string, path string) error {
 	if err != nil {
 		return err
 	}
+	defer i.Close()
 	r, err := xz.NewReader(i)
 	if err != nil {
-		i.Close()
 		return err
 	}
 	o, err := os.Create(path)
 	if err != nil {
-		i.Close()
 		return err
 	}
 	_, err = io.Copy(o, r)
-	i.Close()
-	return err
+	cerr := o.Close()
+	if err != nil {
+		return err
+	}
+	return cerr
 }
 
 func Unzip(archive string, path string) error {

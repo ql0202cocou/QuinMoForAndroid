@@ -6,6 +6,7 @@ import android.os.Build
 import android.util.Log
 import com.jakewharton.processphoenix.ProcessPhoenix
 import io.nekohasekai.sagernet.BuildConfig
+import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.ktx.Logs
@@ -101,7 +102,8 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
             report += "Settings: \n"
             for (pair in PublicDatabase.kvPairDao.all()) {
                 report += "\n"
-                report += pair.key + ": " + pair.toString()
+                // may contain credentials, keep them out of the sharable report
+                report += pair.key + ": " + if (pair.key == Key.GLOBAL_CUSTOM_CONFIG) "<redacted>" else pair.toString()
             }
         } catch (e: Exception) {
             report += "Export settings failed: " + formatThrowable(e)

@@ -81,6 +81,10 @@ func (c *Client) discover(conn net.PacketConn, addr *net.UDPAddr) (_ NATType, _ 
 	changedAddr := resp.changedAddr
 	// mappedAddr is used as the return value, its IP is used for tests
 	mappedAddr := resp.mappedAddr
+	// mappedAddr shall not be nil
+	if mappedAddr == nil {
+		return NATError, nil, errors.New("Server error: no mapped address."), fakeFullCone
+	}
 	// Make sure IP and port are not changed.
 	if resp.serverAddr.IP() != addr.IP.String() ||
 		resp.serverAddr.Port() != uint16(addr.Port) {
@@ -125,7 +129,7 @@ func (c *Client) discover(conn net.PacketConn, addr *net.UDPAddr) (_ NATType, _ 
 	c.logger.Debugln("Send To:", changedAddr)
 	caddr, err := net.ResolveUDPAddr("udp", changedAddr.String())
 	if err != nil {
-		c.logger.Debugf("ResolveUDPAddr error: %v", err)
+		return NATError, mappedAddr, err, fakeFullCone
 	}
 	resp, err = c.test1(conn, caddr)
 	if err != nil {
@@ -141,6 +145,9 @@ func (c *Client) discover(conn net.PacketConn, addr *net.UDPAddr) (_ NATType, _ 
 	if resp.serverAddr.IP() != caddr.IP.String() ||
 		resp.serverAddr.Port() != uint16(caddr.Port) {
 		fakeFullCone = true
+	}
+	if resp.mappedAddr == nil {
+		return NATError, mappedAddr, errors.New("Server error: no mapped address."), fakeFullCone
 	}
 	if mappedAddr.IP() == resp.mappedAddr.IP() && mappedAddr.Port() == resp.mappedAddr.Port() {
 		// Perform test3 to see if the client can receive packet sent
@@ -175,6 +182,9 @@ func (c *Client) behaviorTest(conn net.PacketConn, addr *net.UDPAddr) (*NATBehav
 	if err != nil {
 		return nil, err
 	}
+	if resp1.mappedAddr == nil {
+		return nil, errors.New("Server error: no mapped address.")
+	}
 	// identical used to check if it is open Internet or not.
 	if resp1.identical {
 		return nil, errors.New("Not behind a NAT.")
@@ -198,6 +208,9 @@ func (c *Client) behaviorTest(conn net.PacketConn, addr *net.UDPAddr) (*NATBehav
 	if err != nil {
 		return nil, err
 	}
+	if resp2.mappedAddr == nil {
+		return nil, errors.New("Server error: no mapped address.")
+	}
 	if resp2.mappedAddr.IP() == resp1.mappedAddr.IP() &&
 		resp2.mappedAddr.Port() == resp1.mappedAddr.Port() {
 		natBehavior.MappingType = BehaviorTypeEndpoint
@@ -212,6 +225,9 @@ func (c *Client) behaviorTest(conn net.PacketConn, addr *net.UDPAddr) (*NATBehav
 		resp3, err := c.test(conn, tmpAddr)
 		if err != nil {
 			return nil, err
+		}
+		if resp3.mappedAddr == nil {
+			return nil, errors.New("Server error: no mapped address.")
 		}
 		if resp3.mappedAddr.IP() == resp2.mappedAddr.IP() &&
 			resp3.mappedAddr.Port() == resp2.mappedAddr.Port() {

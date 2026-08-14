@@ -92,7 +92,7 @@ abstract class GroupUpdater {
     protected fun rewriteAddress(
         bean: AbstractBean, addresses: List<InetAddress>, ipv6First: Boolean
     ) {
-        val address = addresses.sortedBy { (it is Inet4Address) xor ipv6First }[0].hostAddress
+        val address = addresses.sortedBy { (it is Inet4Address) == ipv6First }[0].hostAddress
 
         with(bean) {
             when (this) {
@@ -132,7 +132,10 @@ abstract class GroupUpdater {
 
         suspend fun executeUpdate(proxyGroup: ProxyGroup, byUser: Boolean): Boolean {
             return coroutineScope {
-                if (!updating.add(proxyGroup.id)) cancel()
+                if (!updating.add(proxyGroup.id)) {
+                    // another update for this group is already running
+                    return@coroutineScope false
+                }
                 GroupManager.postReload(proxyGroup.id)
 
                 val subscription = proxyGroup.subscription!!
@@ -150,6 +153,10 @@ abstract class GroupUpdater {
                 try {
                     RawUpdater.doUpdate(proxyGroup, subscription, userInterface, byUser)
                     true
+                } catch (e: CancellationException) {
+                    // don't swallow cancellation (nor report it as a failure)
+                    finishUpdate(proxyGroup)
+                    throw e
                 } catch (e: Throwable) {
                     Logs.w(e)
                     userInterface?.onUpdateFailure(proxyGroup, e.readableMessage)

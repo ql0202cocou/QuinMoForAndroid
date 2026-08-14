@@ -66,6 +66,11 @@ func newChangeReqAttribute(changeIP bool, changePort bool) *attribute {
 //
 //             Figure 6: Format of XOR-MAPPED-ADDRESS Attribute
 func (v *attribute) xorAddr(transID []byte) *Host {
+	// 4 bytes header + 4 bytes IPv4 or 16 bytes IPv6 address;
+	// the value comes from the server, so reject malformed lengths.
+	if len(v.value) < 8 || len(v.value) > 20 {
+		return nil
+	}
 	xorIP := make([]byte, 16)
 	for i := 0; i < len(v.value)-4; i++ {
 		xorIP[i] = v.value[i+4] ^ transID[i]
@@ -92,6 +97,11 @@ func (v *attribute) xorAddr(transID []byte) *Host {
 //
 //               Figure 5: Format of MAPPED-ADDRESS Attribute
 func (v *attribute) rawAddr() *Host {
+	// 4 bytes header + at least 4 bytes address; the value comes
+	// from the server, so reject malformed lengths.
+	if len(v.value) < 8 {
+		return nil
+	}
 	host := new(Host)
 	host.family = uint16(v.value[1])
 	host.port = binary.BigEndian.Uint16(v.value[2:4])

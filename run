@@ -2,12 +2,13 @@
 
 EXEC=""
 TARGET="buildScript"
-declare -A PARAMS
+ORIG_ARGS="$*"
+declare -a PARAMS
 declare -i INDEX=0
 
-for e in $@; do
+for e in "$@"; do
   TARGET="$TARGET/$e"
-  PARAMS[$INDEX]=$e
+  PARAMS[$INDEX]="$e"
   INDEX=$INDEX+1
   shift
   if [ -x "${TARGET}.sh" ]; then
@@ -17,5 +18,10 @@ for e in $@; do
   fi
 done
 
+if [ -z "$EXEC" ]; then
+  echo "no matching build script for: $ORIG_ARGS" >&2
+  exit 1
+fi
+
 echo ">> $EXEC"
-exec "$EXEC" $PARAMS
+exec "$EXEC" "${PARAMS[@]}"

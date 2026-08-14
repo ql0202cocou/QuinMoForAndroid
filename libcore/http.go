@@ -206,8 +206,8 @@ func (r *httpRequest) SetContentString(content string) {
 	r.SetContent([]byte(content))
 }
 
-func (r *httpRequest) Execute() (HTTPResponse, error) {
-	defer device.DeferPanicToError("http execute", func(err error) { log.Println(err) })
+func (r *httpRequest) Execute() (resp HTTPResponse, err error) {
+	defer device.DeferPanicToError("http execute", func(err_ error) { err = err_ })
 	// full direct
 	if r.tryH3Direct && !r.trySocks5 {
 		return r.doH3Direct()

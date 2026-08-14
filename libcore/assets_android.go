@@ -86,9 +86,9 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 		// 官方源升级
 		b, err := os.ReadFile(dir + version)
 		if err != nil {
-			// versionFileMissing
+			// versionFileMissing: the extracted file may be stale or partial
 			doExtract = true
-			_ = os.RemoveAll(version)
+			_ = os.RemoveAll(dstName)
 		} else {
 			localVersion = string(b)
 			if localVersion == "Custom" {
@@ -138,10 +138,14 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 	}
 
 	if f, err := asset.Open(apkPrefix + name + ".xz"); err == nil {
-		extractXz(f)
+		if err := extractXz(f); err != nil {
+			return err
+		}
 	} else if f, err := asset.Open("yacd.zip"); err == nil {
 		os.RemoveAll(dstName)
-		extracZip(f, internalAssetsPath)
+		if err := extracZip(f, internalAssetsPath); err != nil {
+			return err
+		}
 		m, err := filepath.Glob(internalAssetsPath + "/Yacd-*")
 		if err != nil {
 			return fmt.Errorf("glob Yacd: %v", err)
@@ -153,9 +157,13 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 		if err != nil {
 			return fmt.Errorf("rename Yacd: %v", err)
 		}
+	} else {
+		// TODO normal file
+		return fmt.Errorf("no asset found for %s", name)
+	}
 
-	} // TODO normal file
-
+	// extraction succeeded, only now bump the version file,
+	// otherwise a broken file would be kept forever
 	o, err := os.Create(dir + version)
 	if err != nil {
 		return fmt.Errorf("create version: %v", err)

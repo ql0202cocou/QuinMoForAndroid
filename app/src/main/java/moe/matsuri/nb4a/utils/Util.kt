@@ -9,6 +9,7 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.zip.DataFormatException
 import java.util.zip.Deflater
 import java.util.zip.Inflater
 
@@ -105,9 +106,11 @@ object Util {
 
             inflater.setInput(input)
 
-            var count = -1
-            while (count != 0) {
-                count = inflater.inflate(buffer)
+            // 0 means no progress possible (truncated or corrupt input);
+            // don't silently return partial data
+            while (!inflater.finished()) {
+                val count = inflater.inflate(buffer)
+                if (count == 0) throw DataFormatException("invalid or truncated zlib data")
                 outputStream.write(buffer, 0, count)
             }
 
