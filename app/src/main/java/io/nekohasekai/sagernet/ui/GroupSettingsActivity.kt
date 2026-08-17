@@ -6,6 +6,7 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.os.Parcelable
+import android.text.InputType
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -148,6 +149,17 @@ class GroupSettingsActivity(
             findPreference<SwitchPreference>(Key.SUBSCRIPTION_AUTO_UPDATE)!!
         val subscriptionAutoUpdateDelay =
             findPreference<EditTextPreference>(Key.SUBSCRIPTION_AUTO_UPDATE_DELAY)!!
+
+        // 每行一个 DNS 地址
+        findPreference<EditTextPreference>(Key.PROXY_SERVER_NAMESERVER)!!.apply {
+            setOnBindEditTextListener { editText ->
+                editText.setSingleLine(false)
+                editText.inputType =
+                    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                editText.minLines = 2
+                editText.setSelection(editText.text.length)
+            }
+        }
 
         subscriptionAutoUpdateDelay.isEnabled = subscriptionAutoUpdate.isChecked
         subscriptionAutoUpdateDelay.setOnPreferenceChangeListener { _, newValue ->

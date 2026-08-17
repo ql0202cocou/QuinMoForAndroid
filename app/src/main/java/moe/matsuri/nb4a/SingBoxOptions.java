@@ -4635,6 +4635,9 @@ public class SingBoxOptions {
 
         public Integer rewrite_ttl;
 
+        // neko: on query failure, continue matching the next DNS rule
+        public Boolean fallback;
+
     }
 
     public static class V2RayTransportOptions_HTTPOptions extends V2RayTransportOptions {

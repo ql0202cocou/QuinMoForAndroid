@@ -192,6 +192,8 @@ type DNSRouteActionOptions struct {
 	DisableCache bool                  `json:"disable_cache,omitempty"`
 	RewriteTTL   *uint32               `json:"rewrite_ttl,omitempty"`
 	ClientSubnet *badoption.Prefixable `json:"client_subnet,omitempty"`
+	// neko: on query failure, continue matching the next DNS rule
+	Fallback bool `json:"fallback,omitempty"`
 }
 
 type _DNSRouteOptionsActionOptions struct {

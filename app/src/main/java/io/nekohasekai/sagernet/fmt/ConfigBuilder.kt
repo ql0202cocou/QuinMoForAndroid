@@ -132,11 +132,15 @@ fun buildConfig(
     val userDNSRuleList = mutableListOf<DNSRule_DefaultOptions>()
     val domainListDNSDirectForce = mutableListOf<String>()
     val bypassDNSBeans = hashSetOf<AbstractBean>()
-    // per-group nameserver: resolve this group's node server domains with it
-    val groupNameserver = if (forTest) {
-        null
+    // per-group nameserver: resolve this group's node server domains with it,
+    // multiple addresses (one per line) are used in order with fallback
+    val groupNameservers = if (forTest) {
+        listOf()
     } else {
-        group?.proxyServerNameserver?.trim()?.takeIf { it.isNotBlank() }
+        group?.proxyServerNameserver?.split("\n")
+            ?.mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
+            ?.distinct()
+            ?: listOf()
     }
     val groupNsDomains = LinkedHashSet<String>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
@@ -280,7 +284,7 @@ fun buildConfig(
             profileList.forEachIndexed { index, proxyEntity ->
                 val bean = proxyEntity.requireBean()
 
-                if (groupNameserver != null &&
+                if (groupNameservers.isNotEmpty() &&
                     bean.serverAddress.isNotBlank() && !bean.serverAddress.isIpAddress()
                 ) {
                     groupNsDomains += bean.serverAddress
@@ -757,20 +761,26 @@ fun buildConfig(
             }
         }
 
-        // per-group nameserver: this group's node server domains resolve via it
-        if (!forTest && groupNameserver != null && groupNsDomains.isNotEmpty()) {
-            dns.servers.add(DNSServerOptions().apply {
-                address = groupNameserver
-                tag = "dns-group"
-                detour = TAG_DIRECT
-                address_resolver = "dns-local"
-                strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
-            })
-            // top priority DNS rule
-            dns.rules.add(0, DNSRule_DefaultOptions().apply {
-                domain = groupNsDomains.toList()
-                server = "dns-group"
-            })
+        // per-group nameserver: this group's node server domains resolve via it,
+        // multiple servers are tried in order (neko dns rule fallback)
+        if (!forTest && groupNameservers.isNotEmpty() && groupNsDomains.isNotEmpty()) {
+            val groupRules = groupNameservers.mapIndexed { index, address ->
+                val tag = "dns-group-$index"
+                dns.servers.add(DNSServerOptions().apply {
+                    this.address = address
+                    this.tag = tag
+                    detour = TAG_DIRECT
+                    address_resolver = "dns-local"
+                    strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
+                })
+                DNSRule_DefaultOptions().apply {
+                    domain = groupNsDomains.toList()
+                    server = tag
+                    fallback = true
+                }
+            }
+            // top priority DNS rules, in server order
+            dns.rules.addAll(0, groupRules)
         }
 
         if (!forTest) _hack_custom_config = DataStore.globalCustomConfig

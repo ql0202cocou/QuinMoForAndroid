@@ -303,6 +303,13 @@ func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg, options adapte
 			if responseCheck != nil && rejected {
 				continue
 			}
+			// neko: on query failure, continue matching the next DNS rule
+			if err != nil && !rejected && rule != nil {
+				if dnsRoute, isDNSRoute := rule.Action().(*R.RuleActionDNSRoute); isDNSRoute && dnsRoute.Fallback {
+					r.logger.DebugContext(ctx, "fallback to next DNS rule after failure")
+					continue
+				}
+			}
 			break
 		}
 	}
@@ -402,10 +409,21 @@ func (r *Router) Lookup(ctx context.Context, domain string, options adapter.DNSQ
 				dnsOptions.Strategy = r.defaultDomainStrategy
 			}
 			responseAddrs, err = r.client.Lookup(dnsCtx, transport, domain, dnsOptions, responseCheck)
-			if responseCheck == nil || err == nil {
+			if err == nil {
 				break
 			}
-			printResult()
+			if responseCheck != nil {
+				printResult()
+				continue
+			}
+			// neko: on query failure, continue matching the next DNS rule
+			if rule != nil {
+				if dnsRoute, isDNSRoute := rule.Action().(*R.RuleActionDNSRoute); isDNSRoute && dnsRoute.Fallback {
+					r.logger.DebugContext(ctx, "fallback to next DNS rule after failure")
+					continue
+				}
+			}
+			break
 		}
 	}
 response:

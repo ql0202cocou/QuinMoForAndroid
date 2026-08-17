@@ -131,6 +131,8 @@ func NewDNSRuleAction(logger logger.ContextLogger, action option.DNSRuleAction) 
 				RewriteTTL:   action.RouteOptions.RewriteTTL,
 				ClientSubnet: netip.Prefix(common.PtrValueOrDefault(action.RouteOptions.ClientSubnet)),
 			},
+			// neko: on query failure, continue matching the next DNS rule
+			Fallback: action.RouteOptions.Fallback,
 		}
 	case C.RuleActionTypeRouteOptions:
 		return &RuleActionDNSRouteOptions{
@@ -259,6 +261,8 @@ func (r *RuleActionRouteOptions) Descriptions() []string {
 type RuleActionDNSRoute struct {
 	Server string
 	RuleActionDNSRouteOptions
+	// neko: on query failure, continue matching the next DNS rule
+	Fallback bool
 }
 
 func (r *RuleActionDNSRoute) Type() string {

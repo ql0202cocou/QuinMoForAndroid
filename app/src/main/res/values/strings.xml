@@ -111,7 +111,7 @@
     <string name="protocol">Protocol</string>
     <string name="proxy_core">Core</string>
     <string name="proxy_server_nameserver">Proxy server nameserver</string>
-    <string name="proxy_server_nameserver_sum">DNS used to resolve server domains of nodes in this group, e.g. udp://223.5.5.5</string>
+    <string name="proxy_server_nameserver_sum">DNS used to resolve server domains of nodes in this group, e.g. udp://223.5.5.5. One address per line; multiple addresses are tried in order.</string>
     <string name="protocol_param">Protocol Param</string>
     <string name="obfs">Obfs</string>
     <string name="obfs_param">Obfs Param</string>

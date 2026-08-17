@@ -24,6 +24,12 @@ Functional neko commits (on top of the 1.12.x upstream base):
 The `1.12.x-neko-1` commits only bump `constant/version.go` and carry no code
 changes.
 
+Additional patches maintained by this fork (not from MatsuriDayo):
+
+| Patch | Notes |
+|---|---|
+| dns: rule action `fallback` | `option/rule_action.go` (`DNSRouteActionOptions.Fallback`, JSON `fallback`), `route/rule/rule_action.go` (`RuleActionDNSRoute.Fallback`), `dns/router.go`: when a DNS query routed by a rule with `fallback: true` fails, matching continues at the next DNS rule instead of returning the error. Used by the Android app to implement ordered multi-server fallback for per-group proxy-server nameservers. |
+
 How to upgrade the base: clone upstream SagerNet/sing-box, merge or rebase the
 patches onto the new tag, resolve conflicts, replace this directory with the
 result (without `.git`), and update this file.

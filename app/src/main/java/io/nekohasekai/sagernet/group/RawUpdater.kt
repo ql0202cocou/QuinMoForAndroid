@@ -47,12 +47,14 @@ object RawUpdater : GroupUpdater() {
 
         val link = subscription.link
         var proxies: List<AbstractBean>
+        var subscriptionText: String? = null
         if (link.startsWith("content://")) {
             val contentText = app.contentResolver.openInputStream(link.toUri())
                 ?.bufferedReader()
                 ?.use { it.readText() }
 
-            proxies = contentText?.let { parseRaw(contentText) }
+            subscriptionText = contentText
+            proxies = contentText?.let { parseRaw(it) }
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
 
@@ -69,7 +71,9 @@ object RawUpdater : GroupUpdater() {
                 setURL(subscription.link)
                 setUserAgent(subscription.customUserAgent.takeIf { it.isNotBlank() } ?: USER_AGENT)
             }.execute()
-            proxies = parseRaw(Util.getStringBox(response.contentString))
+            val responseText = Util.getStringBox(response.contentString)
+            subscriptionText = responseText
+            proxies = parseRaw(responseText)
                 ?: error(app.getString(R.string.no_proxies_found))
 
             subscription.subscriptionUserinfo =
@@ -215,6 +219,12 @@ object RawUpdater : GroupUpdater() {
         }
 
         subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
+
+        // 订阅下发的节点解析 DNS，自动写入分组设置
+        subscriptionText?.let { parseProxyServerNameserver(it) }?.let {
+            proxyGroup.proxyServerNameserver = it
+        }
+
         SagerDatabase.groupDao.updateGroup(proxyGroup)
         finishUpdate(proxyGroup)
 
@@ -710,6 +720,30 @@ object RawUpdater : GroupUpdater() {
         }
 
         return null
+    }
+
+    // mihomo/clash 订阅里 dns.proxy-server-nameserver（或顶层同名字段）的地址列表，
+    // 每行一个；mihomo 特有的 system 值对 sing-box 无意义，直接丢弃
+    fun parseProxyServerNameserver(text: String): String? {
+        if (!text.contains("proxies:")) return null
+        return try {
+            val yaml = Yaml().loadAs(text, Map::class.java) as Map<*, *>
+            val dns = yaml["dns"] as? Map<*, *>
+            val value = dns?.get("proxy-server-nameserver") ?: yaml["proxy-server-nameserver"]
+            val addresses = when (value) {
+                is List<*> -> value.mapNotNull { it?.toString() }
+                is String -> listOf(value)
+                else -> return null
+            }
+            addresses.map { it.trim() }
+                .filter { it.isNotBlank() && it != "system" }
+                .distinct()
+                .joinToString("\n")
+                .takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            Logs.w(e)
+            null
+        }
     }
 
     fun clashCipher(cipher: String): String {

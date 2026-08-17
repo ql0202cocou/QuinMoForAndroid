@@ -73,7 +73,7 @@
     <string name="protocol">协议</string>
     <string name="proxy_core">核心</string>
     <string name="proxy_server_nameserver">代理服务器域名服务器</string>
-    <string name="proxy_server_nameserver_sum">用于解析此分组节点服务器域名的 DNS，如 udp://223.5.5.5</string>
+    <string name="proxy_server_nameserver_sum">用于解析此分组节点服务器域名的 DNS，如 udp://223.5.5.5。每行一个地址，多个地址按顺序依次尝试。</string>
     <string name="protocol_param">协议参数</string>
     <string name="obfs">混淆</string>
     <string name="obfs_param">混淆参数</string>
