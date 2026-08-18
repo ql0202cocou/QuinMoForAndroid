@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.fmt.v2ray
 
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.ktx.isIpAddress
 import io.nekohasekai.sagernet.ktx.toStringPretty
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import org.json.JSONArray
@@ -28,8 +29,8 @@ fun buildXrayConfig(bean: VMessBean, port: Int): String {
         put("settings", JSONObject().apply {
             put("vnext", JSONArray().apply {
                 put(JSONObject().apply {
-                    put("address", bean.serverAddress)
-                    put("port", bean.serverPort)
+                    put("address", bean.finalAddress)
+                    put("port", bean.finalPort)
                     put("users", JSONArray().apply { put(user) })
                 })
             })
@@ -65,6 +66,9 @@ fun buildXrayConfig(bean: VMessBean, port: Int): String {
 }
 
 private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
+    // 经 mapping 外核只能拨到本地地址，TLS SNI 需要显式兜底
+    val sni = bean.sni.takeIf { it.isNotBlank() }
+        ?: bean.serverAddress.takeIf { it.isNotBlank() && !it.isIpAddress() }
     return JSONObject().apply {
         // transport
         when (bean.type) {
@@ -139,7 +143,7 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
         if (bean.realityPubKey.isNotBlank()) {
             put("security", "reality")
             put("realitySettings", JSONObject().apply {
-                if (bean.sni.isNotBlank()) put("serverName", bean.sni)
+                if (sni != null) put("serverName", sni)
                 put("publicKey", bean.realityPubKey)
                 if (bean.realityShortId.isNotBlank()) put("shortId", bean.realityShortId)
                 fp?.let { put("fingerprint", it) }
@@ -147,7 +151,7 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
         } else if (bean.security == "tls") {
             put("security", "tls")
             put("tlsSettings", JSONObject().apply {
-                if (bean.sni.isNotBlank()) put("serverName", bean.sni)
+                if (sni != null) put("serverName", sni)
                 if (bean.alpn.isNotBlank()) {
                     put("alpn", JSONArray(bean.alpn.listByLineOrComma()))
                 }

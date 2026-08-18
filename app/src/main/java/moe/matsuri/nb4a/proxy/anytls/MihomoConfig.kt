@@ -1,6 +1,7 @@
 package moe.matsuri.nb4a.proxy.anytls
 
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.ktx.isIpAddress
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import org.yaml.snakeyaml.Yaml
 
@@ -10,11 +11,14 @@ fun buildMihomoConfig(bean: AnyTLSBean, port: Int): String {
     val proxy = LinkedHashMap<String, Any?>()
     proxy["name"] = "anytls-out"
     proxy["type"] = "anytls"
-    proxy["server"] = bean.serverAddress
-    proxy["port"] = bean.serverPort
+    proxy["server"] = bean.finalAddress
+    proxy["port"] = bean.finalPort
     proxy["password"] = bean.password
     proxy["udp"] = true
-    if (bean.sni.isNotBlank()) proxy["sni"] = bean.sni
+    // 经 mapping 外核只能拨到本地地址，TLS SNI 需要显式兜底
+    val sni = bean.sni.takeIf { it.isNotBlank() }
+        ?: bean.serverAddress.takeIf { it.isNotBlank() && !it.isIpAddress() }
+    if (sni != null) proxy["sni"] = sni
     if (bean.alpn.isNotBlank()) proxy["alpn"] = bean.alpn.listByLineOrComma()
     if (bean.allowInsecure || DataStore.globalAllowInsecure) proxy["skip-cert-verify"] = true
     if (bean.utlsFingerprint.isNotBlank()) proxy["client-fingerprint"] = bean.utlsFingerprint
