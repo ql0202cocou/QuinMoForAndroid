@@ -17,6 +17,7 @@ jniLibs/
 .idea/deploymentTargetDropDown.xml
 /nkmr
 .kotlin/
+/log/
 
 # submodules
 /external
