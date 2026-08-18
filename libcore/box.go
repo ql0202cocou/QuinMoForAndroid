@@ -93,6 +93,12 @@ func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *Box
 
 	// create box context
 	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel unless we hand the context off to a BoxInstance; covers every error return.
+	defer func() {
+		if b == nil {
+			cancel()
+		}
+	}()
 	ctx = box.Context(ctx,
 		nekoboxAndroidInboundRegistry(), nekoboxAndroidOutboundRegistry(), nekoboxAndroidEndpointRegistry(),
 		nekoboxAndroidDNSTransportRegistry(localTransport), nekoboxAndroidServiceRegistry(),
@@ -114,7 +120,6 @@ func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *Box
 		PlatformLogWriter: boxPlatformLogWriter,
 	})
 	if err != nil {
-		cancel()
 		return nil, fmt.Errorf("create service: %v", err)
 	}
 
