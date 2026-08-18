@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 // Builds an Xray-core client config for a VMess/VLESS profile:
 // a local socks inbound chained from sing-box, and the profile as outbound.
-// NOTE: ECH and newer REALITY fields (e.g. mldsa65Verify) are not mapped yet.
+// NOTE: ECH is not mapped yet.
 fun buildXrayConfig(bean: VMessBean, port: Int): String {
     val user = JSONObject().apply {
         put("id", bean.uuid)
@@ -146,6 +146,10 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
                 if (sni != null) put("serverName", sni)
                 put("publicKey", bean.realityPubKey)
                 if (bean.realityShortId.isNotBlank()) put("shortId", bean.realityShortId)
+                // post-quantum REALITY; Xray-only, sing-box 1.13 does not support it
+                if (bean.realityMldsa65Verify.isNotBlank()) {
+                    put("mldsa65Verify", bean.realityMldsa65Verify)
+                }
                 fp?.let { put("fingerprint", it) }
             })
         } else if (bean.security == "tls") {

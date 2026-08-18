@@ -185,6 +185,9 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
             url.queryParameter("sid")?.let {
                 realityShortId = it
             }
+            (url.queryParameter("pqv") ?: url.queryParameter("mldsa65Verify"))?.let {
+                realityMldsa65Verify = it
+            }
         }
     }
 
@@ -501,6 +504,9 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
                     builder.setQueryParameter("security", "reality")
                     builder.addQueryParameter("pbk", realityPubKey)
                     builder.addQueryParameter("sid", realityShortId)
+                    if (realityMldsa65Verify.isNotBlank()) {
+                        builder.addQueryParameter("pqv", realityMldsa65Verify)
+                    }
                 }
             }
         }

@@ -40,6 +40,9 @@ public abstract class StandardV2RayBean extends AbstractBean {
 
     public String realityShortId;
 
+    // Xray-only: sing-box 1.13 has no ML-DSA-65 REALITY support
+    public String realityMldsa65Verify;
+
 
     // --------------------------------------- //
 
@@ -100,6 +103,7 @@ public abstract class StandardV2RayBean extends AbstractBean {
 
         if (realityPubKey == null) realityPubKey = "";
         if (realityShortId == null) realityShortId = "";
+        if (realityMldsa65Verify == null) realityMldsa65Verify = "";
 
         if (enableECH == null) enableECH = false;
         if (JavaUtil.isNullOrBlank(echConfig)) echConfig = "";
@@ -112,7 +116,7 @@ public abstract class StandardV2RayBean extends AbstractBean {
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(4);
+        output.writeInt(5);
         super.serialize(output);
         output.writeString(uuid);
         output.writeString(encryption);
@@ -165,6 +169,8 @@ public abstract class StandardV2RayBean extends AbstractBean {
         output.writeBoolean(muxPadding);
         output.writeInt(muxType);
         output.writeInt(muxConcurrency);
+
+        output.writeString(realityMldsa65Verify);
     }
 
     @Override
@@ -255,6 +261,10 @@ public abstract class StandardV2RayBean extends AbstractBean {
             muxPadding = input.readBoolean();
             muxType = input.readInt();
             muxConcurrency = input.readInt();
+        }
+
+        if (version >= 5) {
+            realityMldsa65Verify = input.readString();
         }
     }
 

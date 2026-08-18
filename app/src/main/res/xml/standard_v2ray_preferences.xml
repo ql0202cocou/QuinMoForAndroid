@@ -149,6 +149,11 @@
             app:key="realityShortId"
             app:title="Reality ShortId"
             app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_vpn_key_24"
+            app:key="realityMldsa65Verify"
+            app:summary="ML-DSA-65 (post-quantum). Xray core only."
+            app:title="Reality mldsa65Verify" />
     </PreferenceCategory>
 
     <PreferenceCategory
