@@ -271,7 +271,11 @@ fun buildConfig(
             profileList.forEachIndexed { index, proxyEntity ->
                 val bean = proxyEntity.requireBean()
 
+                // only this group's own nodes: resolveChain() also pulls in the group's front/
+                // landing proxy and any cross-group chain member, whose domains this group's
+                // (often private, split-horizon) nameserver has no business being asked about
                 if (groupNameservers.isNotEmpty() &&
+                    proxyEntity.groupId == proxy.groupId &&
                     bean.serverAddress.isNotBlank() && !bean.serverAddress.isIpAddress()
                 ) {
                     groupNsDomains += bean.serverAddress
