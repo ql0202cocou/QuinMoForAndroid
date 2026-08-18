@@ -1,0 +1,54 @@
+name: Build APK
+on:
+  workflow_call:
+    inputs:
+      gradle-task:
+        description: "Gradle assemble task to run"
+        required: true
+        type: string
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download LibCore
+        uses: actions/download-artifact@v4
+        with:
+          name: libcore-aar
+          path: app/libs
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle
+          key: gradle-oss-${{ hashFiles('**/*.gradle.kts') }}
+      - name: Plugin cores cache
+        uses: actions/cache@v4
+        with:
+          path: app/executableSo
+          key: plugins-${{ hashFiles('buildScript/lib/plugins.sh') }}
+      - name: Install SDK 36
+        # Lives here rather than in buildScript/ so it stays off the F-Droid prebuild path.
+        run: |
+          if [ ! -d "$ANDROID_HOME/platforms/android-36" ] || [ ! -d "$ANDROID_HOME/build-tools/36.0.0" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+              "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          fi
+      - name: Gradle Build
+        env:
+          BUILD_PLUGIN: none
+        run: |
+          echo "sdk.dir=${ANDROID_HOME}" > local.properties
+          echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+          export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
+          ./run init action gradle
+          ./gradlew ${{ inputs.gradle-task }}
+          APK=$(find app/build/outputs/apk -name '*arm64-v8a*.apk')
+          APK=$(dirname $APK)
+          echo "APK=$APK" >> $GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        with:
+          name: APKs
+          path: ${{ env.APK }}
