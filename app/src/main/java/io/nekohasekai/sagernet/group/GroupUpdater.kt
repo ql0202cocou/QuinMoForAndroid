@@ -15,6 +15,7 @@ import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.isTLS
 import io.nekohasekai.sagernet.ktx.*
 import kotlinx.coroutines.*
+import libcore.Libcore
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.*
@@ -37,7 +38,7 @@ abstract class GroupUpdater {
     }
 
     protected suspend fun forceResolve(
-        profiles: List<AbstractBean>, groupId: Long?
+        profiles: List<AbstractBean>, groupId: Long?, groupNameserver: String? = null
     ) {
         val ipv6Mode = DataStore.ipv6Mode
         val lookupPool = newFixedThreadPoolContext(5, "DNS Lookup")
@@ -70,8 +71,10 @@ abstract class GroupUpdater {
                             .getAllByName(profile.serverAddress)
                             .filterNotNull()
                     } else {
+                        // 分组指定了节点解析 DNS 时优先使用，失败回退系统 DNS
                         // System DNS is enough (when VPN connected, it uses v2ray-core)
-                        InetAddress.getAllByName(profile.serverAddress).filterNotNull()
+                        lookupViaNameserver(groupNameserver, profile.serverAddress)
+                            ?: InetAddress.getAllByName(profile.serverAddress).filterNotNull()
                     }
                     if (results.isEmpty()) error("empty response")
                     rewriteAddress(profile, results, ipv6First)
@@ -87,6 +90,22 @@ abstract class GroupUpdater {
 
         lookupJobs.joinAll()
         lookupPool.close()
+    }
+
+    // 经分组 nameserver（第一个可用地址）解析，失败返回 null 走系统 DNS
+    private fun lookupViaNameserver(nameserver: String?, domain: String): List<InetAddress>? {
+        val server = nameserver
+            ?.lineSequence()?.map { it.trim() }
+            ?.firstOrNull { it.isNotBlank() && !it.startsWith("#") && it != "local" }
+            ?: return null
+        return try {
+            Libcore.lookupHost(server, domain).lineSequence()
+                .mapNotNull { ip -> runCatching { InetAddress.getByName(ip.trim()) }.getOrNull() }
+                .toList().takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            Logs.d("Lookup $domain via $server failed: ${e.readableMessage}")
+            null
+        }
     }
 
     protected fun rewriteAddress(

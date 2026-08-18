@@ -91,6 +91,11 @@ object RawUpdater : GroupUpdater() {
             }
         }
 
+        // 订阅下发的节点解析 DNS，自动写入分组设置（在 forceResolve 之前生效）
+        subscriptionText?.let { parseProxyServerNameserver(it) }?.let {
+            proxyGroup.proxyServerNameserver = it
+        }
+
         val proxiesMap = LinkedHashMap<String, AbstractBean>()
         for (proxy in proxies) {
             var index = 0
@@ -106,7 +111,9 @@ object RawUpdater : GroupUpdater() {
         }
         proxies = proxiesMap.values.toList()
 
-        if (subscription.forceResolve) forceResolve(proxies, proxyGroup.id)
+        if (subscription.forceResolve) {
+            forceResolve(proxies, proxyGroup.id, proxyGroup.proxyServerNameserver)
+        }
 
         val exists = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
         val duplicate = ArrayList<String>()
@@ -219,12 +226,6 @@ object RawUpdater : GroupUpdater() {
         }
 
         subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
-
-        // 订阅下发的节点解析 DNS，自动写入分组设置
-        subscriptionText?.let { parseProxyServerNameserver(it) }?.let {
-            proxyGroup.proxyServerNameserver = it
-        }
-
         SagerDatabase.groupDao.updateGroup(proxyGroup)
         finishUpdate(proxyGroup)
 
