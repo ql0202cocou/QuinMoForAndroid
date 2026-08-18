@@ -78,6 +78,36 @@ Full build from a clean checkout:
 - Release signing: the keystore `release.keystore` (alias `ql0202cocou`) is **not committed** — it lives locally and is gitignored. Passwords go in `local.properties` (`KEYSTORE_PASS`, `ALIAS_NAME`, `ALIAS_PASS`) or the base64-encoded `LOCAL_PROPERTIES` env var. In CI the workflows decode `secrets.KEYSTORE_BASE64` into `release.keystore` before building. Without credentials, release builds are unsigned.
 - Env var `nkmr_minify=0` disables minify/resource-shrinking for release builds.
 
+## External core config mapping
+
+Each bundled external core has a hand-written config builder, and **any bean field it does not
+explicitly map is silently dropped** — the profile still starts, the option just never applies. This
+is the most common source of "works on sing-box, broken on the plugin" reports.
+
+| Core | Builder | Covers |
+|---|---|---|
+| Xray | `fmt/v2ray/XrayConfig.kt` | VMess / VLESS |
+| mihomo | `moe/matsuri/nb4a/proxy/anytls/MihomoConfig.kt` | AnyTLS only — it never sees VLESS/REALITY |
+
+When adding a bean field, map it in the sing-box builder **and** the relevant external-core builder,
+or record the gap. Known gaps as of 1.6.6: `certificates` is unmapped in `MihomoConfig`; ECH is
+unmapped in `XrayConfig`.
+
+Core capability differs and is checkable without hunting docs — read it out of the shipped binary:
+
+```bash
+strings -a app/executableSo/arm64-v8a/libxray.so  | grep -i mldsa65
+strings -a app/executableSo/arm64-v8a/libmihomo.so | grep -oE 'proxy:"[a-z0-9-]+,omitempty"' | sort -u
+```
+
+mihomo option keys surface as Go struct tags (`proxy:"ech-opts,omitempty"`). This is how the
+`mldsa65Verify` support matrix was established: present in `libxray.so`, absent from vendored
+sing-box 1.13.18 — hence Xray-only, and labelled as such in the profile editor.
+
+The external core dials `127.0.0.1` (the sing-box mapping inbound), so `bean.finalAddress` is not the
+real host. Both builders already fall back to `bean.serverAddress` when `bean.sni` is blank — preserve
+that when adding TLS options, or the core will send `127.0.0.1` as the SNI.
+
 ## Code style guidelines
 
 - Kotlin follows the official code style (`kotlin.code.style=official` in `gradle.properties`). Match the surrounding file: heavy use of extension functions (`ktx/`), `DataStore` for preferences, coroutines for async.
@@ -89,6 +119,12 @@ Full build from a clean checkout:
   KDoc there explains why. A regression here silently discards user input.
 - Use `@RequiresApi`, not `@TargetApi` (lint `UseRequiresApi`), and prefer the `androidx.core` KTX extensions
   over their platform equivalents (lint `UseKtx`) — both are errors under `warningsAsErrors`.
+- Beans hand-roll Kryo serialization with a leading version int (`StandardV2RayBean.serialize`). To add
+  a field: bump that int, append the write at the **end** of the stream, and guard the read with
+  `if (version >= N)`. Old records then skip it and get their default from `initializeDefaultValues()`,
+  which `KryoConverters.deserialize` calls outside its try/catch — so the field is `""`, never null.
+  Downgrades are safe too: each bean deserializes from its own `byte[]`, so trailing bytes are ignored.
+  Getting this wrong loses every profile of that type, and there is no test to catch it.
 - Go side: standard `gofmt` style; Android-only files use the `//go:build android` convention via the `_android.go` suffix pattern (e.g. `assets_android.go` / `assets_other.go`).
 
 ## Testing instructions
@@ -118,8 +154,28 @@ All releases are manual via GitHub Actions (`workflow_dispatch`):
 - `.github/workflows/build-apk.yml` — reusable (`workflow_call`) APK build, parameterised by `gradle-task`. Holds the runner setup both release and preview need: caches, the SDK 36 install, keystore decode, `./run init action gradle`, and the APK upload. Callers pass `secrets: inherit`.
 - `.github/workflows/release.yml` — jobs: (1) `libcore`; (2) `build` calls `build-apk.yml` with `app:assembleOssRelease`; (3) `publish` pushes the APKs to a GitHub release with `ghr` (skipped when input `publish=y`).
 - `.github/workflows/preview.yml` — same shape, calls `build-apk.yml` with `app:assemblePreviewRelease` (uses `PRE_VERSION_NAME` from `nb4a.properties`, APKs named `NekoBox-pre-*.apk`).
-- F-Droid builds use `buildScript/fdroid/prebuild.sh` (just builds the core) plus the `fdroid` flavor.
+- F-Droid builds use `buildScript/fdroid/prebuild.sh` plus the `fdroid` flavor. That script runs
+  `./run init action gradle` **and** `buildScript/lib/core.sh`, so anything added to the CI prep script
+  also runs on F-Droid's builders — keep runner-specific setup in the workflows instead.
 - The Google Play version has been controlled by a third party since May 2024 and is not open source — do not treat it as a distribution target (see `README.md`).
+
+Cutting a release:
+
+1. Bump `nb4a.properties` only (`VERSION_NAME`, `PRE_VERSION_NAME`, `VERSION_CODE`); commit as
+   `chore: 发布 X.Y.Z` touching nothing else, then `git tag X.Y.Z` — lightweight tag, bare version
+   number, on that commit. Push both.
+2. **No workflow has a push or pull_request trigger**, so pushing validates nothing. Run
+   `gh workflow run "Preview Build"` to exercise `main` through the same `build-apk.yml`, or
+   `gh workflow run "Release Build" -f tag=X.Y.Z -f publish=y` to run the release pipeline without
+   creating a GitHub Release. Omit `publish` when you actually want to publish.
+3. Verify the artifact, not just the green check:
+   `aapt2 dump badging <apk>` (versionName / versionCode == `VERSION_CODE` × 5),
+   `apksigner verify --print-certs <apk>` (SHA-256 must match previous releases or updates are
+   rejected as a signature mismatch), and `llvm-readelf -l` on the bundled `.so` (LOAD align `0x4000`).
+
+CI green means it compiled and packaged. It says nothing about runtime behaviour — external-core
+config mapping, bean deserialization of existing profiles, and anything touching the VPN need a
+device.
 
 ## Security considerations
 
@@ -128,3 +184,30 @@ All releases are manual via GitHub Actions (`workflow_dispatch`):
 - The app defines a signature-level permission `${applicationId}.SERVICE` guarding its IPC/AIDL surface — keep `protectionLevel="signature"` when touching the manifest.
 - `VpnService` traffic, plugin binaries (`GuardedProcessPool`) and user-supplied configs/subscriptions are trust boundaries: validate parsed input in `fmt/` parsers and don't log credentials/keys.
 - geoip/geosite databases are downloaded from GitHub at build time; builds are therefore network-dependent and sensitive to upstream release changes. The gomobile toolchain and all core Go sources are vendored under `libcore/` and no longer fetched at build time.
+
+## Open issues (as of 1.6.6, 2026-08-18)
+
+Carried into the next session; none of these are fixed.
+
+- **Xray plugin fails VLESS+REALITY where sing-box succeeds** — server closes the connection during the
+  handshake. Undiagnosed. An SNI-fallback theory was investigated and **disproved** (`XrayConfig.kt`
+  already falls back to `bean.serverAddress`). Next step needs the device log's Xray handshake error,
+  or whether that profile's SNI / Fingerprint / ShortId fields are empty.
+- **`pqv` share-link parameter is a guess.** The REALITY `mldsa65Verify` field is exported as `pqv`,
+  inferred from the `pbk`/`sid`/`fp` abbreviation convention with no authoritative source. The parser
+  also accepts the full `mldsa65Verify` name. Confirm against a real post-quantum REALITY link.
+- **`certificates` unmapped for mihomo** — see External core config mapping. `libmihomo.so` exposes
+  `proxy:"certificate"` / `proxy:"cert"` but no `ca-str`, so it may only accept a file path while the
+  bean stores inline PEM. It also carries a runtime guard string,
+  `disallow using AnyTLS without certificates/shadow-tls/res-tls/jls/allow-insecure config`, which may
+  reject startup outright rather than failing the handshake.
+- **`libcore.yml` cache key is over-broad** — it hashes all of `buildScript/**`, but only `run`,
+  `buildScript/lib/core*` and `buildScript/init/env*.sh` affect the core. A routine `plugins.sh`
+  version bump therefore forces a full 10–15 min gomobile rebuild.
+- **`Router.Exchange` ignores `fallback` on NXDOMAIN.** The neko `fallback` DNS-rule patch only
+  continues on transport errors. `Router.Lookup` is unaffected because `client.Lookup` converts any
+  non-success Rcode into an error, and node dialing goes through `Lookup` — so this is latent, and
+  only reachable by app DNS queries proxied through the tunnel.
+- **1.6.5 and 1.6.6 shipped without device verification** — 16 KB page alignment, the predictive-back
+  migration, targetSdk 36 behaviour, and both external-core field mappings are verified by build, lint
+  and binary inspection only.
