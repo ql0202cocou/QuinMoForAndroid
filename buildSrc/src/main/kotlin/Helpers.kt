@@ -41,11 +41,11 @@ fun Project.requireLocalProperties(): Properties {
 
 fun Project.setupCommon() {
     android.apply {
-        buildToolsVersion = "35.0.1"
-        compileSdk = 35
+        buildToolsVersion = "36.0.0"
+        compileSdk = 36
         defaultConfig {
             minSdk = 21
-            targetSdk = 35
+            targetSdk = 36
         }
         buildTypes {
             getByName("release") {
@@ -178,7 +178,6 @@ fun Project.setupApp() {
         productFlavors {
             create("oss")
             create("fdroid")
-            create("play")
             create("preview") {
                 buildConfigField(
                     "String",
