@@ -69,6 +69,8 @@ class ConfigEditActivity : ThemedActivity() {
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
 
+        guardUnsavedChanges({ dirty }) { UnsavedChangesDialogFragment().apply { key() } }
+
         binding.editor.apply {
             language = JsonLanguage()
             setHorizontallyScrolling(true)
@@ -163,16 +165,6 @@ class ConfigEditActivity : ThemedActivity() {
             }
             finish()
         }
-    }
-
-    override fun onBackPressed() {
-        if (dirty) UnsavedChangesDialogFragment().apply { key() }
-            .show(supportFragmentManager, null) else super.onBackPressed()
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        if (!super.onSupportNavigateUp()) finish()
-        return true
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

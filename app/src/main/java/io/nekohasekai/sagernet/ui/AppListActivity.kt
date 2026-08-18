@@ -302,11 +302,6 @@ class AppListActivity : ThemedActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-    override fun onSupportNavigateUp(): Boolean {
-        if (!super.onSupportNavigateUp()) finish()
-        return true
-    }
-
     override fun supportNavigateUpTo(upIntent: Intent) =
         super.supportNavigateUpTo(upIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
 

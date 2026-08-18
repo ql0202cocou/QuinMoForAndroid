@@ -222,6 +222,8 @@ class RouteSettingsActivity(
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
 
+        guardUnsavedChanges(::needSave) { UnsavedChangesDialogFragment().apply { key() } }
+
         if (savedInstanceState == null) {
             val editingId = intent.getLongExtra(EXTRA_ROUTE_ID, 0L)
             DataStore.editingId = editingId
@@ -293,17 +295,6 @@ class RouteSettingsActivity(
     }
 
     override fun onOptionsItemSelected(item: MenuItem) = child.onOptionsItemSelected(item)
-
-    override fun onBackPressed() {
-        if (needSave()) {
-            UnsavedChangesDialogFragment().apply { key() }.show(supportFragmentManager, null)
-        } else super.onBackPressed()
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        if (!super.onSupportNavigateUp()) finish()
-        return true
-    }
 
     override fun onDestroy() {
         DataStore.profileCacheStore.unregisterChangeListener(this)

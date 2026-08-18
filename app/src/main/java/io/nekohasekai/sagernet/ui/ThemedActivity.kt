@@ -4,15 +4,18 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.widget.TextView
+import androidx.activity.addCallback
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import androidx.fragment.app.DialogFragment
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.snackbar.Snackbar
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.ktx.showAllowingStateLoss
 import io.nekohasekai.sagernet.utils.Theme
 
 abstract class ThemedActivity : AppCompatActivity {
@@ -73,5 +76,20 @@ abstract class ThemedActivity : AppCompatActivity {
     }
 
     internal open fun snackbarInternal(text: CharSequence): Snackbar = throw NotImplementedError()
+
+    override fun onSupportNavigateUp(): Boolean {
+        if (!super.onSupportNavigateUp()) finish()
+        return true
+    }
+
+    /**
+     * Guard the back gesture when there are unsaved edits. Predictive back routes through
+     * [onBackPressedDispatcher] and skips `onBackPressed()` overrides, so register here instead.
+     */
+    protected fun guardUnsavedChanges(isDirty: () -> Boolean, dialog: () -> DialogFragment) {
+        onBackPressedDispatcher.addCallback(this) {
+            if (isDirty()) dialog().showAllowingStateLoss(supportFragmentManager) else finish()
+        }
+    }
 
 }
