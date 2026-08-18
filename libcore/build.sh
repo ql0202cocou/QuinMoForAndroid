@@ -17,8 +17,11 @@ fi
 export PATH="$GOPATH/bin:$PATH"
 mkdir -p "$BUILD"
 
+# NDK r25's linker defaults to max-page-size=4096, producing a libgojni.so that cannot be
+# dlopen'ed on 16 KB-page devices (Android 15+). Pass it through explicitly until the NDK
+# pin moves to r27+, which defaults to 16 KB.
 export GOBIND=gobind-matsuri
-"$GOPATH"/bin/gomobile-matsuri bind -v -androidapi 21 -target android/arm64,android/amd64 -cache "$(realpath $BUILD)" -trimpath -ldflags='-s -w' -tags='with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' . || exit 1
+"$GOPATH"/bin/gomobile-matsuri bind -v -androidapi 21 -target android/arm64,android/amd64 -cache "$(realpath $BUILD)" -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -tags='with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' . || exit 1
 rm -r libcore-sources.jar
 
 proj=../app/libs
