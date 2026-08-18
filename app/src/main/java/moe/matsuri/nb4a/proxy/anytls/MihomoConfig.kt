@@ -22,6 +22,13 @@ fun buildMihomoConfig(bean: AnyTLSBean, port: Int): String {
     if (bean.alpn.isNotBlank()) proxy["alpn"] = bean.alpn.listByLineOrComma()
     if (bean.allowInsecure || DataStore.globalAllowInsecure) proxy["skip-cert-verify"] = true
     if (bean.utlsFingerprint.isNotBlank()) proxy["client-fingerprint"] = bean.utlsFingerprint
+    // mihomo outbound.ECHOptions{enable, config}; sing-box gets the same value via tls.ech.config
+    if (bean.echConfig.isNotBlank()) {
+        proxy["ech-opts"] = linkedMapOf<String, Any?>(
+            "enable" to true,
+            "config" to bean.echConfig,
+        )
+    }
 
     val listener = LinkedHashMap<String, Any?>()
     listener["name"] = "socks-in"
