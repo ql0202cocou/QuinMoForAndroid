@@ -50,9 +50,9 @@ fun Context.getDrawableByName(name: String?): Drawable? {
 fun Long.toBytesString(): String {
     val size = this.toDouble()
     return when {
-        this >= GB -> String.format("%.2f GiB", size / GB)
-        this >= MB -> String.format("%.2f MiB", size / MB)
-        this >= KB -> String.format("%.2f KiB", size / KB)
+        this >= GB -> String.format(java.util.Locale.US, "%.2f GiB", size / GB)
+        this >= MB -> String.format(java.util.Locale.US, "%.2f MiB", size / MB)
+        this >= KB -> String.format(java.util.Locale.US, "%.2f KiB", size / KB)
         else -> "$this Bytes"
     }
 }

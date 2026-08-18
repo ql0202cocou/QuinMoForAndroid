@@ -34,4 +34,17 @@
 
     <issue id="InvalidPackage" severity="ignore" />
     <issue id="TrustAllX509TrustManager" severity="ignore" />
+
+    <!-- 依赖刻意钉版（见 AGENTS.md 依赖封顶说明），不报新版本提醒 -->
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="GradleDependency" severity="ignore" />
+    <!-- 分包代理与插件发现需要全量包可见性 -->
+    <issue id="QueryAllPackagesPermission" severity="ignore" />
+    <!-- 应用级签名权限是有意为之，勿改命名（AGENTS.md 安全节） -->
+    <issue id="PermissionNamingConvention" severity="ignore" />
+    <!-- 图标/矢量资源不重绘 -->
+    <issue id="VectorPath" severity="ignore" />
+    <issue id="IconLauncherShape" severity="ignore" />
+    <!-- 主题背景属设计 -->
+    <issue id="Overdraw" severity="ignore" />
 </lint>
