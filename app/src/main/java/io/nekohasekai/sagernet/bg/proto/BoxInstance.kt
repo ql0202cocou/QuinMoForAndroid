@@ -115,7 +115,8 @@ abstract class BoxInstance(
         cacheDir.mkdirs()
 
         fun writeCacheFile(prefix: String, ext: String, content: String): File {
-            val file = File(cacheDir, prefix + "_" + SystemClock.elapsedRealtime() + "." + ext)
+            // nanos: concurrent TestInstances can call this within the same millisecond
+            val file = File(cacheDir, prefix + "_" + SystemClock.elapsedRealtimeNanos() + "." + ext)
             file.writeText(content)
             cacheFiles.add(file)
             return file

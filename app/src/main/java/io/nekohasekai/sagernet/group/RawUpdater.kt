@@ -728,13 +728,15 @@ object RawUpdater : GroupUpdater() {
     }
 
     // mihomo/clash 订阅里 dns.proxy-server-nameserver（或顶层同名字段）的地址列表，
-    // 每行一个；mihomo 特有的 system 值对 sing-box 无意义，直接丢弃
+    // 每行一个；缺省时按 mihomo 语义回退 dns.nameserver（节点域名用它解析）。
+    // mihomo 特有的 system 值对 sing-box 无意义，直接丢弃
     fun parseProxyServerNameserver(text: String): String? {
         if (!text.contains("proxies:")) return null
         return try {
             val yaml = Yaml().loadAs(text, Map::class.java) as Map<*, *>
             val dns = yaml["dns"] as? Map<*, *>
             val value = dns?.get("proxy-server-nameserver") ?: yaml["proxy-server-nameserver"]
+                ?: dns?.get("nameserver")
             val addresses = when (value) {
                 is List<*> -> value.mapNotNull { it?.toString() }
                 is String -> listOf(value)

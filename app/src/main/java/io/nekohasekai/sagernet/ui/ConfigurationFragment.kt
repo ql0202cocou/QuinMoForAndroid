@@ -66,6 +66,7 @@ import io.nekohasekai.sagernet.ktx.dp2px
 import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.ktx.getColour
 import io.nekohasekai.sagernet.ktx.isIpAddress
+import io.nekohasekai.sagernet.ktx.lookupViaNameserver
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
@@ -721,13 +722,20 @@ class ConfigurationFragment @JvmOverloads constructor(
                         profile.status = 0
                         var address = profile.requireBean().serverAddress
                         if (!address.isIpAddress()) {
-                            try {
-                                SagerNet.underlyingNetwork!!.getAllByName(address).apply {
-                                    if (isNotEmpty()) {
-                                        address = this[0].hostAddress
+                            // 组里配了节点解析 DNS（如 DoH）时优先使用，伪造域名也能解析
+                            val viaGroupNs =
+                                lookupViaNameserver(group.proxyServerNameserver, address)
+                            if (viaGroupNs != null) {
+                                address = viaGroupNs[0].hostAddress
+                            } else {
+                                try {
+                                    SagerNet.underlyingNetwork!!.getAllByName(address).apply {
+                                        if (isNotEmpty()) {
+                                            address = this[0].hostAddress
+                                        }
                                     }
+                                } catch (ignored: UnknownHostException) {
                                 }
-                            } catch (ignored: UnknownHostException) {
                             }
                         }
                         if (!isActive) break

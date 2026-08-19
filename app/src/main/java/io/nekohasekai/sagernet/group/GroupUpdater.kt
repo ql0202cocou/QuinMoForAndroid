@@ -15,7 +15,6 @@ import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.isTLS
 import io.nekohasekai.sagernet.ktx.*
 import kotlinx.coroutines.*
-import libcore.Libcore
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.*
@@ -90,22 +89,6 @@ abstract class GroupUpdater {
 
         lookupJobs.joinAll()
         lookupPool.close()
-    }
-
-    // 经分组 nameserver（第一个可用地址）解析，失败返回 null 走系统 DNS
-    private fun lookupViaNameserver(nameserver: String?, domain: String): List<InetAddress>? {
-        val server = nameserver
-            ?.lineSequence()?.map { it.trim() }
-            ?.firstOrNull { it.isNotBlank() && !it.startsWith("#") && it != "local" }
-            ?: return null
-        return try {
-            Libcore.lookupHost(server, domain).lineSequence()
-                .mapNotNull { ip -> runCatching { InetAddress.getByName(ip.trim()) }.getOrNull() }
-                .toList().takeIf { it.isNotEmpty() }
-        } catch (e: Exception) {
-            Logs.d("Lookup $domain via $server failed: ${e.readableMessage}")
-            null
-        }
     }
 
     protected fun rewriteAddress(
