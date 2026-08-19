@@ -350,8 +350,8 @@ object RawUpdater : GroupUpdater() {
 
                                     "flow" -> if (bean is VMessBean && bean.isVLESS) {
                                         (opt.value as? String)?.let {
-                                            if (it.contains("xtls-rprx-vision")) {
-                                                bean.encryption = "xtls-rprx-vision"
+                                            if (it.contains(StandardV2RayBean.FLOW_VISION)) {
+                                                bean.encryption = StandardV2RayBean.FLOW_VISION
                                             }
                                         }
                                     }

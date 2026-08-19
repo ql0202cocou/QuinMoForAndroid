@@ -133,15 +133,12 @@ fun buildConfig(
     val domainListDNSDirectForce = mutableListOf<String>()
     val bypassDNSBeans = hashSetOf<AbstractBean>()
     // per-group nameserver: resolve this group's node server domains with it,
-    // multiple addresses (one per line) are used in order with fallback
-    val groupNameservers = if (forTest) {
-        listOf()
-    } else {
-        group?.proxyServerNameserver?.split("\n")
-            ?.mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
-            ?.distinct()
-            ?: listOf()
-    }
+    // multiple addresses (one per line) are used in order with fallback.
+    // forTest honors it too: a fake node domain may only resolve through it.
+    val groupNameservers = group?.proxyServerNameserver?.split("\n")
+        ?.mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
+        ?.distinct()
+        ?: listOf()
     val groupNsDomains = LinkedHashSet<String>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST
@@ -764,8 +761,9 @@ fun buildConfig(
         }
 
         // per-group nameserver: this group's node server domains resolve via it,
-        // multiple servers are tried in order (neko dns rule fallback)
-        if (!forTest && groupNameservers.isNotEmpty() && groupNsDomains.isNotEmpty()) {
+        // multiple servers are tried in order (neko dns rule fallback).
+        // Kept for forTest too: node domains must resolve or the test cannot dial.
+        if (groupNameservers.isNotEmpty() && groupNsDomains.isNotEmpty()) {
             val groupRules = groupNameservers.mapIndexed { index, address ->
                 val tag = "dns-group-$index"
                 dns.servers.add(DNSServerOptions().apply {

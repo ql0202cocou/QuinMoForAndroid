@@ -268,12 +268,19 @@ public abstract class StandardV2RayBean extends AbstractBean {
         }
     }
 
+    public static final String FLOW_VISION = "xtls-rprx-vision";
+
     public boolean isVLESS() {
         if (this instanceof VMessBean) {
             Integer aid = ((VMessBean) this).alterId;
             return aid != null && aid == -1;
         }
         return false;
+    }
+
+    // for VLESS, `encryption` holds the flow value
+    public boolean isVisionFlow() {
+        return isVLESS() && FLOW_VISION.equals(encryption);
     }
 
 }

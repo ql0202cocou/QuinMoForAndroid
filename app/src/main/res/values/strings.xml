@@ -75,6 +75,10 @@
     <string name="allow_insecure">Allow Insecure</string>
     <string name="allow_insecure_sum">Disable certificate checking. When enabled, this configuration
         is as secure as plaintext</string>
+    <string name="anytls_allow_insecure_sum">Disable certificate checking. When enabled, this
+        configuration is as secure as plaintext. Ignored when a certificate fingerprint is pinned
+        (mihomo core)</string>
+    <string name="certificate_fingerprint">Certificate Fingerprint (SHA-256)</string>
     <string name="traffic" translatable="false">%1$s↑ %2$s↓</string>
     <string name="speed_detail">Proxy： %1$s↑ %2$s↓\nDirect： %3$s↑ %4$s↓</string>
     <string name="speed">%s/s</string>

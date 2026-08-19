@@ -48,6 +48,9 @@ abstract class BoxInstance(
         return pluginPath.getOrPut(name) { PluginManager.init(name)!! }
     }
 
+    // TestInstance overrides this to enable mihomo's Clash API for delay self-test.
+    protected open fun mihomoTestController(): Pair<Int, String>? = null
+
     protected open fun buildConfig() {
         config = buildConfig(profile)
     }
@@ -95,7 +98,10 @@ abstract class BoxInstance(
 
                     is AnyTLSBean -> {
                         initPlugin("mihomo-plugin")
-                        pluginConfigs[port] = profile.type to buildMihomoConfig(bean, port)
+                        val controller = mihomoTestController()
+                        pluginConfigs[port] = profile.type to buildMihomoConfig(
+                            bean, port, controller?.first, controller?.second ?: ""
+                        )
                     }
                 }
             }

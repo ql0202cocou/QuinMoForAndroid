@@ -2,16 +2,23 @@ package moe.matsuri.nb4a.proxy.anytls
 
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.isIpAddress
+import moe.matsuri.nb4a.utils.JavaUtil
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import org.yaml.snakeyaml.Yaml
 import java.security.MessageDigest
 import java.security.cert.CertificateFactory
 
+const val MIHOMO_PROXY_NAME = "anytls-out"
+
 // Builds a mihomo client config for an AnyTLS profile:
 // a local socks listener chained from sing-box, and the profile as proxy.
-fun buildMihomoConfig(bean: AnyTLSBean, port: Int): String {
+// controllerPort/controllerSecret enable the Clash API (external-controller),
+// used by URL test so mihomo measures the delay through the proxy itself.
+fun buildMihomoConfig(
+    bean: AnyTLSBean, port: Int, controllerPort: Int? = null, controllerSecret: String = ""
+): String {
     val proxy = LinkedHashMap<String, Any?>()
-    proxy["name"] = "anytls-out"
+    proxy["name"] = MIHOMO_PROXY_NAME
     proxy["type"] = "anytls"
     proxy["server"] = bean.finalAddress
     proxy["port"] = bean.finalPort
@@ -22,17 +29,14 @@ fun buildMihomoConfig(bean: AnyTLSBean, port: Int): String {
         ?: bean.serverAddress.takeIf { it.isNotBlank() && !it.isIpAddress() }
     if (sni != null) proxy["sni"] = sni
     if (bean.alpn.isNotBlank()) proxy["alpn"] = bean.alpn.listByLineOrComma()
-    // Certificate pinning wins over allowInsecure: mihomo's `fingerprint` is
-    // implemented as InsecureSkipVerify + VerifyConnection, and a leaf hash match
-    // skips name/expiry checks — which already covers the usual self-signed cases
-    // that make users reach for allowInsecure.
-    val certPin = bean.certificateFingerprint.ifBlank {
-        bean.certificates.takeIf { it.isNotBlank() }?.let { certificateSha256(it) } ?: ""
-    }
-    if (certPin.isNotBlank()) {
-        // mihomo has no custom-CA option ("certificate" is the mTLS client cert),
-        // pin the server certificate's SHA-256 instead. Works for the usual
-        // self-signed case; a CA cert only matches if the server sends it in-chain.
+    // mihomo has no custom-CA option ("certificate" is the mTLS client cert), so pin the
+    // server certificate's SHA-256 instead; a CA cert only matches if the server sends it
+    // in-chain. Pinning wins over allowInsecure: mihomo implements `fingerprint` as
+    // InsecureSkipVerify + VerifyConnection, so a leaf hash match already skips the
+    // name/expiry checks that make users reach for allowInsecure.
+    val certPin = bean.certificateFingerprint.takeIf { it.isNotBlank() }
+        ?: bean.certificates.takeIf { it.isNotBlank() }?.let(::certificateSha256)
+    if (certPin != null) {
         proxy["fingerprint"] = certPin
     } else if (bean.allowInsecure || DataStore.globalAllowInsecure) {
         proxy["skip-cert-verify"] = true
@@ -56,9 +60,13 @@ fun buildMihomoConfig(bean: AnyTLSBean, port: Int): String {
     val config = LinkedHashMap<String, Any?>()
     config["log-level"] = if (DataStore.logLevel > 0) "debug" else "warning"
     config["mode"] = "rule"
+    if (controllerPort != null) {
+        config["external-controller"] = "127.0.0.1:$controllerPort"
+        config["secret"] = controllerSecret
+    }
     config["listeners"] = listOf(listener)
     config["proxies"] = listOf(proxy)
-    config["rules"] = listOf("MATCH,anytls-out")
+    config["rules"] = listOf("MATCH,$MIHOMO_PROXY_NAME")
 
     return Yaml().dump(config)
 }
@@ -68,5 +76,5 @@ fun buildMihomoConfig(bean: AnyTLSBean, port: Int): String {
 private fun certificateSha256(pem: String): String? = runCatching {
     val der = CertificateFactory.getInstance("X.509")
         .generateCertificate(pem.byteInputStream()).encoded
-    MessageDigest.getInstance("SHA-256").digest(der).joinToString("") { "%02x".format(it) }
+    JavaUtil.bytesToHex(MessageDigest.getInstance("SHA-256").digest(der))
 }.getOrNull()

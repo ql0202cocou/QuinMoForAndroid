@@ -40,7 +40,7 @@
         <SwitchPreference
             app:icon="@drawable/ic_notification_enhanced_encryption"
             app:key="allowInsecure"
-            app:summary="Ignored when certificate fingerprint pinning is in effect (mihomo core)"
+            app:summary="@string/anytls_allow_insecure_sum"
             app:title="@string/allow_insecure" />
         <EditTextPreference
             app:icon="@drawable/ic_baseline_legend_toggle_24"
@@ -55,7 +55,7 @@
         <EditTextPreference
             app:icon="@drawable/ic_baseline_vpn_key_24"
             app:key="certificateFingerprint"
-            app:title="Certificate Fingerprint (SHA-256)"
+            app:title="@string/certificate_fingerprint"
             app:useSimpleSummaryProvider="true" />
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue=""
@@ -67,7 +67,7 @@
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
-    <PreferenceCategory app:title="ECH">
+    <PreferenceCategory app:title="@string/ech_settings">
         <EditTextPreference
             app:icon="@drawable/ic_baseline_nfc_24"
             app:key="echConfig"
