@@ -735,7 +735,8 @@ object RawUpdater : GroupUpdater() {
         return try {
             val yaml = Yaml().loadAs(text, Map::class.java) as Map<*, *>
             val dns = yaml["dns"] as? Map<*, *>
-            val value = dns?.get("proxy-server-nameserver") ?: yaml["proxy-server-nameserver"]
+            val value = dns?.get("proxy-server-nameserver")
+                ?: yaml["proxy-server-nameserver"]
                 ?: dns?.get("nameserver")
             val addresses = when (value) {
                 is List<*> -> value.mapNotNull { it?.toString() }

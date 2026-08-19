@@ -714,28 +714,27 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
+            // 同组节点常共用一个域名，而下面的解析不带缓存、失败还要等满超时，
+            // 所以按本轮测试缓存结果（失败时缓存域名本身，后面照常报解析失败）
+            val resolvedAddresses = ConcurrentHashMap<String, String>()
             repeat(DataStore.connectionTestConcurrent) {
                 testJobs.add(launch(Dispatchers.IO) {
                     while (isActive) {
                         val profile = profiles.poll() ?: break
 
                         profile.status = 0
-                        var address = profile.requireBean().serverAddress
-                        if (!address.isIpAddress()) {
-                            // 组里配了节点解析 DNS（如 DoH）时优先使用，伪造域名也能解析
-                            val viaGroupNs =
-                                lookupViaNameserver(group.proxyServerNameserver, address)
-                            if (viaGroupNs != null) {
-                                address = viaGroupNs[0].hostAddress
-                            } else {
-                                try {
-                                    SagerNet.underlyingNetwork!!.getAllByName(address).apply {
-                                        if (isNotEmpty()) {
-                                            address = this[0].hostAddress
-                                        }
-                                    }
+                        val domain = profile.requireBean().serverAddress
+                        val address = if (domain.isIpAddress()) domain else {
+                            resolvedAddresses.getOrPut(domain) {
+                                // 组里配了节点解析 DNS（如 DoH）时优先使用，伪造域名也能解析
+                                val results = lookupViaNameserver(
+                                    group.proxyServerNameserver, domain
+                                ) ?: try {
+                                    SagerNet.underlyingNetwork!!.getAllByName(domain).toList()
                                 } catch (ignored: UnknownHostException) {
+                                    emptyList()
                                 }
+                                results.firstOrNull()?.hostAddress ?: domain
                             }
                         }
                         if (!isActive) break

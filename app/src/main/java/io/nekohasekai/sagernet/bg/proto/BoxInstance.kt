@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet.bg.proto
 
-import android.os.SystemClock
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.bg.AbstractInstance
 import io.nekohasekai.sagernet.bg.GuardedProcessPool
@@ -40,6 +39,14 @@ abstract class BoxInstance(
     val externalInstances = hashMapOf<Int, AbstractInstance>()
     open lateinit var processes: GuardedProcessPool
     private var cacheFiles = ArrayList<File>()
+
+    // Concurrent TestInstances share these directories, so let the filesystem
+    // pick the name — a timestamp only makes collisions rarer, not impossible.
+    private fun newCacheFile(prefix: String, ext: String, dir: File): File {
+        dir.mkdirs()
+        return File.createTempFile(prefix + "_", ".$ext", dir).also { cacheFiles.add(it) }
+    }
+
     fun isInitialized(): Boolean {
         return ::config.isInitialized && ::box.isInitialized
     }
@@ -82,12 +89,7 @@ abstract class BoxInstance(
                     is HysteriaBean -> {
                         initPlugin("hysteria-plugin")
                         pluginConfigs[port] = profile.type to bean.buildHysteria1Config(port) {
-                            File(
-                                app.cacheDir, "hysteria_" + SystemClock.elapsedRealtime() + ".ca"
-                            ).apply {
-                                parentFile?.mkdirs()
-                                cacheFiles.add(this)
-                            }
+                            newCacheFile("hysteria", "ca", app.cacheDir)
                         }
                     }
 
@@ -112,14 +114,9 @@ abstract class BoxInstance(
     override fun launch() {
         // TODO move, this is not box
         val cacheDir = File(SagerNet.application.cacheDir, "tmpcfg")
-        cacheDir.mkdirs()
 
         fun writeCacheFile(prefix: String, ext: String, content: String): File {
-            // nanos: concurrent TestInstances can call this within the same millisecond
-            val file = File(cacheDir, prefix + "_" + SystemClock.elapsedRealtimeNanos() + "." + ext)
-            file.writeText(content)
-            cacheFiles.add(file)
-            return file
+            return newCacheFile(prefix, ext, cacheDir).apply { writeText(content) }
         }
 
         for ((chain) in config.externalIndex) {
