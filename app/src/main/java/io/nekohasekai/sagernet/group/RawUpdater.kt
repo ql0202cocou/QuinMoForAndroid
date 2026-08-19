@@ -518,6 +518,10 @@ object RawUpdater : GroupUpdater() {
                                     "skip-cert-verify" -> bean.allowInsecure =
                                         opt.value.toString() == "true"
 
+                                    "certificate" -> bean.certificates = opt.value.toString()
+                                    "fingerprint" -> bean.certificateFingerprint =
+                                        opt.value.toString()
+
                                     "alpn" -> {
                                         val alpn = (opt.value as? (List<String>))
                                         bean.alpn = alpn?.joinToString("\n")

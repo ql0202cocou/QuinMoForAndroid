@@ -28,6 +28,7 @@ public class AnyTLSBean extends AbstractBean {
     public String sni;
     public String alpn;
     public String certificates;
+    public String certificateFingerprint;
     public String utlsFingerprint;
     public Boolean allowInsecure;
     // In sing-box, this seemed can be used with REALITY.
@@ -43,6 +44,7 @@ public class AnyTLSBean extends AbstractBean {
         if (sni == null) sni = "";
         if (alpn == null) alpn = "";
         if (certificates == null) certificates = "";
+        if (certificateFingerprint == null) certificateFingerprint = "";
         if (utlsFingerprint == null) utlsFingerprint = "";
         if (allowInsecure == null) allowInsecure = false;
         if (echConfig == null) echConfig = "";
@@ -50,7 +52,7 @@ public class AnyTLSBean extends AbstractBean {
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(0);
+        output.writeInt(1);
         super.serialize(output);
         output.writeString(password);
         output.writeString(sni);
@@ -59,6 +61,7 @@ public class AnyTLSBean extends AbstractBean {
         output.writeString(utlsFingerprint);
         output.writeBoolean(allowInsecure);
         output.writeString(echConfig);
+        output.writeString(certificateFingerprint);
     }
 
     @Override
@@ -72,6 +75,9 @@ public class AnyTLSBean extends AbstractBean {
         utlsFingerprint = input.readString();
         allowInsecure = input.readBoolean();
         echConfig = input.readString();
+        if (version >= 1) {
+            certificateFingerprint = input.readString();
+        }
     }
 
     @NotNull
