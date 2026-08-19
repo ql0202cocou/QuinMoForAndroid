@@ -36,8 +36,10 @@ fun buildXrayConfig(bean: VMessBean, port: Int): String {
             })
         })
         put("streamSettings", buildXrayStreamSettings(bean))
-        // xudp rides on xray mux; packetaddr is not supported by xray
-        if (bean.enableMux || bean.packetEncoding == 2) {
+        // xudp rides on xray mux; packetaddr is not supported by xray.
+        // vision flow doesn't support mux; without mux VLESS carries UDP natively.
+        val isVision = bean.isVLESS && bean.encryption == "xtls-rprx-vision"
+        if (!isVision && (bean.enableMux || bean.packetEncoding == 2)) {
             put("mux", JSONObject().apply {
                 put("enabled", true)
                 put("concurrency", if (bean.muxConcurrency > 0) bean.muxConcurrency else 8)
