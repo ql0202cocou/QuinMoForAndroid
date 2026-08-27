@@ -26,6 +26,7 @@ import moe.matsuri.nb4a.net.LocalResolverImpl
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
 import moe.matsuri.nb4a.proxy.anytls.buildMihomoConfig
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 abstract class BoxInstance(
     val profile: ProxyEntity
@@ -122,7 +123,6 @@ abstract class BoxInstance(
         for ((chain) in config.externalIndex) {
             chain.entries.forEachIndexed { index, (port, profile) ->
                 val bean = profile.requireBean()
-                val needChain = index != chain.size - 1
                 val (profileType, config) = pluginConfigs[port] ?: (0 to "")
 
                 when {
@@ -219,17 +219,25 @@ abstract class BoxInstance(
         box.start()
     }
 
+    private val closed = AtomicBoolean(false)
+
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+
         for (instance in externalInstances.values) {
             runCatching {
                 instance.close()
             }
         }
 
-        cacheFiles.removeAll { it.delete(); true }
-
+        // Stop the plugin processes before deleting their config files:
+        // GuardedProcessPool.close only schedules cancelAndJoin on the given
+        // scope, so a still-alive guard could otherwise restart a plugin whose
+        // config file is already gone.
         if (::processes.isInitialized) processes.close(GlobalScope + Dispatchers.IO)
+
+        cacheFiles.removeAll { it.delete(); true }
 
         if (::box.isInitialized) {
             box.close()

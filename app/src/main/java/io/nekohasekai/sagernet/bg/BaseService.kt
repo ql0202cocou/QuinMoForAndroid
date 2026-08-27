@@ -354,7 +354,7 @@ class BaseService {
                 try {
                     data.notification = createNotification(ServiceNotification.genTitle(profile))
 
-                    Executable.killAll()    // clean up old processes
+                    onIoDispatcher { Executable.killAll() }    // clean up old processes (/proc IO off the main thread)
                     preInit()
                     proxy.init()
                     DataStore.currentProfile = profile.id

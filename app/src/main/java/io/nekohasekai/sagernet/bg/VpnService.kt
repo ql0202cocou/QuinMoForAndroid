@@ -16,6 +16,7 @@ import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.VpnRequestActivity
 import io.nekohasekai.sagernet.utils.Subnet
+import java.io.IOException
 import android.net.VpnService as BaseVpnService
 
 class VpnService : BaseVpnService(),
@@ -52,7 +53,13 @@ class VpnService : BaseVpnService(),
 
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun killProcesses() {
-        conn?.close()
+        // ParcelFileDescriptor.close throws IOException; don't let it escape
+        // and skip the rest of the cleanup (proxy, state, stopSelf).
+        try {
+            conn?.close()
+        } catch (e: IOException) {
+            Logs.w(e)
+        }
         conn = null
         super.killProcesses()
     }

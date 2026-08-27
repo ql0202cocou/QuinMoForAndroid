@@ -12,6 +12,7 @@ import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.ktx.tryResume
 import io.nekohasekai.sagernet.ktx.tryResumeWithException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import libcore.Libcore
 import moe.matsuri.nb4a.net.LocalResolverImpl
 import moe.matsuri.nb4a.proxy.anytls.MIHOMO_PROXY_NAME
@@ -22,7 +23,7 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.Continuation
 
 class TestInstance(profile: ProxyEntity, val link: String, private val timeout: Int) :
     BoxInstance(profile) {
@@ -44,37 +45,52 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
     override fun mihomoTestController(): Pair<Int, String>? = mihomoController
 
     suspend fun doTest(): Int {
-        return suspendCoroutine { c ->
+        return suspendCancellableCoroutine { c ->
+            // CancellableContinuation hides the ktx tryResume extensions behind
+            // its internal members; view it as a plain Continuation instead.
+            val cont = c as Continuation<Int>
             processes = GuardedProcessPool {
                 Logs.w(it)
-                c.tryResumeWithException(it)
+                cont.tryResumeWithException(it)
+            }
+            c.invokeOnCancellation {
+                // The test below runs on GlobalScope and outlives the caller;
+                // close the instance so its box and plugin processes don't
+                // linger after the caller gave up. close() is idempotent.
+                runCatching { close() }
             }
             runOnDefaultDispatcher {
-                use {
-                    try {
-                        init()
-                        launch()
-                        val controller = mihomoController
-                        if (controller != null) {
-                            try {
-                                c.tryResume(mihomoDelay(controller))
-                            } catch (e: Exception) {
-                                // mihomo collapses every dial failure into one opaque
-                                // message; re-test through the same tunnel via sing-box,
-                                // whose errors name the actual cause.
-                                Logs.w("mihomo delay test failed, retry via sing-box: ${e.message}")
-                                c.tryResume(Libcore.urlTest(box, link, timeout))
+                try {
+                    use {
+                        try {
+                            init()
+                            launch()
+                            val controller = mihomoController
+                            if (controller != null) {
+                                try {
+                                    cont.tryResume(mihomoDelay(controller))
+                                } catch (e: Exception) {
+                                    // mihomo collapses every dial failure into one opaque
+                                    // message; re-test through the same tunnel via sing-box,
+                                    // whose errors name the actual cause.
+                                    Logs.w("mihomo delay test failed, retry via sing-box: ${e.message}")
+                                    cont.tryResume(Libcore.urlTest(box, link, timeout))
+                                }
+                            } else {
+                                if (processes.processCount > 0) {
+                                    // wait for plugin start
+                                    delay(500)
+                                }
+                                cont.tryResume(Libcore.urlTest(box, link, timeout))
                             }
-                        } else {
-                            if (processes.processCount > 0) {
-                                // wait for plugin start
-                                delay(500)
-                            }
-                            c.tryResume(Libcore.urlTest(box, link, timeout))
+                        } catch (e: Exception) {
+                            cont.tryResumeWithException(e)
                         }
-                    } catch (e: Exception) {
-                        c.tryResumeWithException(e)
                     }
+                } catch (e: Exception) {
+                    // use {} rethrows close() failures; the continuation must
+                    // still be resumed (a no-op if it already was).
+                    cont.tryResumeWithException(e)
                 }
             }
         }
