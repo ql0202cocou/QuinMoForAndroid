@@ -13,9 +13,9 @@ import android.service.quicksettings.TileService as BaseTileService
 class TileService : BaseTileService(), SagerConnection.Callback {
     private val iconIdle by lazy { Icon.createWithResource(this, R.drawable.ic_service_idle) }
     private val iconBusy by lazy { Icon.createWithResource(this, R.drawable.ic_service_busy) }
-    private val iconConnected by lazy {
-        Icon.createWithResource(this, R.drawable.ic_service_connected)
-    }
+    // ic_service_connected is an animated vector for ServiceButton; tiles cannot
+    // animate it and would show a wrong frame, so the static airplane is used here.
+    private val iconConnected by lazy { Icon.createWithResource(this, R.drawable.ic_service_busy) }
     private var tapPending = false
 
     private val connection = SagerConnection(SagerConnection.CONNECTION_ID_TILE)
