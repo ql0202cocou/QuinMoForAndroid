@@ -70,7 +70,8 @@ fun parseV2Ray(link: String): StandardV2RayBean {
 
         var protocol = url.username
         bean.type = protocol
-        bean.alterId = url.password.substringAfterLast('-').toInt()
+        bean.alterId = url.password.substringAfterLast('-').toIntOrNull()
+            ?: error("invalid link $link")
         bean.uuid = url.password.substringBeforeLast('-')
 
         if (protocol.endsWith("+tls")) {
@@ -209,7 +210,7 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
                 path = it
             }
             url.queryParameter("ed")?.let { ed ->
-                wsMaxEarlyData = ed.toInt()
+                wsMaxEarlyData = ed.toIntOrNull()
 
                 url.queryParameter("eh")?.let {
                     earlyDataHeaderName = it

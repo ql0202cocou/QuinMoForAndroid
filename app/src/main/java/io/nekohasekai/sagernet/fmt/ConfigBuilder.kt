@@ -694,7 +694,7 @@ fun buildConfig(
         }
 
         if (forTest) {
-            dns.rules = listOf()
+            dns.rules = mutableListOf()
         } else {
             // built-in DNS rules
             route.rules.add(0, Rule_DefaultOptions().apply {

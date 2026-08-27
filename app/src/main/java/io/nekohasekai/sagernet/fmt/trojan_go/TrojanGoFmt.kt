@@ -139,21 +139,21 @@ fun JSONObject.parseTrojanGo(): TrojanGoBean {
             is String -> {
                 password = pass
             }
-            is List<*> -> {
-                password = pass[0] as String
+            is JSONArray -> {
+                password = pass.getString(0)
             }
         }
-        optJSONArray("ssl")?.apply {
+        optJSONObject("ssl")?.apply {
             sni = optString("sni", sni)
         }
-        optJSONArray("websocket")?.apply {
+        optJSONObject("websocket")?.apply {
             if (optBoolean("enabled", false)) {
                 type = "ws"
                 host = optString("host", host)
                 path = optString("path", path)
             }
         }
-        optJSONArray("shadowsocks")?.apply {
+        optJSONObject("shadowsocks")?.apply {
             if (optBoolean("enabled", false)) {
                 encryption = "ss;${optString("method", "")}:${optString("password", "")}"
             }

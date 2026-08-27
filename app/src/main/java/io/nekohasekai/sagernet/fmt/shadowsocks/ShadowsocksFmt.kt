@@ -67,7 +67,7 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
             method = link.username
             password = link.password
             plugin = ""
-            val remarks = url.substringAfter("#").unUrlSafe()
+            val remarks = url.substringAfter("#", "").unUrlSafe()
             if (remarks.isNotBlank()) name = remarks
         }
     }
