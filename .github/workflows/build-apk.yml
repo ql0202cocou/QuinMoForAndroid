@@ -52,3 +52,5 @@ jobs:
         with:
           name: APKs
           path: ${{ env.APK }}
+          # hand-off for the publish job only; published APKs live as release assets
+          retention-days: 1
