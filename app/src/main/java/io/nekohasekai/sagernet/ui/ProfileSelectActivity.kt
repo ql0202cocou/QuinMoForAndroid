@@ -11,17 +11,19 @@ class ProfileSelectActivity : ThemedActivity(R.layout.layout_empty),
     companion object {
         const val EXTRA_SELECTED = "selected"
         const val EXTRA_PROFILE_ID = "id"
+        const val EXTRA_NO_CHAIN = "noChain"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val selected = intent.getParcelableExtra<ProxyEntity>(EXTRA_SELECTED)
+        val noChain = intent.getBooleanExtra(EXTRA_NO_CHAIN, false)
 
         supportFragmentManager.beginTransaction()
             .replace(
                 R.id.fragment_holder,
-                ConfigurationFragment(true, selected, R.string.select_profile)
+                ConfigurationFragment(true, selected, R.string.select_profile, noChain)
             )
             .commitAllowingStateLoss()
     }

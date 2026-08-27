@@ -6,8 +6,7 @@ import androidx.room.RoomDatabase
 import dev.matrix.roomigrant.GenerateRoomMigrations
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.SagerNet
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import java.util.concurrent.Executors
 
 @Database(entities = [KeyValuePair::class], version = 1)
 @GenerateRoomMigrations
@@ -20,7 +19,8 @@ abstract class PublicDatabase : RoomDatabase() {
                 .allowMainThreadQueries()
                 .enableMultiInstanceInvalidation()
                 .fallbackToDestructiveMigration()
-                .setQueryExecutor { GlobalScope.launch { it.run() } }
+                // single thread keeps the submitted runnables in order, off the main thread
+                .setQueryExecutor(Executors.newSingleThreadExecutor())
                 .build()
         }
 

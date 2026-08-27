@@ -107,6 +107,7 @@ class GroupSettingsActivity(
                 if (newValue.toString() == "3") {
                     selectProfileForAddFront.launch(
                         Intent(this@GroupSettingsActivity, ProfileSelectActivity::class.java)
+                            .putExtra(ProfileSelectActivity.EXTRA_NO_CHAIN, true)
                     )
                     false
                 } else {
@@ -122,6 +123,7 @@ class GroupSettingsActivity(
                 if (newValue.toString() == "3") {
                     selectProfileForAddLanding.launch(
                         Intent(this@GroupSettingsActivity, ProfileSelectActivity::class.java)
+                            .putExtra(ProfileSelectActivity.EXTRA_NO_CHAIN, true)
                     )
                     false
                 } else {

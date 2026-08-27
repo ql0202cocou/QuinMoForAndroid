@@ -1,6 +1,7 @@
 package moe.matsuri.nb4a.proxy.anytls
 
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.isIpAddress
 import moe.matsuri.nb4a.utils.JavaUtil
 import moe.matsuri.nb4a.utils.listByLineOrComma
@@ -77,4 +78,8 @@ private fun certificateSha256(pem: String): String? = runCatching {
     val der = CertificateFactory.getInstance("X.509")
         .generateCertificate(pem.byteInputStream()).encoded
     JavaUtil.bytesToHex(MessageDigest.getInstance("SHA-256").digest(der))
-}.getOrNull()
+}.getOrElse {
+    // a malformed PEM silently drops the pinning and falls back to plain chain verification
+    Logs.w("failed to parse certificates PEM for fingerprint pinning", it)
+    null
+}

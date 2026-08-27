@@ -74,7 +74,8 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
     override fun wifiState(): String {
         val wifiManager =
             app.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        val connectionInfo = wifiManager.connectionInfo
+        // null when Wi-Fi is off; the Go side treats empty SSID/BSSID as "not connected"
+        val connectionInfo = wifiManager.connectionInfo ?: return ","
         return "${connectionInfo.ssid},${connectionInfo.bssid}"
     }
 

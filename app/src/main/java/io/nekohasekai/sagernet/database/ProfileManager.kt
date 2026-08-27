@@ -184,8 +184,18 @@ object ProfileManager {
 
     suspend fun getRules(): List<RuleEntity> {
         var rules = SagerDatabase.rulesDao.allRules()
-        if (rules.isEmpty() && !DataStore.rulesFirstCreate) {
-            createRule(
+        if (!DataStore.rulesFirstCreate) {
+            // A previous attempt may have crashed midway through creation;
+            // skip the default rules it already created instead of duplicating them.
+            suspend fun createDefaultRule(rule: RuleEntity, post: Boolean = true) {
+                val exists = rules.any {
+                    it.port == rule.port && it.network == rule.network &&
+                            it.domains == rule.domains && it.ip == rule.ip &&
+                            it.outbound == rule.outbound
+                }
+                if (!exists) createRule(rule, post)
+            }
+            createDefaultRule(
                 RuleEntity(
                     name = app.getString(R.string.route_opt_block_quic),
                     port = "443",
@@ -193,7 +203,7 @@ object ProfileManager {
                     outbound = -2
                 )
             )
-            createRule(
+            createDefaultRule(
                 RuleEntity(
                     name = app.getString(R.string.route_opt_block_ads),
                     domains = "geosite:category-ads-all",
@@ -210,20 +220,20 @@ object ProfileManager {
                 val country = c.substringBefore(":")
                 val displayCountry = c.substringAfter(":")
                 //
-                if (country == "cn") createRule(
+                if (country == "cn") createDefaultRule(
                     RuleEntity(
                         name = app.getString(R.string.route_play_store, displayCountry),
                         domains = "googleapis.cn",
                     ), false
                 )
-                createRule(
+                createDefaultRule(
                     RuleEntity(
                         name = app.getString(R.string.route_bypass_domain, displayCountry),
                         domains = "geosite:$country",
                         outbound = -1
                     ), false
                 )
-                createRule(
+                createDefaultRule(
                     RuleEntity(
                         name = app.getString(R.string.route_bypass_ip, displayCountry),
                         ip = "geoip:$country",

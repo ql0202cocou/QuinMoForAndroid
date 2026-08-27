@@ -117,7 +117,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipInputStream
 
 class ConfigurationFragment @JvmOverloads constructor(
-    val select: Boolean = false, val selectedItem: ProxyEntity? = null, val titleRes: Int = 0
+    val select: Boolean = false, val selectedItem: ProxyEntity? = null, val titleRes: Int = 0,
+    val noChain: Boolean = false
 ) : ToolbarFragment(R.layout.layout_group_list),
     PopupMenu.OnMenuItemClickListener,
     Toolbar.OnMenuItemClickListener,
@@ -775,22 +776,24 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                             if (icmpPing) {
                                 profile.status = 2
-                                profile.error = getString(R.string.connection_test_unreachable)
+                                // this runs on a background thread where the fragment
+                                // may already be detached; getString() would throw
+                                profile.error = app.getString(R.string.connection_test_unreachable)
                             } else {
                                 profile.status = 2
                                 when {
                                     !message.contains("failed:") -> profile.error =
-                                        getString(R.string.connection_test_timeout)
+                                        app.getString(R.string.connection_test_timeout)
 
                                     else -> when {
                                         message.contains("ECONNREFUSED") -> {
                                             profile.error =
-                                                getString(R.string.connection_test_refused)
+                                                app.getString(R.string.connection_test_refused)
                                         }
 
                                         message.contains("ENETUNREACH") -> {
                                             profile.error =
-                                                getString(R.string.connection_test_unreachable)
+                                                app.getString(R.string.connection_test_unreachable)
                                         }
 
                                         else -> {
@@ -814,7 +817,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
         test.cancel = {
             test.dialogStatus.set(2)
-            dialog.dismiss()
+            // the activity may already be destroyed when the GlobalScope test
+            // job finishes; dismiss() then throws "not attached to window manager"
+            runCatching { dialog.dismiss() }
             runOnDefaultDispatcher {
                 mainJob.cancel()
                 testJobs.forEach { it.cancel() }
@@ -883,7 +888,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
         test.cancel = {
             test.dialogStatus.set(2)
-            dialog.dismiss()
+            // the activity may already be destroyed when the GlobalScope test
+            // job finishes; dismiss() then throws "not attached to window manager"
+            runCatching { dialog.dismiss() }
             runOnDefaultDispatcher {
                 mainJob.cancel()
                 testJobs.forEach { it.cancel() }
@@ -1086,6 +1093,14 @@ class ConfigurationFragment @JvmOverloads constructor(
         val select by lazy {
             try {
                 (parentFragment as ConfigurationFragment).select
+            } catch (e: Exception) {
+                Logs.e(e)
+                false
+            }
+        }
+        val noChain by lazy {
+            try {
+                (parentFragment as ConfigurationFragment).noChain
             } catch (e: Exception) {
                 Logs.e(e)
                 false
@@ -1441,6 +1456,11 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             fun reloadProfiles() {
                 var newProfiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
+                if (select && noChain) {
+                    // a chain cannot be a group's front/landing proxy:
+                    // resolveChain() adds it raw and buildChain has no ChainBean branch
+                    newProfiles = newProfiles.filter { it.type != ProxyEntity.TYPE_CHAIN }
+                }
                 when (proxyGroup.order) {
                     GroupOrder.BY_NAME -> {
                         newProfiles = newProfiles.sortedBy { it.displayName() }
