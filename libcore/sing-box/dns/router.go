@@ -304,10 +304,16 @@ func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg, options adapte
 				continue
 			}
 			// neko: on query failure, continue matching the next DNS rule
-			if err != nil && !rejected && rule != nil {
+			if rule != nil {
 				if dnsRoute, isDNSRoute := rule.Action().(*R.RuleActionDNSRoute); isDNSRoute && dnsRoute.Fallback {
-					r.logger.DebugContext(ctx, "fallback to next DNS rule after failure")
-					continue
+					// Besides transport failures, a non-success rcode (NXDOMAIN & co.)
+					// counts too: client.Exchange reports those as a plain response,
+					// and a split-horizon server must not be the final word.
+					if (err != nil && !rejected) ||
+						(err == nil && response != nil && response.Rcode != mDNS.RcodeSuccess) {
+						r.logger.DebugContext(ctx, "fallback to next DNS rule after failure")
+						continue
+					}
 				}
 			}
 			break

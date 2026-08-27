@@ -27,6 +27,11 @@ import kotlin.coroutines.suspendCoroutine
 class TestInstance(profile: ProxyEntity, val link: String, private val timeout: Int) :
     BoxInstance(profile) {
 
+    // mihomo measures the full handshake (TCP + TLS + auth + HEAD, plus the
+    // server-domain DNS), while the sing-box path measures a warm RTT. Give it
+    // double the budget so slow-but-working nodes don't report a timeout.
+    private val mihomoTimeout = timeout * 2
+
     // Single-node AnyTLS-on-mihomo: enable mihomo's Clash API so mihomo measures
     // the delay through the proxy itself. Chained profiles keep the sing-box path.
     private val mihomoController: Pair<Int, String>? by lazy {
@@ -51,7 +56,15 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
                         launch()
                         val controller = mihomoController
                         if (controller != null) {
-                            c.tryResume(mihomoDelay(controller))
+                            try {
+                                c.tryResume(mihomoDelay(controller))
+                            } catch (e: Exception) {
+                                // mihomo collapses every dial failure into one opaque
+                                // message; re-test through the same tunnel via sing-box,
+                                // whose errors name the actual cause.
+                                Logs.w("mihomo delay test failed, retry via sing-box: ${e.message}")
+                                c.tryResume(Libcore.urlTest(box, link, timeout))
+                            }
                         } else {
                             if (processes.processCount > 0) {
                                 // wait for plugin start
@@ -74,7 +87,7 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
         val (port, secret) = controller
         val client = OkHttpClient.Builder()
             .connectTimeout(2, TimeUnit.SECONDS)
-            .readTimeout(timeout + 3000L, TimeUnit.MILLISECONDS)
+            .readTimeout(mihomoTimeout + 3000L, TimeUnit.MILLISECONDS)
             .build()
         val base = "http://127.0.0.1:$port"
 
@@ -97,7 +110,7 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
         if (!ready) throw IOException("mihomo controller not ready")
 
         val url = "$base/proxies/$MIHOMO_PROXY_NAME/delay" +
-            "?url=${URLEncoder.encode(link, "UTF-8")}&timeout=$timeout"
+            "?url=${URLEncoder.encode(link, "UTF-8")}&timeout=$mihomoTimeout"
         client.newCall(newRequest(url)).execute().use { resp ->
             val body = resp.body?.string().orEmpty()
             if (resp.isSuccessful) return JSONObject(body).getInt("delay")
