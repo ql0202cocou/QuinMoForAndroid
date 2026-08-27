@@ -66,37 +66,34 @@ class SagerConnection(
             if (state < 0) return // skip private
             val s = BaseService.State.values()[state]
             DataStore.serviceState = s
-            val callback = callback ?: return
             runOnMainDispatcher {
-                callback.stateChanged(s, profileName, msg)
+                // re-read at execution time: disconnect() may have run while
+                // this lambda was queued, and a stale copy would still fire
+                callback?.stateChanged(s, profileName, msg)
             }
         }
 
         override fun cbSpeedUpdate(stats: SpeedDisplayData) {
-            val callback = callback ?: return
             runOnMainDispatcher {
-                callback.cbSpeedUpdate(stats)
+                callback?.cbSpeedUpdate(stats)
             }
         }
 
         override fun cbTrafficUpdate(stats: TrafficData) {
-            val callback = callback ?: return
             runOnMainDispatcher {
-                callback.cbTrafficUpdate(stats)
+                callback?.cbTrafficUpdate(stats)
             }
         }
 
         override fun cbSelectorUpdate(id: Long) {
-            val callback = callback ?: return
             runOnMainDispatcher {
-                callback.cbSelectorUpdate(id)
+                callback?.cbSelectorUpdate(id)
             }
         }
 
         override fun missingPlugin(profileName: String, pluginName: String) {
-            val callback = callback ?: return
             runOnMainDispatcher {
-                callback.missingPlugin(profileName, pluginName)
+                callback?.missingPlugin(profileName, pluginName)
             }
         }
 
@@ -141,7 +138,7 @@ class SagerConnection(
         service = null
         callbackRegistered = false
         if (!restartingApp) {
-            callback?.also { runOnMainDispatcher { it.onBinderDied() } }
+            runOnMainDispatcher { callback?.onBinderDied() }
         }
     }
 

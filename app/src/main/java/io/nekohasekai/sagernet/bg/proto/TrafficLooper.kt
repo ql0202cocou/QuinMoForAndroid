@@ -22,21 +22,25 @@ class TrafficLooper
     private val tagMap = mutableMapOf<String, TrafficUpdater.TrafficLooperData>() // tag to 1 data
 
     suspend fun stop() {
-        job?.cancel()
+        // wait for the loop to finish so no in-flight queryStats hits a closed box
+        job?.cancelAndJoin()
         // finally traffic post
         if (!DataStore.profileTrafficStatistics) return
         val traffic = mutableMapOf<Long, TrafficData>()
-        data.proxy?.config?.trafficMap?.forEach { (_, ents) ->
-            for (ent in ents) {
-                val item = idMap[ent.id] ?: return@forEach
-                ent.rx = item.rx
-                ent.tx = item.tx
-                ProfileManager.updateProfile(ent) // update DB
-                traffic[ent.id] = TrafficData(
-                    id = ent.id,
-                    rx = ent.rx,
-                    tx = ent.tx,
-                )
+        withContext(Dispatchers.IO) {
+            data.proxy?.config?.trafficMap?.forEach { (_, ents) ->
+                for (ent in ents) {
+                    // only skip this ent, not the rest of the tag's entries
+                    val item = idMap[ent.id] ?: continue
+                    ent.rx = item.rx
+                    ent.tx = item.tx
+                    ProfileManager.updateProfile(ent) // update DB
+                    traffic[ent.id] = TrafficData(
+                        id = ent.id,
+                        rx = ent.rx,
+                        tx = ent.tx,
+                    )
+                }
             }
         }
         data.binder.broadcast { b ->

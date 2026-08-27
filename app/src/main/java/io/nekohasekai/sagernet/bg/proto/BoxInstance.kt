@@ -221,6 +221,10 @@ abstract class BoxInstance(
 
     private val closed = AtomicBoolean(false)
 
+    protected fun isClosed(): Boolean {
+        return closed.get()
+    }
+
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun close() {
         if (!closed.compareAndSet(false, true)) return

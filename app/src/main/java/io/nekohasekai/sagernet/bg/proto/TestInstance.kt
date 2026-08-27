@@ -11,6 +11,7 @@ import io.nekohasekai.sagernet.ktx.mkPort
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.ktx.tryResume
 import io.nekohasekai.sagernet.ktx.tryResumeWithException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import libcore.Libcore
@@ -63,6 +64,11 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
                 try {
                     use {
                         try {
+                            // If cancellation won the race before this block ran,
+                            // closed is already set and the use {} close() below is
+                            // a no-op — starting the box and plugins now would leak
+                            // them, so bail out instead.
+                            if (isClosed()) throw CancellationException("test cancelled")
                             init()
                             launch()
                             val controller = mihomoController

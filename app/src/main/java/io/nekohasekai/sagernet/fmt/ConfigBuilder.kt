@@ -25,6 +25,7 @@ import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
 import io.nekohasekai.sagernet.fmt.wireguard.buildSingBoxEndpointWireGuardBean
 import io.nekohasekai.sagernet.ktx.isIpAddress
 import io.nekohasekai.sagernet.ktx.mkPort
+import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.utils.PackageCache
 import moe.matsuri.nb4a.*
 import moe.matsuri.nb4a.SingBoxOptions.*
@@ -497,11 +498,15 @@ fun buildConfig(
             }
             val uidList = rule.packages.map {
                 if (!isVPN) {
-                    Toast.makeText(
-                        SagerNet.application,
-                        SagerNet.application.getString(R.string.route_need_vpn, rule.displayName()),
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    // buildConfig runs on a Looper-less background thread in the
+                    // :bg process; a Toast must be posted from the main thread.
+                    runOnMainDispatcher {
+                        Toast.makeText(
+                            SagerNet.application,
+                            SagerNet.application.getString(R.string.route_need_vpn, rule.displayName()),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
                 PackageCache[it]?.takeIf { uid -> uid >= 1000 }
             }.toHashSet().filterNotNull()
@@ -597,11 +602,13 @@ fun buildConfig(
 
             if (!ruleObj.checkEmpty()) {
                 if (ruleObj.outbound.isNullOrBlank()) {
-                    Toast.makeText(
-                        SagerNet.application,
-                        "Warning: " + rule.displayName() + ": A non-existent outbound was specified.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    runOnMainDispatcher {
+                        Toast.makeText(
+                            SagerNet.application,
+                            "Warning: " + rule.displayName() + ": A non-existent outbound was specified.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 } else {
                     // block 改用新的写法
                     if (ruleObj.outbound == TAG_BLOCK) {

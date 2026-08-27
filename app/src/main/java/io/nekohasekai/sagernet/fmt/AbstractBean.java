@@ -115,28 +115,29 @@ public abstract class AbstractBean extends Serializable {
     @Override
     public abstract AbstractBean clone();
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+    // Serializes this bean without the name, holding this instance's monitor so
+    // concurrent equals/hashCode calls can't observe the temporary flag flip.
+    private synchronized byte[] serializeForComparison() {
         try {
             serializeWithoutName = true;
-            ((AbstractBean) o).serializeWithoutName = true;
-            return Arrays.equals(KryoConverters.serialize(this), KryoConverters.serialize((AbstractBean) o));
+            return KryoConverters.serialize(this);
         } finally {
             serializeWithoutName = false;
-            ((AbstractBean) o).serializeWithoutName = false;
         }
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        // each side is serialized under its own monitor, one at a time; never
+        // holding both locks avoids AB-BA deadlock on symmetric equals calls
+        return Arrays.equals(serializeForComparison(), ((AbstractBean) o).serializeForComparison());
+    }
+
+    @Override
     public int hashCode() {
-        try {
-            serializeWithoutName = true;
-            return Arrays.hashCode(KryoConverters.serialize(this));
-        } finally {
-            serializeWithoutName = false;
-        }
+        return Arrays.hashCode(serializeForComparison());
     }
 
     @NotNull

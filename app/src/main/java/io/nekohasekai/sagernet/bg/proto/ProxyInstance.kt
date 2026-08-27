@@ -57,10 +57,15 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     }
 
     override fun close() {
-        super.close()
-        runBlocking {
-            looper?.stop()
+        // stop the looper first: its in-flight queryStats needs a live box,
+        // and it joins quickly now that the final DB write runs on Dispatchers.IO
+        try {
+            runBlocking {
+                looper?.stop()
+            }
+        } finally {
             looper = null
+            super.close()
         }
     }
 

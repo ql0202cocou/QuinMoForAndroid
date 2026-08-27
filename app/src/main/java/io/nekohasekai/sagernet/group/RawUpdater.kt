@@ -30,6 +30,7 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import org.yaml.snakeyaml.TypeDescription
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import org.yaml.snakeyaml.error.YAMLException
 import java.io.StringReader
 import androidx.core.net.toUri
@@ -149,13 +150,17 @@ object RawUpdater : GroupUpdater() {
         Logs.d("Unique profiles: ${nameMap.size}")
 
         val toDelete = ArrayList<ProxyEntity>()
-        val toReplace = exists.mapNotNull { entity ->
+        val toReplace = LinkedHashMap<String, ProxyEntity>()
+        for (entity in exists) {
             val name = entity.displayName()
-            if (nameMap.contains(name)) name to entity else let {
+            // toMap() would silently drop same-name duplicates; delete them so
+            // the group ends up with exactly one entity per name
+            if (nameMap.contains(name) && !toReplace.containsKey(name)) {
+                toReplace[name] = entity
+            } else {
                 toDelete.add(entity)
-                null
             }
-        }.toMap()
+        }
 
         Logs.d("toDelete profiles: ${toDelete.size}")
         Logs.d("toReplace profiles: ${toReplace.size}")
@@ -244,9 +249,12 @@ object RawUpdater : GroupUpdater() {
 
             try {
 
-                val yaml = Yaml().apply {
+                // SafeConstructor: never instantiate arbitrary classes from a
+                // remote subscription (CVE-2022-1471). loadAs(Map) is unsupported
+                // under it, but load() yields the same LinkedHashMap structure.
+                val yaml = Yaml(SafeConstructor()).apply {
                     addTypeDescription(TypeDescription(String::class.java, "str"))
-                }.loadAs(text, Map::class.java)
+                }.load(text) as Map<*, *>
 
                 val globalClientFingerprint = yaml["global-client-fingerprint"]?.toString() ?: ""
 
@@ -741,7 +749,7 @@ object RawUpdater : GroupUpdater() {
     fun parseProxyServerNameserver(text: String): String? {
         if (!text.contains("proxies:")) return null
         return try {
-            val yaml = Yaml().loadAs(text, Map::class.java) as Map<*, *>
+            val yaml = Yaml(SafeConstructor()).load(text) as Map<*, *>
             val dns = yaml["dns"] as? Map<*, *>
             val value = dns?.get("proxy-server-nameserver")
                 ?: yaml["proxy-server-nameserver"]
