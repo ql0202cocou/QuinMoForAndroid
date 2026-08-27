@@ -87,16 +87,17 @@ func init() {
 		if fd < 0 {
 			return nil, unix.Errno(-fd)
 		}
+		// bionic hands us a plain socket fd; close() is the documented way to
+		// release it (res_nclose operates on resolver state, not this fd).
+		defer unix.Close(fd)
 
 		// wait for response (timeout 5000 ms)
 		pfds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN | unix.POLLERR}}
 		nReady, err := unix.Poll(pfds, 5000)
 		if err != nil {
-			unix.Close(fd)
 			return nil, err
 		}
 		if nReady == 0 {
-			unix.Close(fd)
 			return nil, context.DeadlineExceeded
 		}
 

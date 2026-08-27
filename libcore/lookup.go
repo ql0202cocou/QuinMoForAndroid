@@ -50,15 +50,11 @@ func lookupHostType(ctx context.Context, server string, domain string, queryType
 	var err error
 	switch scheme {
 	case "udp", "tcp":
-		if !strings.Contains(address, ":") {
-			address += ":53"
-		}
+		address = withDefaultPort(address, "53")
 		client := &mDNS.Client{Net: scheme, Timeout: 5 * time.Second}
 		response, _, err = client.ExchangeContext(ctx, query, address)
 	case "tls":
-		if !strings.Contains(address, ":") {
-			address += ":853"
-		}
+		address = withDefaultPort(address, "853")
 		host, _, _ := net.SplitHostPort(address)
 		client := &mDNS.Client{
 			Net:       "tcp-tls",
@@ -89,6 +85,15 @@ func lookupHostType(ctx context.Context, server string, domain string, queryType
 		}
 	}
 	return addresses, nil
+}
+
+// withDefaultPort appends the default port unless address already has one.
+// Bare IPv6 literals (e.g. 2606:4700::1111) get bracketed via JoinHostPort.
+func withDefaultPort(address, port string) string {
+	if _, _, err := net.SplitHostPort(address); err == nil {
+		return address
+	}
+	return net.JoinHostPort(strings.Trim(address, "[]"), port)
 }
 
 func exchangeHTTPS(ctx context.Context, server string, query *mDNS.Msg) (*mDNS.Msg, error) {

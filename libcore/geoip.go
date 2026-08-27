@@ -37,6 +37,9 @@ func (g *geoip) Rules(countryCode string) ([]option.HeadlessRule, error) {
 		}
 		countryMap[nextCountryCode] = append(countryMap[nextCountryCode], ipNet)
 	}
+	if err := networks.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate networks: %w", err)
+	}
 
 	ipNets := countryMap[strings.ToLower(countryCode)]
 

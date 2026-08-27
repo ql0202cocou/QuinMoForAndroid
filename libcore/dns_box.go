@@ -78,6 +78,9 @@ func (p *platformLocalDNSTransport) Exchange(ctx context.Context, message *mDNS.
 	} else {
 		// Lookup - Android 10 以下
 
+		if len(message.Question) == 0 {
+			return nil, E.New("query has no question")
+		}
 		question := message.Question[0]
 		var network string
 		switch question.Qtype {
@@ -148,6 +151,7 @@ func (c *ExchangeContext) Success(result string) {
 	}), func(it string) netip.Addr {
 		return M.ParseSocksaddrHostPort(it, 0).Unwrap().Addr
 	})
+	c.done()
 }
 
 func (c *ExchangeContext) RawSuccess(result []byte) {

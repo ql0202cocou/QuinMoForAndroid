@@ -218,6 +218,8 @@ func (b *BoxInstance) SetV2rayStats(outbounds string) {
 }
 
 func (b *BoxInstance) QueryStats(tag, direct string) int64 {
+	b.access.Lock()
+	defer b.access.Unlock()
 	if b.v2api == nil {
 		return 0
 	}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"strings"
 	_ "unsafe"
 
@@ -48,11 +49,17 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 
 	// Working dir
 	tmp := filepath.Join(cachePath, "../no_backup")
-	os.MkdirAll(tmp, 0755)
-	os.Chdir(tmp)
+	if err := os.MkdirAll(tmp, 0755); err != nil {
+		log.Println("failed to create working dir:", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		log.Println("failed to chdir to working dir:", err)
+	}
 
 	// sing-box fs
-	resourcePaths = append(resourcePaths, externalAssets)
+	if !slices.Contains(resourcePaths, externalAssets) {
+		resourcePaths = append(resourcePaths, externalAssets)
+	}
 	externalAssetsPath = externalAssets
 	internalAssetsPath = internalAssets
 

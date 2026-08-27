@@ -127,6 +127,7 @@ func (c *httpClient) TrySocks5(port int32) {
 			}
 			_, err = socks.ClientHandshake5(socksConn, socks5.CommandConnect, metadata.ParseSocksaddr(addr), "", "")
 			if err != nil {
+				socksConn.Close()
 				if c.tryH3Direct {
 					return nil, errFailConnectSocks5
 				}
@@ -230,6 +231,8 @@ func (r *httpRequest) Execute() (resp HTTPResponse, err error) {
 type requestFunc func() (response *http.Response, err error)
 
 func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
+	// requests derive from ctx so the deferred cancel() aborts any
+	// goroutine still running when this function returns.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -242,7 +245,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 	funcs := []requestFunc{
 		// Http(s) With Ech
 		func() (response *http.Response, err error) {
-			request := r.request.Clone(context.Background())
+			request := r.request.Clone(ctx)
 			echClient := &http.Client{
 				Transport: &http.Transport{
 					DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -265,7 +268,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 		},
 		// H3 HTTPS
 		func() (response *http.Response, err error) {
-			request := r.request.Clone(context.Background())
+			request := r.request.Clone(ctx)
 			h3Client := &http.Client{
 				Transport: &http3.Transport{
 					TLSClientConfig: r.tls.Clone(),
@@ -338,7 +341,14 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 	case result := <-successCh:
 		return &httpResponse{Response: result}, nil
 	case <-ctx.Done():
-		return nil, finalErr
+		mu.Lock()
+		err := finalErr
+		mu.Unlock()
+		if err == nil {
+			// timed out before any request finished; never return (nil, nil)
+			err = ctx.Err()
+		}
+		return nil, err
 	}
 }
 
