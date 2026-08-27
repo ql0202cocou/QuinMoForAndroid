@@ -6,6 +6,10 @@ on:
         description: "Gradle assemble task to run"
         required: true
         type: string
+      ref:
+        description: "Git ref to check out (empty = caller's ref)"
+        required: false
+        type: string
 jobs:
   build:
     name: Build APK
@@ -13,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - name: Download LibCore
         uses: actions/download-artifact@v4
         with:
@@ -45,8 +51,8 @@ jobs:
           export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
           ./run init action gradle
           ./gradlew ${{ inputs.gradle-task }}
-          APK=$(find app/build/outputs/apk -name '*arm64-v8a*.apk')
-          APK=$(dirname $APK)
+          APK=$(find app/build/outputs/apk -name '*arm64-v8a*.apk' | head -n 1)
+          APK=$(dirname "$APK")
           echo "APK=$APK" >> $GITHUB_ENV
       - uses: actions/upload-artifact@v4
         with:

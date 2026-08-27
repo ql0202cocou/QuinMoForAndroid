@@ -14,10 +14,16 @@ DIR=app/executableSo
 STAMP="$DIR/.versions"
 WANT="xray=$XRAY_VERSION mihomo=$MIHOMO_VERSION"
 
+is_elf() {
+  [ "$(head -c 4 "$1" 2>/dev/null | od -An -tx1 | tr -d ' \n')" = "7f454c46" ]
+}
+
 # skip when the installed cores already match the pinned versions
+# (ELF magic check, so an interrupted previous run's truncated .so is not
+# mistaken for an up-to-date install)
 if [ "$(cat "$STAMP" 2>/dev/null)" = "$WANT" ] \
-  && [ -f "$DIR/arm64-v8a/libxray.so" ] && [ -f "$DIR/x86_64/libxray.so" ] \
-  && [ -f "$DIR/arm64-v8a/libmihomo.so" ] && [ -f "$DIR/x86_64/libmihomo.so" ]; then
+  && is_elf "$DIR/arm64-v8a/libxray.so" && is_elf "$DIR/x86_64/libxray.so" \
+  && is_elf "$DIR/arm64-v8a/libmihomo.so" && is_elf "$DIR/x86_64/libmihomo.so"; then
   echo ">> plugin cores up to date ($WANT)"
   exit 0
 fi
@@ -38,8 +44,7 @@ check_sha256() {
 }
 
 check_elf() {
-  [ "$(head -c 4 "$1" | od -An -tx1 | tr -d ' \n')" = "7f454c46" ] || {
-    echo "$1 is not an ELF binary"; exit 1; }
+  is_elf "$1" || { echo "$1 is not an ELF binary"; exit 1; }
 }
 
 upstream_arch() {

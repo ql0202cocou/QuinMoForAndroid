@@ -1,5 +1,10 @@
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to check out (empty = caller's ref)"
+        required: false
+        type: string
 jobs:
   libcore:
     name: Native Build (LibCore)
@@ -7,14 +12,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - name: LibCore Cache
         id: cache
         uses: actions/cache@v4
         with:
           path: app/libs/libcore.aar
+          # only the core build inputs belong in the key; hashing all of buildScript/**
+          # forced a full gomobile rebuild on unrelated script edits (e.g. plugins.sh bumps)
           # exclusions keep the post-job key re-evaluation off the gitignored build outputs
-          # (buildScript/nkmr is a symlink to the gitignored /nkmr, broken on CI runners)
-          key: libcore-${{ hashFiles('.github/workflows/libcore.yml', 'run', 'buildScript/**', '!buildScript/nkmr', 'libcore/**', '!libcore/.build/**', '!libcore/libcore.aar') }}
+          key: libcore-${{ hashFiles('.github/workflows/libcore.yml', 'run', 'buildScript/lib/core.sh', 'buildScript/lib/core/**', 'buildScript/init/env.sh', 'buildScript/init/env_ndk.sh', 'libcore/**', '!libcore/.build/**', '!libcore/libcore.aar') }}
       - name: Install Golang
         if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/setup-go@v5

@@ -3,9 +3,12 @@
 set -e
 
 DIR=app/src/main/assets/sing-box
-rm -rf $DIR
-mkdir -p $DIR
-cd $DIR
+
+# Download into a temp dir first and only replace the assets once everything
+# succeeded, so a failed download cannot leave an empty assets dir behind.
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+cd $TMP
 
 get_latest_release() {
   curl --silent "https://api.github.com/repos/$1/releases/latest" | # Get latest release from GitHub api
@@ -15,6 +18,7 @@ get_latest_release() {
 
 ####
 VERSION_GEOIP=`get_latest_release "SagerNet/sing-geoip"`
+[ -n "$VERSION_GEOIP" ] || { echo "failed to resolve latest sing-geoip release"; exit 1; }
 echo VERSION_GEOIP=$VERSION_GEOIP
 echo -n $VERSION_GEOIP > geoip.version.txt
 curl -fLSsO https://github.com/SagerNet/sing-geoip/releases/download/$VERSION_GEOIP/geoip.db
@@ -22,7 +26,14 @@ xz -9 geoip.db
 
 ####
 VERSION_GEOSITE=`get_latest_release "SagerNet/sing-geosite"`
+[ -n "$VERSION_GEOSITE" ] || { echo "failed to resolve latest sing-geosite release"; exit 1; }
 echo VERSION_GEOSITE=$VERSION_GEOSITE
 echo -n $VERSION_GEOSITE > geosite.version.txt
 curl -fLSsO https://github.com/SagerNet/sing-geosite/releases/download/$VERSION_GEOSITE/geosite.db
 xz -9 geosite.db
+
+####
+cd "$OLDPWD"
+rm -rf $DIR
+mkdir -p $DIR
+mv "$TMP"/* $DIR/

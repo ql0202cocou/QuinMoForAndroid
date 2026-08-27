@@ -89,14 +89,6 @@ fun Project.setupCommon() {
                     jniDebuggable(true)
                 }
             }
-            applicationVariants.forEach { variant ->
-                variant.outputs.forEach {
-                    it as BaseVariantOutputImpl
-                    it.outputFileName = it.outputFileName.replace(
-                        "app", "${project.name}-" + variant.versionName
-                    ).replace("-release", "").replace("-oss", "")
-                }
-            }
         }
     }
 }
@@ -133,7 +125,9 @@ fun Project.setupAppCommon() {
 fun Project.setupApp() {
     val pkgName = requireMetadata().getProperty("PACKAGE_NAME")
     val verName = requireMetadata().getProperty("VERSION_NAME")
-    val verCode = (requireMetadata().getProperty("VERSION_CODE").toInt()) * 5
+    val verCode = requireNotNull(requireMetadata().getProperty("VERSION_CODE")) {
+        "VERSION_CODE is missing in nb4a.properties"
+    }.toInt() * 5
     android.apply {
         defaultConfig {
             applicationId = pkgName
@@ -196,6 +190,9 @@ fun Project.setupApp() {
 
         for (abi in listOf("Arm64", "X64")) {
             tasks.create("assemble" + abi + "FdroidRelease") {
+                // Historical task name kept for existing callers: it builds the full
+                // fdroid release (all ABI splits), not just the ABI in the name.
+                description = "Builds the full fdroid release (all ABIs); the ABI in the task name is historical."
                 dependsOn("assembleFdroidRelease")
             }
         }

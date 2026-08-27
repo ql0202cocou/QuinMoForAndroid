@@ -6,6 +6,11 @@ ORIG_ARGS="$*"
 declare -a PARAMS
 
 for e in "$@"; do
+  if [ -n "$EXEC" ]; then
+    # first match wins; remaining args are passed to the matched script
+    PARAMS+=("$e")
+    continue
+  fi
   TARGET="$TARGET/$e"
   PARAMS+=("$e")
   if [ -x "${TARGET}.sh" ]; then
