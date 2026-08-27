@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet.ui
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -49,8 +48,6 @@ import kotlin.coroutines.coroutineContext
 
 class AppManagerActivity : ThemedActivity() {
     companion object {
-        @SuppressLint("StaticFieldLeak")
-        private var instance: AppManagerActivity? = null
         private const val SWITCH = "switch"
 
         private val cachedApps
@@ -250,7 +247,6 @@ class AppManagerActivity : ThemedActivity() {
             appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
         }
 
-        instance = this
         loadApps()
     }
 
@@ -396,7 +392,6 @@ class AppManagerActivity : ThemedActivity() {
     } else super.onKeyUp(keyCode, event)
 
     override fun onDestroy() {
-        instance = null
         loader?.cancel()
         super.onDestroy()
     }

@@ -66,7 +66,8 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
 
     override fun uidByPackageName(packageName: String): Int {
         PackageCache.awaitLoadSync()
-        return PackageCache[packageName] ?: 0
+        // unknown package: -1, since 0 is root's valid uid
+        return PackageCache[packageName] ?: -1
     }
 
     // TODO: 'getter for connectionInfo: WifiInfo!' is deprecated
@@ -91,7 +92,9 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
         Libcore.resetAllConnections(true)
         DataStore.baseService?.apply {
             runOnDefaultDispatcher {
-                val id = data.proxy!!.config.profileTagMap
+                // proxy can be nulled on service stop before this coroutine runs
+                val proxy = data.proxy ?: return@runOnDefaultDispatcher
+                val id = proxy.config.profileTagMap
                     .filterValues { it == tag }.keys.firstOrNull() ?: -1
                 val ent = SagerDatabase.proxyDao.getById(id) ?: return@runOnDefaultDispatcher
                 // traffic & title

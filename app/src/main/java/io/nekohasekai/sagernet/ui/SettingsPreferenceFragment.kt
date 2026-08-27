@@ -101,7 +101,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             MaterialAlertDialogBuilder(requireContext()).setTitle("Log buffer size (kb)")
                 .setView(view)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
-                    DataStore.logBufSize = view.text.toString().toInt()
+                    DataStore.logBufSize = view.text.toString().toIntOrNull() ?: 0
                     if (DataStore.logBufSize <= 0) DataStore.logBufSize = 50
                     needRestart()
                 }

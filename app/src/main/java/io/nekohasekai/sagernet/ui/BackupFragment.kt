@@ -276,8 +276,6 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 profiles.add(ProxyEntity.CREATOR.createFromParcel(parcel))
                 parcel.recycle()
             }
-            SagerDatabase.proxyDao.reset()
-            SagerDatabase.proxyDao.insert(profiles)
 
             val groups = mutableListOf<ProxyGroup>()
             val jsonGroups = content.getJSONArray("groups")
@@ -289,8 +287,12 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 groups.add(ProxyGroup.CREATOR.createFromParcel(parcel))
                 parcel.recycle()
             }
-            SagerDatabase.groupDao.reset()
-            SagerDatabase.groupDao.insert(groups)
+            SagerDatabase.instance.runInTransaction {
+                SagerDatabase.proxyDao.reset()
+                SagerDatabase.proxyDao.insert(profiles)
+                SagerDatabase.groupDao.reset()
+                SagerDatabase.groupDao.insert(groups)
+            }
         }
         if (rule && content.has("rules")) {
             val rules = mutableListOf<RuleEntity>()
@@ -303,8 +305,10 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 rules.add(ParcelizeBridge.createRule(parcel))
                 parcel.recycle()
             }
-            SagerDatabase.rulesDao.reset()
-            SagerDatabase.rulesDao.insert(rules)
+            SagerDatabase.instance.runInTransaction {
+                SagerDatabase.rulesDao.reset()
+                SagerDatabase.rulesDao.insert(rules)
+            }
         }
         if (setting && content.has("settings")) {
             val settings = mutableListOf<KeyValuePair>()
@@ -317,8 +321,10 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 settings.add(KeyValuePair.CREATOR.createFromParcel(parcel))
                 parcel.recycle()
             }
-            PublicDatabase.kvPairDao.reset()
-            PublicDatabase.kvPairDao.insert(settings)
+            PublicDatabase.instance.runInTransaction {
+                PublicDatabase.kvPairDao.reset()
+                PublicDatabase.kvPairDao.insert(settings)
+            }
         }
     }
 

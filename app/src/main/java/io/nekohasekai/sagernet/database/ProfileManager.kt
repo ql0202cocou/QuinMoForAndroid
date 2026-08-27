@@ -185,7 +185,6 @@ object ProfileManager {
     suspend fun getRules(): List<RuleEntity> {
         var rules = SagerDatabase.rulesDao.allRules()
         if (rules.isEmpty() && !DataStore.rulesFirstCreate) {
-            DataStore.rulesFirstCreate = true
             createRule(
                 RuleEntity(
                     name = app.getString(R.string.route_opt_block_quic),
@@ -232,6 +231,8 @@ object ProfileManager {
                     ), false
                 )
             }
+            // mark only after all default rules were created successfully
+            DataStore.rulesFirstCreate = true
             rules = SagerDatabase.rulesDao.allRules()
         }
         return rules

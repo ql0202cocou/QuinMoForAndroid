@@ -51,19 +51,6 @@ object NGUtil {
     }
 
     /**
-     * get text from clipboard
-     */
-    fun getClipboard(context: Context): String {
-        return try {
-            val cmb = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cmb.primaryClip?.getItemAt(0)?.text.toString()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            ""
-        }
-    }
-
-    /**
      * set text to clipboard
      */
     fun setClipboard(context: Context, content: String) {

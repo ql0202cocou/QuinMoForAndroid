@@ -166,10 +166,11 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
         suspend fun reload() {
             val groups = SagerDatabase.groupDao.allGroups().toMutableList()
-            if (groups.size > 1 && SagerDatabase.proxyDao.countByGroup(groups.find { it.ungrouped }!!.id) == 0L) groups.removeAll { it.ungrouped }
-            groupList.clear()
-            groupList.addAll(groups)
+            val ungrouped = groups.find { it.ungrouped }
+            if (ungrouped != null && groups.size > 1 && SagerDatabase.proxyDao.countByGroup(ungrouped.id) == 0L) groups.removeAll { it.ungrouped }
             groupListView.post {
+                groupList.clear()
+                groupList.addAll(groups)
                 notifyDataSetChanged()
             }
         }
@@ -246,11 +247,11 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         }
 
         override suspend fun groupAdd(group: ProxyGroup) {
-            groupList.add(group)
             delay(300L)
 
             onMainDispatcher {
                 undoManager.flush()
+                groupList.add(group)
                 notifyItemInserted(groupList.size - 1)
 
                 if (group.type == GroupType.SUBSCRIPTION) {
@@ -260,9 +261,9 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         }
 
         override suspend fun groupRemoved(groupId: Long) {
-            val index = groupList.indexOfFirst { it.id == groupId }
-            if (index == -1) return
             onMainDispatcher {
+                val index = groupList.indexOfFirst { it.id == groupId }
+                if (index == -1) return@onMainDispatcher
                 undoManager.flush()
                 if (SagerDatabase.groupDao.allGroups().size <= 2) {
                     runOnDefaultDispatcher {
@@ -281,10 +282,10 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 reload()
                 return
             }
-            groupList[index] = group
             onMainDispatcher {
                 undoManager.flush()
 
+                groupList[index] = group
                 notifyItemChanged(index)
             }
         }
