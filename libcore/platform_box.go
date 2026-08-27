@@ -59,7 +59,8 @@ func (w *boxPlatformInterfaceWrapper) OpenInterface(options *tun.Options, platfo
 	if err != nil {
 		return nil, fmt.Errorf("intfBox.OpenTun: %v", err)
 	}
-	// Do you want to close it?
+	// The original fd is owned by the Kotlin side (closed via conn.close());
+	// dup it so the sing-box tun owns its own copy and manages its lifecycle.
 	tunFd, err = syscall.Dup(tunFd)
 	if err != nil {
 		return nil, fmt.Errorf("syscall.Dup: %v", err)
@@ -103,13 +104,16 @@ func (w *boxPlatformInterfaceWrapper) RequestPermissionForWIFIState() error {
 }
 
 func (w *boxPlatformInterfaceWrapper) ReadWIFIState() adapter.WIFIState {
-	state := strings.Split(intfBox.WIFIState(), ",")
-	if len(state) != 2 {
+	// Format is "ssid,bssid"; split from the end since the SSID may contain commas
+	// while the BSSID is a MAC address and never does.
+	state := intfBox.WIFIState()
+	sep := strings.LastIndex(state, ",")
+	if sep < 0 {
 		return adapter.WIFIState{}
 	}
 	return adapter.WIFIState{
-		SSID:  state[0],
-		BSSID: state[1],
+		SSID:  state[:sep],
+		BSSID: state[sep+1:],
 	}
 }
 
