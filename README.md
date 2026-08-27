@@ -1,7 +1,6 @@
 # QuinMo for Android
 
 [![API](https://img.shields.io/badge/API-21%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=21)
-[![Releases](https://img.shields.io/github/v/release/MatsuriDayo/NekoBoxForAndroid)](https://github.com/MatsuriDayo/NekoBoxForAndroid/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-orange.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 sing-box / universal proxy toolchain for Android.
@@ -9,25 +8,6 @@ sing-box / universal proxy toolchain for Android.
 一款使用 sing-box 的 Android 通用代理软件.
 
 This repository is a fork of [MatsuriDayo/NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid), independently maintained. The fork relationship is documented only in this README and is not linked on GitHub.
-
-## 下载 / Downloads
-
-[![GitHub All Releases](https://img.shields.io/github/downloads/Matsuridayo/NekoBoxForAndroid/total?label=downloads-total&logo=github&style=flat-square)](https://github.com/Matsuridayo/NekoBoxForAndroid/releases)
-
-[GitHub Releases 下载](https://github.com/Matsuridayo/NekoBoxForAndroid/releases)
-
-**Google Play 版本自 2024 年 5 月起已被第三方控制，为非开源版本，请不要下载。**
-
-**The Google Play version has been controlled by a third party since May 2024 and is a non-open
-source version. Please do not download it.**
-
-## 更新日志 & Telegram 发布频道 / Changelog & Telegram Channel
-
-https://t.me/Matsuridayo
-
-## 项目主页 & 文档 / Homepage & Documents
-
-https://matsuridayo.github.io
 
 ## 支持的代理协议 / Supported Proxy Protocols
 
@@ -46,11 +26,6 @@ https://matsuridayo.github.io
 * Trojan-Go (trojan-go-plugin)
 * NaïveProxy (naive-plugin)
 * Mieru (mieru-plugin)
-
-请到[这里](https://matsuridayo.github.io/nb4a-plugin/)下载插件以获得完整的代理支持.
-
-Please visit [here](https://matsuridayo.github.io/nb4a-plugin/) to download plugins for full proxy
-supports.
 
 ## 支持的订阅格式 / Supported Subscription Format
 
