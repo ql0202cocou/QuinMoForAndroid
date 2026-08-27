@@ -66,8 +66,6 @@ fun Project.setupCommon() {
                     "/META-INF/native-image/**",
                     "/META-INF/INDEX.LIST",
                     "DebugProbesKt.bin",
-                    "com/**",
-                    "org/**",
                     "**/*.java",
                     "**/*.proto",
                     "okhttp3/**"
