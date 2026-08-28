@@ -294,7 +294,7 @@ class RouteSettingsActivity(
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem) = child.onOptionsItemSelected(item)
+    override fun onOptionsItemSelected(item: MenuItem) = child.onMenuItemSelected(item)
 
     override fun onDestroy() {
         DataStore.profileCacheStore.unregisterChangeListener(this)
@@ -337,7 +337,7 @@ class RouteSettingsActivity(
             }
         }
 
-        override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
+        fun onMenuItemSelected(item: MenuItem) = when (item.itemId) {
             R.id.action_delete -> {
                 if (DataStore.editingId == 0L) {
                     requireActivity().finish()

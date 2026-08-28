@@ -23,6 +23,7 @@ import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.net.toUri
+import androidx.core.os.BundleCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.size
@@ -1076,7 +1077,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         override fun onViewStateRestored(savedInstanceState: Bundle?) {
             super.onViewStateRestored(savedInstanceState)
 
-            savedInstanceState?.getParcelable<ProxyGroup>("proxyGroup")?.also {
+            savedInstanceState?.let {
+                BundleCompat.getParcelable(it, "proxyGroup", ProxyGroup::class.java)
+            }?.also {
                 proxyGroup = it
                 onViewCreated(requireView(), null)
             }
@@ -1746,7 +1749,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     private val exportConfig =
-        registerForActivityResult(ActivityResultContracts.CreateDocument()) { data ->
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { data ->
             if (data != null) {
                 runOnDefaultDispatcher {
                     try {

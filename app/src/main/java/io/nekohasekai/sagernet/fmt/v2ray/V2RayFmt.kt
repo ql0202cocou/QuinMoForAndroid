@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.fmt.v2ray
 
 import android.text.TextUtils
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
@@ -30,6 +31,9 @@ data class VmessQRCode(
     var alpn: String = "",
     var fp: String = "",
     var verify_cert: Boolean = true,
+    // not a v2rayN standard field; "ech" matches our ducksoft query param, "echConfig" is the fallback
+    @SerializedName("ech", alternate = ["echConfig"])
+    var ech: String = "",
 )
 
 fun StandardV2RayBean.isTLS(): Boolean {
@@ -359,6 +363,10 @@ fun parseV2RayN(link: String): VMessBean {
             bean.alpn = vmessQRCode.alpn
             bean.utlsFingerprint = vmessQRCode.fp
             if (!vmessQRCode.verify_cert) bean.allowInsecure = true
+            if (!vmessQRCode.ech.isNullOrBlank()) {
+                bean.echConfig = vmessQRCode.ech
+                bean.enableECH = true
+            }
         }
     }
 
@@ -434,6 +442,9 @@ fun VMessBean.toV2rayN(): String {
         alpn = bean.alpn.replace("\n", ",")
         fp = bean.utlsFingerprint
         verify_cert = !bean.allowInsecure
+        if (bean.enableECH && bean.echConfig.isNotBlank()) {
+            ech = bean.echConfig
+        }
     }.let {
         NGUtil.encode(Gson().toJson(it))
     }

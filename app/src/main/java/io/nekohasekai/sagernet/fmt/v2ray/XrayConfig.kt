@@ -9,7 +9,6 @@ import org.json.JSONObject
 
 // Builds an Xray-core client config for a VMess/VLESS profile:
 // a local socks inbound chained from sing-box, and the profile as outbound.
-// NOTE: ECH is not mapped yet.
 fun buildXrayConfig(bean: VMessBean, port: Int): String {
     val user = JSONObject().apply {
         put("id", bean.uuid)
@@ -171,6 +170,10 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
                             put("certificate", JSONArray(bean.certificates.lines()))
                         })
                     })
+                }
+                // presence of echConfigList enables ECH; blank means "query DNS", leave that to sing-box
+                if (bean.enableECH && bean.echConfig.isNotBlank()) {
+                    put("echConfigList", bean.echConfig)
                 }
             })
         }

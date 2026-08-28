@@ -12,6 +12,7 @@ import android.text.format.Formatter
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.ServiceCompat
 import io.nekohasekai.sagernet.Action
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
@@ -211,11 +212,7 @@ class ServiceNotification(
 
     fun destroy() {
         listenPostSpeed = false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            (service as Service).stopForeground(Service.STOP_FOREGROUND_REMOVE)
-        } else {
-            (service as Service).stopForeground(true)
-        }
+        ServiceCompat.stopForeground(service as Service, ServiceCompat.STOP_FOREGROUND_REMOVE)
         service.unregisterReceiver(this)
     }
 }

@@ -42,6 +42,7 @@ import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.matsuri.nb4a.utils.NGUtil
 import kotlin.coroutines.coroutineContext
@@ -177,7 +178,7 @@ class AppManagerActivity : ThemedActivity() {
     @UiThread
     private fun loadApps() {
         loader?.cancel()
-        loader = lifecycleScope.launchWhenCreated {
+        loader = lifecycleScope.launch {
             loading.crossFadeFrom(binding.list)
             val adapter = binding.list.adapter as AppsAdapter
             withContext(Dispatchers.IO) { adapter.reload() }
@@ -217,8 +218,8 @@ class AppManagerActivity : ThemedActivity() {
         }
 
         binding.bypassGroup.check(if (DataStore.bypass) R.id.appProxyModeBypass else R.id.appProxyModeOn)
-        binding.bypassGroup.setOnCheckedChangeListener { _, checkedId ->
-            when (checkedId) {
+        binding.bypassGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            when (checkedIds.firstOrNull()) {
                 R.id.appProxyModeDisable -> {
                     DataStore.proxyApps = false
                     finish()

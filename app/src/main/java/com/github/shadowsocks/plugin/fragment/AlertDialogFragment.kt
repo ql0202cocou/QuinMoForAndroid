@@ -23,6 +23,8 @@ abstract class AlertDialogFragment<Arg : Parcelable, Ret : Parcelable?> :
         private const val KEY_RET = "ret"
         private const val KEY_WHICH = "which"
 
+        // generic Ret has no reified Class for the typed getParcelable replacement
+        @Suppress("DEPRECATION")
         fun <Ret : Parcelable> setResultListener(fragment: Fragment, requestKey: String,
                                                  listener: (Int, Ret?) -> Unit) {
             fragment.setFragmentResultListener(requestKey) { _, bundle ->
@@ -36,6 +38,8 @@ abstract class AlertDialogFragment<Arg : Parcelable, Ret : Parcelable?> :
     protected abstract fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener)
 
     private val resultKey get() = requireArguments().getString(KEY_RESULT)
+    // generic Arg has no reified Class for the typed getParcelable replacement
+    @Suppress("DEPRECATION")
     protected val arg by lazy { requireArguments().getParcelable<Arg>(KEY_ARG)!! }
     protected open fun ret(which: Int): Ret? = null
 

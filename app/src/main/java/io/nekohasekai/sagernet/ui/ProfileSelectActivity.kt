@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.ui
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.core.content.IntentCompat
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.ProxyEntity
 
@@ -17,7 +18,7 @@ class ProfileSelectActivity : ThemedActivity(R.layout.layout_empty),
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val selected = intent.getParcelableExtra<ProxyEntity>(EXTRA_SELECTED)
+        val selected = IntentCompat.getParcelableExtra(intent, EXTRA_SELECTED, ProxyEntity::class.java)
         val noChain = intent.getBooleanExtra(EXTRA_NO_CHAIN, false)
 
         supportFragmentManager.beginTransaction()
