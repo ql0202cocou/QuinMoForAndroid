@@ -140,7 +140,6 @@ class SagerNet : Application(),
                 )
             }
         }
-        val activity by lazy { application.getSystemService<ActivityManager>()!! }
         val clipboard by lazy { application.getSystemService<ClipboardManager>()!! }
         val connectivity by lazy { application.getSystemService<ConnectivityManager>()!! }
         val notification by lazy { application.getSystemService<NotificationManager>()!! }

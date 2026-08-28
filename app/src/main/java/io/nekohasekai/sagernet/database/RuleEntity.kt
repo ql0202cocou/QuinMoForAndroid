@@ -65,9 +65,6 @@ data class RuleEntity(
     @androidx.room.Dao
     interface Dao {
 
-        @Query("SELECT * from rules WHERE (packages != '') AND enabled = 1")
-        fun checkVpnNeeded(): List<RuleEntity>
-
         @Query("SELECT * FROM rules ORDER BY userOrder")
         fun allRules(): List<RuleEntity>
 
@@ -82,9 +79,6 @@ data class RuleEntity(
 
         @Query("DELETE FROM rules WHERE id = :ruleId")
         fun deleteById(ruleId: Long): Int
-
-        @Delete
-        fun deleteRule(rule: RuleEntity)
 
         @Delete
         fun deleteRules(rules: List<RuleEntity>)

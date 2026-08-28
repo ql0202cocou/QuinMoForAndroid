@@ -46,12 +46,8 @@ class NaiveSettingsActivity : ProfileSettingsActivity<NaiveBean>() {
         rootKey: String?,
     ) {
         addPreferencesFromResource(R.xml.naive_preferences)
-        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.apply {
-            setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
-        }
-        findPreference<EditTextPreference>(Key.SERVER_PASSWORD)!!.apply {
-            summaryProvider = PasswordSummaryProvider
-        }
+        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.bindPortPreference()
+        findPreference<EditTextPreference>(Key.SERVER_PASSWORD)!!.bindPasswordPreference()
         findPreference<EditTextPreference>(Key.SERVER_INSECURE_CONCURRENCY)!!.apply {
             setOnBindEditTextListener(EditTextPreferenceModifiers.Number)
         }

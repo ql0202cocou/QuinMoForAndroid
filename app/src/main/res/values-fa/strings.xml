@@ -5,7 +5,6 @@
     <string name="app_desc">مجموعه ابزار جامع پراکسی برای اندروید، نوشته‌شده با کاتلین.</string>
     <string name="project">پروژه</string>
     <string name="github">کد منبع</string>
-    <string name="oss_licenses">مجوزهای متن‌باز</string>
     <string name="app_version">نسخه برنامه</string>
     <string name="version_x">نسخه (%s)</string>
     <string name="logcat">صدور اطلاعات عیب‌یابی</string>
@@ -13,36 +12,26 @@
     <string name="menu_group">گروه‌ها</string>
     <string name="menu_about">درباره برنامه</string>
     <string name="theme">ظاهر</string>
-    <string name="document">مستندات</string>
     <string name="group_default">گروه پیش‌فرض</string>
     <string name="quick_toggle">تغییر وضعیت</string>
     <string name="quick_enable">فعال‌سازی</string>
     <string name="quick_disable">غیرفعال‌سازی</string>
     <string name="tile_title">سوییچر</string>
-    <string name="menu_traffic">ترافیک</string>
     <string name="menu_dashboard">sing-box تنظیمات</string>
     <!-- externel -->
-    <string name="action_copy">کپی</string>
-    <string name="action_open">باز کردن</string>
     <!-- group -->
     <string name="group_name">نام گروه</string>
     <string name="group_update">به‌روزرسانی گروه</string>
     <string name="group_subscription_link">لینک اشتراک</string>
-    <string name="group_name_required">نام گروه را وارد کنید</string>
     <string name="group_create">ایجاد گروه</string>
-    <string name="group_create_subscription">ایجاد اشتراک</string>
     <string name="update_all_subscription">به‌روزرسانی همه اشتراک‌ها</string>
-    <string name="group_edit">ویرایش گروه</string>
-    <string name="group_edit_subscription">ویرایش اشتراک</string>
     <string name="group_status_empty">خالی</string>
     <string name="group_status_empty_subscription">هنوز به‌روزرسانی نشده است</string>
     <string name="group_status_proxies">%d پراکسی‌ها</string>
     <string name="group_status_proxies_subscription">%d پراکسی‌ها | به‌روزرسانی شدند در %s</string>
     <string name="group_no_difference">%s: بدون تفاوت</string>
     <string name="group_updated">%s: Updated %d proxies</string>
-    <string name="group_show_diff">تفاوت‌ها</string>
     <string name="group_diff">تفاوت‌ها (%s)</string>
-    <string name="group_delete_confirm_prompt">آیا مطمئن هستید که می‌خواهید این گروه را حذف کنید؟</string>
     <string name="group_added">اضافه شده: \n%s</string>
     <string name="group_changed">به‌روز شد \n%s</string>
     <string name="group_deleted">حذف شد: \n%s</string>
@@ -52,22 +41,15 @@
     <string name="service_mode_proxy">فقط به حالت پراکسی</string>
     <string name="service_mode_vpn" translatable="false">VPN</string>
     <string name="port_proxy">پورت پراکسی</string>
-    <string name="port_http">پورت پراکسی HTTP</string>
-    <string name="port_transproxy">پورت Transproxy</string>
     <string name="cag_route">تنظیمات مسیردهی</string>
     <string name="allow_access">اجازه اتصال از شبکه محلی</string>
     <string name="allow_access_sum">اجازه اتصال سرورهای ورودی به 0.0.0.0</string>
     <string name="inbound_settings">تنظیمات اتصالات ورودی</string>
     <string name="general_settings">تنظیمات برنامه</string>
-    <string name="require_http">فعال‌کردن ورودی HTTP</string>
     <string name="cag_ws">تنظیمات WebSocket</string>
     <string name="ws_max_early_data" translatable="false">Max early data</string>
-    <string name="ws_browser_forwarding">اتصال مرورگر</string>
-    <string name="ws_browser_forwarding_sum">ارسال WebSocketهای مربوطه از طریق مرورگر</string>
     <string name="speed_interval">تنظیم فاصله زمانی نمایش سرعت</string>
     <string name="cag_misc">تنظیمات متفرقه</string>
-    <string name="show_stop">نمایش دکمه توقف</string>
-    <string name="show_stop_sum">اگر دکمه تغییر وضعیت در نوار اعلان را نمی‌خواهید</string>
     <string name="show_direct_speed">نمایش سرعت</string>
     <string name="show_direct_speed_sum">نمایش سرعت اتصال، حتی در هنگام غیرفعال بودن پراکسی</string>
     <string name="security_settings">تنظیمات امنیت TLS</string>
@@ -80,8 +62,6 @@
     <string name="connection_test_available">اتصال موفق! سرعت برقراری ارتباط HTTPS: %dms</string>
     <string name="connection_test_available_http">اتصال موفق! سرعت برقراری ارتباط HTTP: %dms</string>
     <string name="connection_test_error">ناموفق بود: %s</string>
-    <string name="connection_test_fail">اینترنت متصل نیست</string>
-    <string name="connection_test_error_status_code">کد ارور: #%d</string>
     <string name="cag_dns">تنظیمات DNs</string>
     <string name="remote_dns">DNS ریموت</string>
     <string name="direct_dns">DNS مستقیم</string>
@@ -89,10 +69,6 @@
     <string name="dns_routing_message">بررسی دامنه‌ها در دورزدن مسیرها با DNS مستقیم. احتمال افشای نشانی DNS وجود دارد.</string>
     <string name="enable_fakedns">فعال کردن FakeDNS</string>
     <string name="fakedns_message">ممکن است نیاز باشد که برنامه‌های دیگر را برای اتصال مجدد، دوباره راه‌اندازی کنید.</string>
-    <string name="dns_hosts">بازنویسی دامنه</string>
-    <string name="port_local_dns">پورت DNS محلی</string>
-    <string name="require_transproxy">فعال کردن Transproxy ورودی</string>
-    <string name="transproxy_mode">حالت Transproxy</string>
     <string name="connection_test_url">آزمایش اتصال به لینک</string>
     <!-- proxy category -->
     <string name="profile_name">نام</string>
@@ -101,18 +77,13 @@
     <string name="username">نام کاربری</string>
     <string name="username_opt">نام کاربری (اختیاری)</string>
     <string name="password_opt">رمز عبور (اختیاری)</string>
-    <string name="key_opt">کلید (اختیاری)</string>
     <string name="password">Pرمز عبور</string>
     <string name="enc_method">نوع رمزنگاری</string>
     <string name="protocol">دستورالعمل</string>
-    <string name="protocol_param">مؤلفه دستورالعمل</string>
-    <string name="obfs">دستورالعمل درهم‌سازی obfs</string>
-    <string name="obfs_param">مؤلفه Obfs</string>
     <string name="uuid">شناسه کاربری</string>
     <string name="alter_id">شناسه دیگر</string>
     <string name="security">رمزنگاری لایه Transport</string>
     <string name="network">شبکه</string>
-    <string name="header_type">نوع سرآیند</string>
     <string name="ws_host">میزبان WebSocket</string>
     <string name="ws_path">مسیر WebSocket</string>
     <string name="http_host">میزبان HTTP</string>
@@ -125,8 +96,6 @@
     <string name="early_data_header_name">نام سرآیند درخواست داده‌های اولیه</string>
     <string name="encryption">رمزنگاری</string>
     <string name="extra_headers">سرآیندهای اضافی</string>
-    <string name="config_type">نوع پیکربندی</string>
-    <string name="edit_config">ویرایش پیکربندی</string>
     <!-- feature category -->
     <string name="ipv6">مسیریابی IP نسخه 6</string>
     <string name="prefer">ترجیح</string>
@@ -157,28 +126,23 @@
     <string name="route_not_asset">مشکل: ot an asset file: excepted .db, but %s</string>
     <string name="route_opt_bypass_lan">دورزدن شبکه محلی</string>
     <string name="route_opt_block_ads">مسدود کردن تبلیغات</string>
-    <string name="route_opt_block_analysis">مسدود کردن ردیاب‌های اینترنتی</string>
     <string name="route_opt_block_quic">مسدود کردن QUIC</string>
     <string name="domain_strategy">راهبرد شناسایی دامنه</string>
     <string name="traffic_sniffing">فعال کردن ثبت ترافیک</string>
     <string name="enable_mux">فعال کردن مالتی‌پلکسر</string>
     <string name="mux_sum">باید سرور هم امکان پشتیبانی از مالتی‌پلکسر را داشته باشد. مالتی‌پلکسر برای کاهش زمان تأخیر در اتصال TCP طراحی شده است و نه برای افزایش توان اتصال. استفاده از مالتی‌پلکسر برای تماشای فیلم، دانلود فایل یا آزمایش سرعت معمولاً نتیجه‌ای ندارد.</string>
     <string name="mux_concurrency">تعداد اتصال همزمان با مالتی‌پلکسر</string>
-    <string name="tcp_keep_alive_interval">فعال نگه‌داشتن بازه دریافت بسته‌های TCP</string>
     <string name="proxied_apps">تانل‌کردن اپلیکیشن‌ها</string>
     <string name="proxied_apps_summary">انتخاب اپلیکیشن‌های مورد نظر برای پراکسی شدن</string>
     <string name="on">روشن</string>
     <string name="off">خاموش</string>
     <string name="search_apps">در حال جستجو…</string>
-    <string name="scanning">در حال اسکن…</string>
     <string name="invert_selections">برعکس‌کردن گزینه‌های انتخاب‌شده</string>
     <string name="clear_selections">برداشتن انتخاب‌ها</string>
     <string name="bypass_apps">پراکسی نشوند</string>
     <string name="show_system_apps">نمایش برنامه‌های سیستمی</string>
     <string name="auto_connect">اتصال خودکار</string>
     <string name="auto_connect_summary">فعال کردن پراکسی در هنگام راه‌اندازی/به‌روزرسانی برنامه اگر قبلاً در حال اجرا بوده است</string>
-    <string name="direct_boot_aware">امکان تغییر وضعیت پراکسی در صفحه قفل</string>
-    <string name="direct_boot_aware_summary">اطلاعات پراکسی انتخابی شما، کمتر محافظت می‌شود.</string>
     <!-- notification category -->
     <string name="service_vpn">VPN سراسری</string>
     <string name="service_proxy">پراکسی</string>
@@ -203,7 +167,6 @@
     <string name="action_socks" translatable="false">SOCKS</string>
     <string name="action_http" translatable="false">HTTP</string>
     <string name="action_shadowsocks" translatable="false">Shadowsocks</string>
-    <string name="action_shadowsocksr" translatable="false">ShadowsocksR</string>
     <string name="action_vmess" translatable="false">VMess</string>
     <string name="action_trojan" translatable="false">Trojan</string>
     <string name="action_trojan_go" translatable="false">Trojan Go</string>
@@ -215,18 +178,11 @@
     <string name="action_tuic" translatable="false">TUIC</string>
     <string name="proxy_chain">زنجیره پراکسی</string>
     <string name="custom_config">پیکربندی اختصاصی</string>
-    <string name="balancer">برابرکننده</string>
-    <string name="balancer_settings">تنظیمات برابرکننده</string>
-    <string name="balancer_type">نوع</string>
-    <string name="balancer_strategy">راهبرد</string>
     <string name="chain_settings">تنظیمات زنجیره</string>
     <string name="config_settings">تنظیمات پیکربندی</string>
     <string name="circular_reference">ارجاع حلقه‌ای</string>
     <string name="circular_reference_sum">مسیر نمی‌تواند شامل خودش باشد.</string>
     <string name="clear_profiles">پاک‌کردن</string>
-    <string name="action_create_group">گروه خالی</string>
-    <string name="action_from_link">از اشتراک</string>
-    <string name="action_scan_china_apps">اسکن برنامه‌های چینی</string>
     <string name="action_export_file">صدور به صورت فایل</string>
     <string name="action_export_clipboard">صدور در بریده‌دان</string>
     <string name="action_export">صدور</string>
@@ -255,8 +211,6 @@
         <item quantity="other">%d پراکسی اضافه شدند</item>
     </plurals>
     <string name="undo">برگشت</string>
-    <string name="insecure">ناامن</string>
-    <string name="deprecated">منسوخ</string>
     <!-- tasker -->
     <!-- status -->
     <string name="connecting">در حال اتصال…</string>
@@ -278,8 +232,6 @@
     <string name="plugin_configure">پیکربندی…</string>
     <string name="plugin_disabled">غیرفعال</string>
     <string name="plugin_unknown">افزونه نامشخص %s</string>
-    <string name="plugin_untrusted">هشدار: به نظر می‌رسد این افزونه از منابع شناخته‌شده نیست و ممکن است ناامن باشد.</string>
-    <string name="plugin_auto_connect_unlock_only">این افزونه ممکن است با اتصال خودکار، کار نکند</string>
     <string name="proxy_cat">تنظیمات سرور</string>
     <string name="ss_cat">تنظیمات سرور</string>
     <string name="unsaved_changes_prompt">تغییرات جدید هنوز ذخیره نشدند، آیا می‌خواهید ذخیره شوند؟</string>
@@ -288,23 +240,16 @@
     <string name="apply">اعمال تغییرات</string>
     <string name="need_reload">برای اعمال تغییرات، سرویس پراکسی را دوباره راه‌اندازی کنید</string>
     <string name="license">مجوز</string>
-    <string name="route_warn">اطمینان حاصل کنید که مستندات فنی را قبل از افزودن قوانین سفارشی مطالعه کرده‌اید،
- در غیر این صورت ممکن است نتوانید به اینترنت وصل شوید.</string>
     <string name="lines">%d خط</string>
     <string name="night_mode">حالت تاریک</string>
     <string name="follow_system">مانند سیستم</string>
     <string name="enable">فعال</string>
     <string name="disable">غیرفعال</string>
     <string name="auto">خودکار</string>
-    <string name="enable_log">فعال کردن ثبت آمار</string>
-    <string name="enable_log_sum">برای اهداف عیب‌یابی</string>
     <string name="list">فهرست</string>
     <string name="random">تصادفی</string>
     <string name="leastPing" translatable="false">Ping</string>
-    <string name="api_port">پورت API</string>
-    <string name="probe_interval">مدت زمان Balancer observation</string>
     <string name="standard">استاندارد</string>
-    <string name="v2rayn" translatable="false">V2RayN</string>
     <string name="available" translatable="false">%dms</string>
     <string name="unavailable">در دسترس نیست</string>
     <string name="always_show_address">نشانی‌ها همواره نمایش داده شود</string>
@@ -313,9 +258,6 @@
     <string name="connection_test">آزمایش اتصال</string>
     <string name="connection_test_clear_results">پاک کردن نتایج آزمایش</string>
     <string name="connection_test_tcp_ping" translatable="false">TCPing</string>
-    <string name="connection_test_tcp_ping_unavailable">TCPing در دسترس نیست</string>
-    <string name="connection_test_icmp_ping" translatable="false">ICMPing</string>
-    <string name="connection_test_icmp_ping_unavailable">ICMPing در دسترس نیست</string>
     <string name="connection_test_url_test" translatable="false">آزمایش اتصال به لینک</string>
     <string name="connection_test_domain_not_found">دامنه یافت نشد</string>
     <string name="connection_test_refused">اتصال رد شد</string>
@@ -323,19 +265,15 @@
     <string name="connection_test_timeout">بدون پاسخ</string>
     <string name="append_http_proxy">پراکسی HTTP را به VPN اضافه کنید</string>
     <string name="append_http_proxy_sum">پروکسی HTTP مستقیماً از (مرورگر/برخی برنامه‌های پشتیبانی‌شده) بدون استفاده از دستگاه NIC مجازی (نسخه اندروید بالاتر از 10) استفاده می‌شود.</string>
-    <string name="protocol_settings">تنظیمات پروتکل‌ها</string>
-    <string name="trojan_provider">تأمین‌کننده Trojan</string>
     <string name="group_basic">ابتدایی</string>
     <string name="group_settings">تنظیمات گروه</string>
     <string name="subscription">اشتراک</string>
     <string name="subscription_settings">تنظیمات اشتراک</string>
     <string name="group_type">نوع گروه</string>
-    <string name="subscription_type">نوع اشتراک</string>
     <string name="delete_group_prompt">آیا می‌خواهید این گروه را حذف کنید؟</string>
     <string name="force_resolve">بررسی اجباری</string>
     <string name="force_resolve_sum">هنگام به‌روزرسانی گروه، همه نام‌های دامنه را به نشانی IP تفسیر کنید. میزبان و SNI در صورت امکان به صورت خودکار اضافه می‌شوند.</string>
     <string name="deduplication_sum">حذف خودکار پراکسی‌های تکراری، بعد از به‌روزرسانی</string>
-    <string name="raw">خام</string>
     <string name="update_settings">اعمال تغییرات</string>
     <string name="auto_update">به‌روزرسانی خودکار</string>
     <string name="auto_update_delay">به‌روزرسانی خودکار گروه (در مدت زمان مورد نظر به دقیقه)</string>
@@ -345,20 +283,15 @@
     <string name="confirm">تأیید</string>
     <string name="missing_plugin">افزونه مورد نیاز یافت‌ نشد</string>
     <string name="profile_requiring_plugin">پراکسی %s نیاز به نصب افزونه %s دارد، اما پیدا نشد.</string>
-    <string name="action_learn_more">اطلاعات بیشتر</string>
     <string name="action_download">دانلود</string>
     <string name="install_from_play_store">نصب از فروشگاه Play</string>
     <string name="install_from_fdroid">نصب از F-Droid</string>
     <string name="download">دانلود</string>
-    <string name="ooc_subscription_token">مشخصه OOCv1 API</string>
-    <string name="ooc_subscription_token_invalid">مشخصه OOCv1 نادرست</string>
     <string name="update_subscription_warning">پروکسی متصل نیست، آیا مطمئن هستید که می خواهید به‌روزرسانی کنید؟</string>
     <string name="ooc_warning">هشدار</string>
-    <string name="ooc_missing_protocol">اشتراک به پشتیبانی از پروتکل %s نیاز دارد، اما یافت نشد. پراکسی های پشتیبانی نشده نادیده گرفته می شوند.</string>
     <string name="service_subscription">سرویس به‌روزسانی اشتراک</string>
     <string name="subscription_update">به‌روزرسانی اشتراک</string>
     <string name="subscription_update_message">به‌روزرسانی %s …</string>
-    <string name="group_filter">پالایش</string>
     <string name="subscription_used">%s استفاده‌شده</string>
     <string name="subscription_traffic">%s استفاده‌شده / %s باقی‌مانده</string>
     <string name="subscription_expire">انقضا: %s</string>
@@ -375,7 +308,6 @@
     <string name="hysteria_auth_payload">بسته احرازهویت</string>
     <string name="hysteria_upload_mbps">حدأکثر سرعت ارسال (به مگابیت‌برثانیه)</string>
     <string name="hysteria_download_mbps">حدأکثر سرعت دریافتی (به مگابیت‌برثانیه)</string>
-    <string name="experimental_settings">تنظیمات آزمایشی</string>
     <string name="hysteria_stream_receive_window">پنجره دریافت جریان QUIC</string>
     <string name="hysteria_connection_receive_window">پنجره دریافت اتصال QUIC</string>
     <string name="hysteria_disable_mtu_discovery">غیرفعال کردن Path MTU Discovery</string>
@@ -383,43 +315,22 @@
     <string name="group_order_origin">مبدأ</string>
     <string name="group_order_by_name">به ترتیب نام</string>
     <string name="group_order_by_delay">به میزان تأخیر</string>
-    <string name="plugin_exists_but_on_shit_system">پراکسی %s به افزونه %s نیاز دارد، اما تأمین‌کننده تجهیزات اختصاصی شما(معمولاً سازمان‌های جاسوسی و سازنده بدافزار) اندروید شما را دستکاری کرده و افزونه را غیرقابل استفاده کرده است!</string>
 
-    <string name="shadowsocks_plugin_simple_obfs">Obfs ساده (افزونه اندروید Shadowsocks)</string>
-    <string name="shadowsocks_plugin_v2ray">V2Ray (افزونه Shadowsocks اندروید)</string>
 
-    <string name="traffic_uplink" translatable="false">%s | %s/s ↑</string>
-    <string name="traffic_downlink" translatable="false">%s | %s/s ↓</string>
 
-    <string name="traffic_uplink_total" translatable="false">%s ↑</string>
-    <string name="traffic_downlink_total" translatable="false">%s ↓</string>
 
-    <string name="tcp_connections">%d اتصال TCP</string>
-    <string name="udp_connections">%d اتصال UDP</string>
 
-    <string name="copy_label">کپی کردن نام</string>
-    <string name="copy_package_name">کپی کردن نام بسته</string>
-    <string name="open_app">باز کردن برنامه</string>
-    <string name="open_settings">باز کردن تنظیمات</string>
-    <string name="open_market">باز کردن بازار</string>
-    <string name="create_rule">افزودن دستورالعمل</string>
 
-    <string name="copy_success">کپی موفق!</string>
-    <string name="copy_failed">کپی ناموفق.</string>
-    <string name="app_no_launcher">این برنامه، رابط کاربری ندارد.</string>
     <string name="route_for">دستورالعمل برای %s</string>
 
     <string name="route_need_vpn">دستورالعمل مسیریابی %s متکی به اجرای VPN است، بنابراین نادیده گرفته می‌شود.</string>
 
     <string name="profile_traffic_statistics">آمار ترافیک پراکسی</string>
     <string name="profile_traffic_statistics_summary">در صورت غیرفعال شدن، ترافیک استفاده شده پراکسی محاسبه نخواهد شد</string>
-    <string name="no_statistics">هنوز بدون آمار</string>
-    <string name="app_statistics_disabled">آمار ترافیک برنامه غیرفعال شد</string>
     <string name="ssh_auth_type_none">هیچ کدام</string>
     <string name="ssh_public_key">کلید عمومی</string>
     <string name="ssh_private_key">کلید خصوصی</string>
     <string name="ssh_private_key_passphrase">عبارات عبور کلید خصوصی</string>
-    <string name="translate_platform">سکوی ترجمه</string>
     <string name="menu_tools">ابزارها</string>
     <string name="menu_log">آمار و اطلاعات</string>
     <string name="clear_logcat">پاک‌کردن اطلاعات Logcat</string>
@@ -427,17 +338,9 @@
     <string name="wireguard_public_key">کلید عمومی همتا</string>
     <string name="wireguard_psk">کلید همتا از پیش مشترک</string>
 
-    <string name="cloudflare_wrap" translatable="false">Cloudflare Warp</string>
-    <string name="warp_license">CloudFlare Warp یک ارائه دهنده رایگان WireGuard VPN است. با استفاده از آن، با شرایط استفاده، موافقت می کنید.</string>
-    <string name="warp_generate">ایجاد پیکربندی</string>
-    <string name="generating">در حال ایجاد…</string>
     <string name="tun_implementation">پیاده‌سازی TUN</string>
-    <string name="destination_override">بازنویسی مقصد</string>
-    <string name="destination_override_summary">از دامنه ردیابی‌شده برای بازنویسی آدرس مقصد استفاده کنید، نه فقط برای مسیریابی.</string>
     <string name="resolve_destination">بررسی مقصد</string>
     <string name="resolve_destination_summary">اگر آدرس مقصد یک دامنه باشد، بر اساس استراتژی IPv6 (تعارض با FakeDNS) از بین می‌رود.</string>
-    <string name="pcap" translatable="false">Pcap</string>
-    <string name="pcap_notice">فایل‌های Pcap در %s ذخیره می‌شوند.</string>
     <string name="naive_insecure_concurrency">همزمانی ناامن</string>
     <string name="naive_insecure_concurrency_summary">از N اتصال تونل همزمان برای قوی‌تر بودن در شرایط بد شبکه استفاده کنید. اتصالات بیشتر، اتصال به تونل را آسان‌تر و ایمن‌تر می کند. این پروژه برای افزایش امنیت در برابر شنود ترافیک تلاش می‌کند. استفاده ناامن، هدف پروژه نیست. \n\nاگر می‌خواهید از این استفاده کنید، ابتدا N=2 را امتحان کنید تا ببینید آیا مشکلات شما حل می‌شود یا خیر. اکیداً توصیه می‌شود از بیش از 4 اتصال در اینجا استفاده نکنید.</string>
 
@@ -463,7 +366,6 @@
 
     <string name="packet_encoding">رمزگذاری بسته</string>
     <string name="acquire_wake_lock">به دست آوردن WakeLock</string>
-    <string name="release_wake_lock">رها کردن WakeLock</string>
     <string name="acquire_wake_lock_summary">پردازنده را روشن نگه‌می‌دارد.</string>
     <string name="action_switch">سوییچ</string>
 
@@ -472,11 +374,8 @@
     <string name="tuic_disable_sni">غیرفعال کردن SNI</string>
     <string name="tuic_reduce_rtt">فعال کردن ارتباط 0-RTT QUIC</string>
 
-    <string name="please_update">نسخه (%s) برنامه شما بسیار قدیمی شده است و در %s متوقف می‌شود. لطفاً به نسخه جدیدتر به‌روزرسانی کنید</string>
-    <string name="please_update_force">برنامه شما خیلی قدیمی شده است (%s). و در %s کار نمی‌کند. باید نسخه جدید را دانلود کنید!</string>
     <string name="connection_test_delete_unavailable">پاک‌کردن غیرقابل‌دسترس‌ها</string>
     <string name="move">حرکت</string>
-    <string name="exe_prefer_provider">ارائه‌دهنده برگزیده افزونه‌ها</string>
     <string name="create_shortcut">ساخت میانبر</string>
     <string name="app_tls_version">نسخه TLS </string>
     <string name="hop_interval">مدت زمان Port hopping (به ثانیه)</string>
@@ -488,7 +387,6 @@
     <string name="custom_outbound_json">خروجی سفارشی JSON</string>
     <string name="custom_config_json">پراکسی سفارشی JSON</string>
     <string name="is_outbound_only">مجموعه JSON برای خروجی است</string>
-    <string name="save">ذخیره</string>
     <string name="set_panel_url">تعیین لینک صفحه</string>
     <string name="enable_clash_api">فعال کردن Clash API</string>
     <string name="log_level">سطح ثبت آمار</string>
@@ -511,12 +409,8 @@
     <string name="test_concurrency">آزمایش همزمان اتصال</string>
     <string name="mux_type">پروتکل مالتی‌پلکسر</string>
     <string name="sniff_routing">ردیابی نتایج برای مسیریابی</string>
-    <string name="sniff_override">ردیابی نتایج برای مقصد</string>
-    <string name="resolve_server">نشانی سرور را مطابق خط مشی IPv6 بررسی کنید</string>
     <string name="auto_select_proxy_apps">انتخاب خودکار برنامه‌های پراکسی</string>
     <string name="auto_select_proxy_apps_message">انتخاب خودکار برنامه‌های پراکسی، با این کار انتخاب‌های فعلی شما پاک می شود.</string>
-    <string name="enable_ech">فعال کردن ECH</string>
-    <string name="enable_ech_sum">فعال کردن ECH</string>
     <string name="ech_settings">تنظیمات ECH</string>
     <string name="ech_config">پیکربندی ECH</string>
     <string name="http_upgrade_host">میزبان HTTPUpgrade</string>

@@ -152,9 +152,6 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
             )
         }
 
-        //for (String key : systemProperties.stringPropertyNames()) {
-        //    Logger.logVerbose(key + ": " +  systemProperties.get(key));
-        //}
         return systemProperties
     }
 

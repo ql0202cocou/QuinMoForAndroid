@@ -102,7 +102,6 @@ object RawUpdater : GroupUpdater() {
             var index = 0
             var name = proxy.displayName()
             while (proxiesMap.containsKey(name)) {
-                println("Exists name: $name")
                 index++
                 name = name.replace(" (${index - 1})", "")
                 name = "$name ($index)"

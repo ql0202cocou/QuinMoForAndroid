@@ -7,7 +7,6 @@ import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
-import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean
 import io.nekohasekai.sagernet.ktx.app
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
@@ -69,15 +68,9 @@ class TrojanGoSettingsActivity : ProfileSettingsActivity<TrojanGoBean>() {
         rootKey: String?,
     ) {
         addPreferencesFromResource(R.xml.trojan_go_preferences)
-        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.apply {
-            setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
-        }
-        findPreference<EditTextPreference>(Key.SERVER_PASSWORD)!!.apply {
-            summaryProvider = PasswordSummaryProvider
-        }
-        findPreference<EditTextPreference>(Key.SERVER_PASSWORD1)!!.apply {
-            summaryProvider = PasswordSummaryProvider
-        }
+        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.bindPortPreference()
+        findPreference<EditTextPreference>(Key.SERVER_PASSWORD)!!.bindPasswordPreference()
+        findPreference<EditTextPreference>(Key.SERVER_PASSWORD1)!!.bindPasswordPreference()
         wsCategory = findPreference(Key.SERVER_WS_CATEGORY)!!
         ssCategory = findPreference(Key.SERVER_SS_CATEGORY)!!
         method = findPreference(Key.SERVER_METHOD)!!

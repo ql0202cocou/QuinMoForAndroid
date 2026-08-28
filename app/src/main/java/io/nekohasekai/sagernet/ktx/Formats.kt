@@ -42,12 +42,6 @@ inline fun JSONArray.forEach(action: (Int, Any) -> Unit) {
     }
 }
 
-inline fun JSONObject.forEach(action: (String, Any) -> Unit) {
-    for (k in this.keys()) {
-        action(k, this.get(k))
-    }
-}
-
 fun isJsonObjectValid(j: Any): Boolean {
     if (j is JSONObject) return true
     if (j is JSONArray) return true
@@ -110,29 +104,31 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
     val entities = ArrayList<AbstractBean>()
     val entitiesByLine = ArrayList<AbstractBean>()
 
+    val linkParsers: List<Triple<String, String, (String) -> AbstractBean>> = listOf(
+        Triple("sn://", "universal", ::parseUniversal),
+        Triple("socks://", "socks", ::parseSOCKS),
+        Triple("socks4://", "socks", ::parseSOCKS),
+        Triple("socks4a://", "socks", ::parseSOCKS),
+        Triple("socks5://", "socks", ::parseSOCKS),
+        Triple("vmess://", "v2ray", ::parseV2Ray),
+        Triple("vless://", "vless", ::parseV2Ray),
+        Triple("trojan://", "trojan", ::parseTrojan),
+        Triple("trojan-go://", "trojan-go", ::parseTrojanGo),
+        Triple("ss://", "shadowsocks", ::parseShadowsocks),
+        Triple("naive+", "naive", ::parseNaive),
+        Triple("hysteria://", "hysteria1", ::parseHysteria1),
+        Triple("hysteria2://", "hysteria2", ::parseHysteria2),
+        Triple("hy2://", "hysteria2", ::parseHysteria2),
+        Triple("tuic://", "TUIC", ::parseTuic),
+        Triple("anytls://", "anytls", ::parseAnytls),
+    )
+
     fun String.parseLink(entities: ArrayList<AbstractBean>) {
         if (startsWith("clash://install-config?") || startsWith("sn://subscription?")) {
             throw SubscriptionFoundException(this)
         }
 
-        if (startsWith("sn://")) {
-            Logs.d("Try parse universal link: $this")
-            runCatching {
-                entities.add(parseUniversal(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("socks://") || startsWith("socks4://") || startsWith("socks4a://") || startsWith(
-                "socks5://"
-            )
-        ) {
-            Logs.d("Try parse socks link: $this")
-            runCatching {
-                entities.add(parseSOCKS(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (matches("(http|https)://.*".toRegex())) {
+        if (matches("(http|https)://.*".toRegex())) {
             Logs.d("Try parse http link: $this")
             runCatching {
                 entities.add(parseHttp(this))
@@ -147,75 +143,18 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
                     .replaceFirst("https://", "clash://")
                 throw (SubscriptionFoundException(clashUrl))
             }
-        } else if (startsWith("vmess://")) {
-            Logs.d("Try parse v2ray link: $this")
-            runCatching {
-                entities.add(parseV2Ray(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("vless://")) {
-            Logs.d("Try parse vless link: $this")
-            runCatching {
-                entities.add(parseV2Ray(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("trojan://")) {
-            Logs.d("Try parse trojan link: $this")
-            runCatching {
-                entities.add(parseTrojan(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("trojan-go://")) {
-            Logs.d("Try parse trojan-go link: $this")
-            runCatching {
-                entities.add(parseTrojanGo(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("ss://")) {
-            Logs.d("Try parse shadowsocks link: $this")
-            runCatching {
-                entities.add(parseShadowsocks(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("naive+")) {
-            Logs.d("Try parse naive link: $this")
-            runCatching {
-                entities.add(parseNaive(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("hysteria://")) {
-            Logs.d("Try parse hysteria1 link: $this")
-            runCatching {
-                entities.add(parseHysteria1(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("hysteria2://") || startsWith("hy2://")) {
-            Logs.d("Try parse hysteria2 link: $this")
-            runCatching {
-                entities.add(parseHysteria2(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("tuic://")) {
-            Logs.d("Try parse TUIC link: $this")
-            runCatching {
-                entities.add(parseTuic(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("anytls://")) {
-            Logs.d("Try parse anytls link: $this")
-            runCatching {
-                entities.add(parseAnytls(this))
-            }.onFailure {
-                Logs.w(it)
+            return
+        }
+
+        for ((prefix, name, parse) in linkParsers) {
+            if (startsWith(prefix)) {
+                Logs.d("Try parse $name link: $this")
+                runCatching {
+                    entities.add(parse(this))
+                }.onFailure {
+                    Logs.w(it)
+                }
+                return
             }
         }
     }
@@ -226,16 +165,8 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
     for (link in linksByLine) {
         link.parseLink(entitiesByLine)
     }
-//    var isBadLink = false
-    if (entities.onEach { it.initializeDefaultValues() }.size == entitiesByLine.onEach { it.initializeDefaultValues() }.size) run test@{
-        entities.forEachIndexed { index, bean ->
-            val lineBean = entitiesByLine[index]
-            if (bean == lineBean && bean.displayName() != lineBean.displayName()) {
-//                isBadLink = true
-                return@test
-            }
-        }
-    }
+    entities.forEach { it.initializeDefaultValues() }
+    entitiesByLine.forEach { it.initializeDefaultValues() }
     return if (entities.size > entitiesByLine.size) entities else entitiesByLine
 }
 

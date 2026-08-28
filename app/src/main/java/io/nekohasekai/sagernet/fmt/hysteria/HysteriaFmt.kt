@@ -86,18 +86,9 @@ fun parseHysteria2(url: String): HysteriaBean {
         link.queryParameter("insecure")?.also {
             allowInsecure = it == "1" || it == "true"
         }
-//        link.queryParameter("upmbps")?.also {
-//            uploadMbps = it.toIntOrNull() ?: uploadMbps
-//        }
-//        link.queryParameter("downmbps")?.also {
-//            downloadMbps = it.toIntOrNull() ?: downloadMbps
-//        }
         link.queryParameter("obfs-password")?.also {
             obfuscation = it
         }
-//        link.queryParameter("pinSHA256")?.also {
-//            // TODO your box do not support it
-//        }
     }
 }
 
@@ -331,14 +322,7 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
                     password = bean.obfuscation
                 }
             }
-//            disable_mtu_discovery = bean.disableMtuDiscovery
             password = bean.authPayload
-//            if (bean.streamReceiveWindow > 0) {
-//                recv_window_conn = bean.streamReceiveWindow.toLong()
-//            }
-//            if (bean.connectionReceiveWindow > 0) {
-//                recv_window_conn = bean.connectionReceiveWindow.toLong()
-//            }
             tls = SingBoxOptions.OutboundTLSOptions().apply {
                 if (bean.sni.isNotBlank()) {
                     server_name = bean.sni

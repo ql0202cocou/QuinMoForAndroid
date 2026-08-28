@@ -7,7 +7,6 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
@@ -91,17 +90,11 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
         val isVmess = tmpBean is VMessBean && tmpBean?.isVLESS == false
         val isVless = tmpBean?.isVLESS == true
 
-        serverPort.preference.apply {
-            this as EditTextPreference
-            setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
-        }
+        (serverPort.preference as EditTextPreference).bindPortPreference()
 
-        alterId.preference.apply {
-            this as EditTextPreference
-            setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
-        }
+        (alterId.preference as EditTextPreference).bindPortPreference()
 
-        uuid.preference.summaryProvider = PasswordSummaryProvider
+        (uuid.preference as EditTextPreference).bindPasswordPreference()
 
         type.preference.isVisible = !isHttp
         uuid.preference.isVisible = !isHttp

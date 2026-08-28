@@ -327,10 +327,6 @@
         <item>IPOnDemand</item>
     </string-array>
 
-    <string-array name="transproxy_mode">
-        <item>REDIRECT</item>
-        <item>TPROXY</item>
-    </string-array>
 
     <string-array name="mieru_protocol">
         <item>TCP</item>
@@ -367,19 +363,7 @@
         <item>L11R/Antizapret-sing-box-geo</item>
     </string-array>
 
-    <string-array name="balancer_type">
-        <item>@string/list</item>
-        <item>@string/menu_group</item>
-    </string-array>
 
-    <string-array name="balancer_strategy_entry">
-        <item>@string/random</item>
-        <item>@string/leastPing</item>
-    </string-array>
-    <string-array name="balancer_strategy_value">
-        <item />
-        <item>leastPing</item>
-    </string-array>
 
 
     <string-array name="group_types">
@@ -398,10 +382,6 @@
         <item>2</item>
     </string-array>
 
-    <string-array name="tuic_version">
-        <item>5</item>
-        <item>4</item>
-    </string-array>
 
     <string-array name="socks_versions">
         <item>SOCKS4</item>
@@ -409,10 +389,6 @@
         <item>SOCKS5</item>
     </string-array>
 
-    <string-array name="simple_obfs">
-        <item>http</item>
-        <item>tls</item>
-    </string-array>
 
     <string-array name="group_orders">
         <item>@string/group_order_origin</item>
@@ -449,7 +425,6 @@
         <item>9000</item>
     </string-array>
 
-    <string-array name="mux_select_init" />
 
     <string-array name="mux_type">
         <item>h2mux</item>
@@ -465,10 +440,6 @@
         <item>ipv6_only</item>
     </string-array>
 
-    <string-array name="exe_prefer_provider">
-        <item>Matsuri</item>
-        <item>SagerNet</item>
-    </string-array>
 
     <string-array name="app_tls_version">
         <item>1.2</item>

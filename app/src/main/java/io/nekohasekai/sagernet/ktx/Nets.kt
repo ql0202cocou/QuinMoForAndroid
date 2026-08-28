@@ -4,7 +4,7 @@ package io.nekohasekai.sagernet.ktx
 
 import android.os.SystemClock
 import io.nekohasekai.sagernet.BuildConfig
-import io.nekohasekai.sagernet.fmt.AbstractBean
+
 import libcore.Libcore
 import moe.matsuri.nb4a.utils.NGUtil
 import okhttp3.HttpUrl
@@ -52,10 +52,6 @@ fun String.wrapIPV6Host(): String {
     } else {
         return this
     }
-}
-
-fun AbstractBean.wrapUri(): String {
-    return "${finalAddress.wrapIPV6Host()}:$finalPort"
 }
 
 // Resolve via the group's proxyServerNameserver (first usable address, e.g. DoH);

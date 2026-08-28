@@ -6,7 +6,6 @@ import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
-import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 
@@ -42,12 +41,8 @@ class SocksSettingsActivity : ProfileSettingsActivity<SOCKSBean>() {
         rootKey: String?,
     ) {
         addPreferencesFromResource(R.xml.socks_preferences)
-        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.apply {
-            setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
-        }
-        val password = findPreference<EditTextPreference>(Key.SERVER_PASSWORD)!!.apply {
-            summaryProvider = PasswordSummaryProvider
-        }
+        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.bindPortPreference()
+        val password = findPreference<EditTextPreference>(Key.SERVER_PASSWORD)!!.bindPasswordPreference()
         val protocol = findPreference<SimpleMenuPreference>(Key.SERVER_PROTOCOL)!!
 
         fun updateProtocol(version: Int) {

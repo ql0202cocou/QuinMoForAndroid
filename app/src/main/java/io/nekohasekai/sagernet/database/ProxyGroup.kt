@@ -113,9 +113,6 @@ data class ProxyGroup(
         fun deleteById(groupId: Long): Int
 
         @Delete
-        fun deleteGroup(group: ProxyGroup)
-
-        @Delete
         fun deleteGroup(groupList: List<ProxyGroup>)
 
         @Insert

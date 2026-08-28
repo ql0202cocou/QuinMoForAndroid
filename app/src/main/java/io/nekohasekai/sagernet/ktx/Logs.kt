@@ -25,10 +25,6 @@ object Logs {
         Libcore.nekoLogPrintln("[Info] [${mkTag()}] $message")
     }
 
-    fun i(message: String, exception: Throwable) {
-        Libcore.nekoLogPrintln("[Info] [${mkTag()}] $message" + "\n" + exception.stackTraceToString())
-    }
-
     fun w(message: String) {
         Libcore.nekoLogPrintln("[Warning] [${mkTag()}] $message")
     }

@@ -10,7 +10,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.res.Resources
 import android.os.Build
 import android.system.Os
 import android.system.OsConstants
@@ -38,27 +37,14 @@ import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ui.MainActivity
 import io.nekohasekai.sagernet.ui.ThemedActivity
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import moe.matsuri.nb4a.utils.NGUtil
 import java.io.FileDescriptor
-import java.net.HttpURLConnection
 import java.net.InetAddress
-import java.net.Socket
 import java.net.URLEncoder
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.reflect.KMutableProperty0
 import kotlin.reflect.KProperty
-import kotlin.reflect.KProperty0
 
 fun String?.blankAsNull(): String? = if (isNullOrBlank()) null else this
 
@@ -81,26 +67,8 @@ val Throwable.readableMessage
  * https://android.googlesource.com/platform/prebuilts/runtime/+/94fec32/appcompat/hiddenapi-light-greylist.txt#9466
  */
 
-private val socketGetFileDescriptor = Socket::class.java.getDeclaredMethod("getFileDescriptor\$")
-val Socket.fileDescriptor get() = socketGetFileDescriptor.invoke(this) as FileDescriptor
-
 private val getInt = FileDescriptor::class.java.getDeclaredMethod("getInt$")
 val FileDescriptor.int get() = getInt.invoke(this) as Int
-
-suspend fun <T> HttpURLConnection.useCancellable(block: suspend HttpURLConnection.() -> T): T {
-    return suspendCancellableCoroutine { cont ->
-        cont.invokeOnCancellation {
-            if (Build.VERSION.SDK_INT >= 26) disconnect() else GlobalScope.launch(Dispatchers.IO) { disconnect() }
-        }
-        GlobalScope.launch(Dispatchers.IO) {
-            try {
-                cont.resume(block())
-            } catch (e: Throwable) {
-                cont.resumeWithException(e)
-            }
-        }
-    }
-}
 
 fun parsePort(str: String?, default: Int, min: Int = 1025): Int {
     val value = str?.toIntOrNull() ?: default
@@ -126,15 +94,6 @@ fun Context.listenForPackageChanges(onetime: Boolean = true, callback: () -> Uni
         })
     }
 
-/**
- * Based on: https://stackoverflow.com/a/26348729/2245107
- */
-fun Resources.Theme.resolveResourceId(@AttrRes resId: Int): Int {
-    val typedValue = TypedValue()
-    if (!resolveAttribute(resId, typedValue, true)) throw Resources.NotFoundException()
-    return typedValue.resourceId
-}
-
 fun Preference.remove() = parent!!.removePreference(this)
 
 /**
@@ -159,11 +118,6 @@ fun String?.parseNumericAddress(): InetAddress? =
 @JvmOverloads
 fun DialogFragment.showAllowingStateLoss(fragmentManager: FragmentManager, tag: String? = null) {
     if (!fragmentManager.isStateSaved) show(fragmentManager, tag)
-}
-
-fun String.pathSafe(): String {
-    // " " encoded as +
-    return URLEncoder.encode(this, "UTF-8")
 }
 
 fun String.urlSafe(): String {
@@ -289,7 +243,6 @@ fun Context.getColorAttr(@AttrRes resId: Int): Int {
     }.resourceId)
 }
 
-val isExpert: Boolean by lazy { BuildConfig.DEBUG || DataStore.isExpert }
 const val isOss = BuildConfig.FLAVOR == "oss"
 const val isPreview = BuildConfig.FLAVOR == "preview"
 
@@ -307,36 +260,5 @@ fun <T> Continuation<T>.tryResumeWithException(exception: Throwable) {
     }
 }
 
-operator fun <F> KProperty0<F>.getValue(thisRef: Any?, property: KProperty<*>): F = get()
-operator fun <F> KMutableProperty0<F>.setValue(
-    thisRef: Any?, property: KProperty<*>, value: F
-) = set(value)
-
-operator fun AtomicBoolean.getValue(thisRef: Any?, property: KProperty<*>): Boolean = get()
-operator fun AtomicBoolean.setValue(thisRef: Any?, property: KProperty<*>, value: Boolean) =
-    set(value)
-
 operator fun AtomicInteger.getValue(thisRef: Any?, property: KProperty<*>): Int = get()
 operator fun AtomicInteger.setValue(thisRef: Any?, property: KProperty<*>, value: Int) = set(value)
-
-operator fun AtomicLong.getValue(thisRef: Any?, property: KProperty<*>): Long = get()
-operator fun AtomicLong.setValue(thisRef: Any?, property: KProperty<*>, value: Long) = set(value)
-
-operator fun <T> AtomicReference<T>.getValue(thisRef: Any?, property: KProperty<*>): T = get()
-operator fun <T> AtomicReference<T>.setValue(thisRef: Any?, property: KProperty<*>, value: T) =
-    set(value)
-
-operator fun <K, V> Map<K, V>.getValue(thisRef: K, property: KProperty<*>) = get(thisRef)
-operator fun <K, V> MutableMap<K, V>.setValue(thisRef: K, property: KProperty<*>, value: V?) {
-
-    if (value != null) {
-
-        put(thisRef, value)
-
-    } else {
-
-        remove(thisRef)
-
-    }
-
-}

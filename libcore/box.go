@@ -71,8 +71,6 @@ func ResetAllConnections(system bool) {
 			main.Network().ResetNetwork()
 		}
 		log.Println("Reset system connections done")
-	} else {
-		log.Println("TODO: Reset user connections")
 	}
 }
 
@@ -187,7 +185,6 @@ func (b *BoxInstance) Sleep() {
 	if b.pauseManager != nil {
 		b.pauseManager.DevicePause()
 	}
-	// _ = b.Box.Router().ResetNetwork()
 }
 
 func (b *BoxInstance) Wake() {

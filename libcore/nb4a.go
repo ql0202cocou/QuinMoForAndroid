@@ -77,7 +77,6 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 	// Set up some component
 	go func() {
 		defer device.DeferPanicToError("InitCore-go", func(err error) { log.Println(err) })
-		device.GoDebug(process)
 
 		// certs
 		pem, err := os.ReadFile(externalAssetsPath + "ca.pem")

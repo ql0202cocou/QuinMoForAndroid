@@ -35,6 +35,7 @@ import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
 import io.nekohasekai.sagernet.fmt.AbstractBean
@@ -419,4 +420,14 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
     }
 
+}
+
+fun EditTextPreference.bindPortPreference(): EditTextPreference {
+    setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
+    return this
+}
+
+fun EditTextPreference.bindPasswordPreference(): EditTextPreference {
+    summaryProvider = ProfileSettingsActivity.PasswordSummaryProvider
+    return this
 }

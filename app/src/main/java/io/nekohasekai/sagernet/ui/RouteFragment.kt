@@ -15,7 +15,6 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.RuleEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
-import io.nekohasekai.sagernet.databinding.LayoutEmptyRouteBinding
 import io.nekohasekai.sagernet.databinding.LayoutRouteItemBinding
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.widget.ListListener
@@ -47,24 +46,6 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
 
         ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN, ItemTouchHelper.START) {
 
-            override fun getSwipeDirs(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-            ) = if (viewHolder is RuleAdapter.DocumentHolder) {
-                0
-            } else {
-                super.getSwipeDirs(recyclerView, viewHolder)
-            }
-
-            override fun getDragDirs(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-            ) = if (viewHolder is RuleAdapter.DocumentHolder) {
-                0
-            } else {
-                super.getDragDirs(recyclerView, viewHolder)
-            }
-
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val index = viewHolder.bindingAdapterPosition
                 ruleAdapter.remove(index)
@@ -75,12 +56,8 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 recyclerView: RecyclerView,
                 viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder,
             ): Boolean {
-                return if (target is RuleAdapter.DocumentHolder) {
-                    false
-                } else {
-                    ruleAdapter.move(viewHolder.bindingAdapterPosition, target.bindingAdapterPosition)
-                    true
-                }
+                ruleAdapter.move(viewHolder.bindingAdapterPosition, target.bindingAdapterPosition)
+                return true
             }
 
             override fun clearView(
@@ -147,40 +124,26 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             parent: ViewGroup,
             viewType: Int,
         ): RecyclerView.ViewHolder {
-            return if (viewType == 0) {
-                DocumentHolder(LayoutEmptyRouteBinding.inflate(layoutInflater, parent, false))
-            } else {
-                RuleHolder(LayoutRouteItemBinding.inflate(layoutInflater, parent, false))
-            }
-        }
-
-        override fun getItemViewType(position: Int): Int {
-            if (position == 0) return 0
-            return 1
+            return RuleHolder(LayoutRouteItemBinding.inflate(layoutInflater, parent, false))
         }
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            if (holder is DocumentHolder) {
-                holder.bind()
-            } else if (holder is RuleHolder) {
-                holder.bind(ruleList[position - 1])
-            }
+            (holder as RuleHolder).bind(ruleList[position])
         }
 
         override fun getItemCount(): Int {
-            return ruleList.size + 1
+            return ruleList.size
         }
 
         override fun getItemId(position: Int): Long {
-            if (position == 0) return 0L
-            return ruleList[position - 1].id
+            return ruleList[position].id
         }
 
         private val updated = HashSet<RuleEntity>()
         fun move(from: Int, to: Int) {
-            val first = ruleList[from - 1]
+            val first = ruleList[from]
             var previousOrder = first.userOrder
-            val (step, range) = if (from < to) Pair(1, from - 1 until to - 1) else Pair(-1, from - 1 downTo to)
+            val (step, range) = if (from < to) Pair(1, from until to) else Pair(-1, from downTo to + 1)
             for (i in range) {
                 val next = ruleList[i + step]
                 val order = next.userOrder
@@ -190,7 +153,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 updated.add(next)
             }
             first.userOrder = previousOrder
-            ruleList[to - 1] = first
+            ruleList[to] = first
             updated.add(first)
             notifyItemMoved(from, to)
         }
@@ -204,13 +167,13 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         }
 
         fun remove(index: Int) {
-            ruleList.removeAt(index - 1)
+            ruleList.removeAt(index)
             notifyItemRemoved(index)
         }
 
         override fun undo(actions: List<Pair<Int, RuleEntity>>) {
             for ((index, item) in actions) {
-                ruleList.add(index - 1, item)
+                ruleList.add(index, item)
                 notifyItemInserted(index)
             }
         }
@@ -225,7 +188,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         override suspend fun onAdd(rule: RuleEntity) {
             ruleListView.post {
                 ruleList.add(rule)
-                ruleAdapter.notifyItemInserted(ruleList.size)
+                ruleAdapter.notifyItemInserted(ruleList.size - 1)
                 needReload()
             }
         }
@@ -235,7 +198,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             if (index == -1) return
             ruleListView.post {
                 ruleList[index] = rule
-                ruleAdapter.notifyItemChanged(index + 1)
+                ruleAdapter.notifyItemChanged(index)
                 needReload()
             }
         }
@@ -248,7 +211,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 }
             } else ruleListView.post {
                 ruleList.removeAt(index)
-                ruleAdapter.notifyItemRemoved(index + 1)
+                ruleAdapter.notifyItemRemoved(index)
                 needReload()
             }
         }
@@ -258,14 +221,6 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 ruleList.clear()
                 ruleAdapter.notifyDataSetChanged()
                 needReload()
-            }
-        }
-
-        inner class DocumentHolder(binding: LayoutEmptyRouteBinding) : RecyclerView.ViewHolder(binding.root) {
-            fun bind() {
-                itemView.setOnClickListener {
-                    it.context.launchCustomTab("https://matsuridayo.github.io/nb4a-route/")
-                }
             }
         }
 

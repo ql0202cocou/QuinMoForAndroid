@@ -5,9 +5,10 @@ import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ui.profile.ProfileSettingsActivity
+import io.nekohasekai.sagernet.ui.profile.bindPasswordPreference
+import io.nekohasekai.sagernet.ui.profile.bindPortPreference
 import moe.matsuri.nb4a.proxy.PreferenceBinding
 import moe.matsuri.nb4a.proxy.PreferenceBindingManager
 import moe.matsuri.nb4a.proxy.Type
@@ -44,11 +45,7 @@ class AnyTLSSettingsActivity : ProfileSettingsActivity<AnyTLSBean>() {
     ) {
         addPreferencesFromResource(R.xml.anytls_preferences)
 
-        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.apply {
-            setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
-        }
-        findPreference<EditTextPreference>("password")!!.apply {
-            summaryProvider = PasswordSummaryProvider
-        }
+        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.bindPortPreference()
+        findPreference<EditTextPreference>("password")!!.bindPasswordPreference()
     }
 }

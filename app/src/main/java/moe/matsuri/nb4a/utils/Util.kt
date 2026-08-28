@@ -15,33 +15,6 @@ import java.util.zip.Inflater
 
 object Util {
 
-    /**
-     * 取两个文本之间的文本值
-     *
-     * @param text  源文本 比如：欲取全文本为 12345
-     * @param left  文本前面
-     * @param right 后面文本
-     * @return 返回 String
-     */
-    fun getSubString(text: String, left: String?, right: String?): String {
-        var zLen: Int
-        if (left.isNullOrEmpty()) {
-            zLen = 0
-        } else {
-            zLen = text.indexOf(left)
-            if (zLen > -1) {
-                zLen += left.length
-            } else {
-                zLen = 0
-            }
-        }
-        var yLen = if (right == null) -1 else text.indexOf(right, zLen)
-        if (yLen < 0 || right.isNullOrEmpty()) {
-            yLen = text.length
-        }
-        return text.substring(zLen, yLen)
-    }
-
     // Base64 for all
 
     fun b64EncodeUrlSafe(s: String): String {
@@ -50,15 +23,6 @@ object Util {
 
     fun b64EncodeUrlSafe(b: ByteArray): String {
         return String(Base64.encode(b, Base64.NO_PADDING or Base64.NO_WRAP or Base64.URL_SAFE))
-    }
-
-    // v2rayN Style
-    fun b64EncodeOneLine(b: ByteArray): String {
-        return String(Base64.encode(b, Base64.NO_WRAP))
-    }
-
-    fun b64EncodeDefault(b: ByteArray): String {
-        return String(Base64.encode(b, Base64.DEFAULT))
     }
 
     fun b64Decode(b: String): ByteArray {
@@ -168,13 +132,6 @@ object Util {
 
     fun timeStamp2Text(t: Long): String {
         return sdf1.format(Date(t))
-    }
-
-    fun tryToSetField(o: Any, name: String, value: Any) {
-        try {
-            o.javaClass.getField(name).set(o, value)
-        } catch (_: Exception) {
-        }
     }
 
     @SuppressLint("WrongConstant")

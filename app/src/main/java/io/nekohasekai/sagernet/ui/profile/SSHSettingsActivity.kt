@@ -6,7 +6,6 @@ import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
-import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.ssh.SSHBean
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 
@@ -51,16 +50,10 @@ class SSHSettingsActivity : ProfileSettingsActivity<SSHBean>() {
         rootKey: String?,
     ) {
         addPreferencesFromResource(R.xml.ssh_preferences)
-        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.apply {
-            setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
-        }
-        val password = findPreference<EditTextPreference>(Key.SERVER_PASSWORD)!!.apply {
-            summaryProvider = PasswordSummaryProvider
-        }
+        findPreference<EditTextPreference>(Key.SERVER_PORT)!!.bindPortPreference()
+        val password = findPreference<EditTextPreference>(Key.SERVER_PASSWORD)!!.bindPasswordPreference()
         val privateKey = findPreference<EditTextPreference>(Key.SERVER_PRIVATE_KEY)!!
-        val privateKeyPassphrase = findPreference<EditTextPreference>(Key.SERVER_PASSWORD1)!!.apply {
-            summaryProvider = PasswordSummaryProvider
-        }
+        val privateKeyPassphrase = findPreference<EditTextPreference>(Key.SERVER_PASSWORD1)!!.bindPasswordPreference()
         val authType = findPreference<SimpleMenuPreference>(Key.SERVER_AUTH_TYPE)!!
         fun updateAuthType(type: Int = DataStore.serverAuthType) {
             password.isVisible = type == SSHBean.AUTH_TYPE_PASSWORD

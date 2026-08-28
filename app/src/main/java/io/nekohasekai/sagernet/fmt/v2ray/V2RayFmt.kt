@@ -90,16 +90,6 @@ fun parseV2Ray(link: String): StandardV2RayBean {
         }
 
         when (protocol) {
-//            "tcp" -> {
-//                url.queryParameter("type")?.let { type ->
-//                    if (type == "http") {
-//                        bean.headerType = "http"
-//                        url.queryParameter("host")?.let {
-//                            bean.host = it
-//                        }
-//                    }
-//                }
-//            }
             "http" -> {
                 url.queryParameter("path")?.let {
                     bean.path = it

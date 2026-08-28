@@ -5,7 +5,6 @@ import io.nekohasekai.sagernet.ktx.toLink
 import io.nekohasekai.sagernet.ktx.unUrlSafe
 import io.nekohasekai.sagernet.ktx.urlSafe
 import moe.matsuri.nb4a.SingBoxOptions
-import moe.matsuri.nb4a.utils.NGUtil
 import moe.matsuri.nb4a.utils.Util
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -44,22 +43,6 @@ fun SOCKSBean.toUri(): String {
     if (!password.isNullOrBlank()) builder.password(password)
     if (!name.isNullOrBlank()) builder.encodedFragment(name.urlSafe())
     return builder.toLink("socks${protocolVersion()}")
-
-}
-
-fun SOCKSBean.toV2rayN(): String {
-
-    var link = ""
-    if (username.isNotBlank()) {
-        link += username.urlSafe() + ":" + password.urlSafe() + "@"
-    }
-    link += "$serverAddress:$serverPort"
-    link = "socks://" + NGUtil.encode(link)
-    if (name.isNotBlank()) {
-        link += "#" + name.urlSafe()
-    }
-
-    return link
 
 }
 

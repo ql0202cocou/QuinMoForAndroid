@@ -4,8 +4,9 @@ import android.os.Bundle
 import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.ui.profile.ProfileSettingsActivity
+import io.nekohasekai.sagernet.ui.profile.bindPasswordPreference
+import io.nekohasekai.sagernet.ui.profile.bindPortPreference
 import moe.matsuri.nb4a.proxy.PreferenceBinding
 import moe.matsuri.nb4a.proxy.PreferenceBindingManager
 import moe.matsuri.nb4a.proxy.Type
@@ -42,14 +43,8 @@ class ShadowTLSSettingsActivity : ProfileSettingsActivity<ShadowTLSBean>() {
         addPreferencesFromResource(R.xml.shadowtls_preferences)
         pbm.setPreferenceFragment(this)
 
-        serverPort.preference.apply {
-            this as EditTextPreference
-            setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
-        }
-        password.preference.apply {
-            this as EditTextPreference
-            summaryProvider = PasswordSummaryProvider
-        }
+        (serverPort.preference as EditTextPreference).bindPortPreference()
+        (password.preference as EditTextPreference).bindPasswordPreference()
     }
 
 }

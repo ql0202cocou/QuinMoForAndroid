@@ -30,7 +30,7 @@ import moe.matsuri.nb4a.plugin.Plugins
 import androidx.core.net.toUri
 import io.nekohasekai.sagernet.SagerNet
 
-private const val REPO_URL = "https://github.com/ql0202cocou/NekoBoxForAndroid"
+private const val REPO_URL = "https://github.com/ql0202cocou/QuinMoForAndroid"
 
 class AboutFragment : ToolbarFragment(R.layout.layout_about) {
 
