@@ -17,7 +17,7 @@ Functional neko commits (on top of the 1.12.x upstream base):
 | `6b4fdc8c` | nekoutils: add geoip geosite | `nekoutils/srs.go` helpers for libcore assets |
 | `7cf44f37` | nekoutils: add selector callback | `nekoutils/callback.go`, group selector callback |
 | `721602a8` | dialer: add DoNotSelectInterface | dialer option to skip VPN interface selection |
-| `0bc13363` | temp fix gvisor close | `protocol/tun/fix_gvisor.go`; check upstream gVisor updates before keeping |
+| ~~`0bc13363`~~ | ~~temp fix gvisor close~~ | **removed 2026-08-28**: upstream sing-tun's `GVisor.Close()` already contains the same fix (`Attach(nil)` + `CleanupEndpoints().Abort()`), and the patch's `unsafe.Pointer` field punning no longer matches sing-tun's `GVisor` layout (extra fields), so the punned `stack` was always nil — dead code that would read a garbage pointer on the next layout change |
 | `d294d39b` | outbound/vless: disable flow when mux is enable | check if upstream still needs this |
 | `44169a9b` | fix needCacheFile | cache file handling fix |
 

@@ -67,7 +67,12 @@ func (w *boxPlatformInterfaceWrapper) OpenInterface(options *tun.Options, platfo
 	}
 	//
 	options.FileDescriptor = int(tunFd)
-	return tun.New(*options)
+	tunStack, err := tun.New(*options)
+	if err != nil {
+		syscall.Close(tunFd)
+		return nil, err
+	}
+	return tunStack, nil
 }
 
 func (w *boxPlatformInterfaceWrapper) UsePlatformDefaultInterfaceMonitor() bool {

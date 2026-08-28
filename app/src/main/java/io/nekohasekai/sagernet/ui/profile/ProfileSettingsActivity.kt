@@ -339,39 +339,58 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
             R.id.action_move -> {
                 val activity = requireActivity() as ProfileSettingsActivity<*>
-                val view = LinearLayout(context).apply {
-                    val ent = activity.proxyEntity!!
-                    orientation = LinearLayout.VERTICAL
 
-                    SagerDatabase.groupDao.allGroups()
-                        .filter { it.type == GroupType.BASIC && it.id != ent.groupId }
-                        .forEach { group ->
-                            LayoutGroupItemBinding.inflate(layoutInflater, this, true).apply {
-                                edit.isVisible = false
-                                options.isVisible = false
-                                groupName.text = group.displayName()
-                                groupUpdate.text = getString(R.string.move)
-                                groupUpdate.setOnClickListener {
-                                    runOnDefaultDispatcher {
-                                        val oldGroupId = ent.groupId
-                                        val newGroupId = group.id
-                                        ent.groupId = newGroupId
-                                        ProfileManager.updateProfile(ent)
-                                        GroupManager.postUpdate(oldGroupId) // reload
-                                        GroupManager.postUpdate(newGroupId)
-                                        DataStore.editingGroup = newGroupId // post switch animation
-                                        runOnMainDispatcher {
-                                            activity.finish()
+                fun showMoveDialog() {
+                    val view = LinearLayout(context).apply {
+                        val ent = activity.proxyEntity!!
+                        orientation = LinearLayout.VERTICAL
+
+                        SagerDatabase.groupDao.allGroups()
+                            .filter { it.type == GroupType.BASIC && it.id != ent.groupId }
+                            .forEach { group ->
+                                LayoutGroupItemBinding.inflate(layoutInflater, this, true).apply {
+                                    edit.isVisible = false
+                                    options.isVisible = false
+                                    groupName.text = group.displayName()
+                                    groupUpdate.text = getString(R.string.move)
+                                    groupUpdate.setOnClickListener {
+                                        runOnDefaultDispatcher {
+                                            val oldGroupId = ent.groupId
+                                            val newGroupId = group.id
+                                            ent.groupId = newGroupId
+                                            ProfileManager.updateProfile(ent)
+                                            GroupManager.postUpdate(oldGroupId) // reload
+                                            GroupManager.postUpdate(newGroupId)
+                                            DataStore.editingGroup = newGroupId // post switch animation
+                                            runOnMainDispatcher {
+                                                activity.finish()
+                                            }
                                         }
                                     }
                                 }
                             }
+                    }
+                    val scrollView = ScrollView(context).apply {
+                        addView(view)
+                    }
+                    MaterialAlertDialogBuilder(activity).setView(scrollView).show()
+                }
+
+                if (DataStore.dirty) {
+                    // Moving finishes the editor without applying the edits;
+                    // confirm like the back guard instead of silently dropping them.
+                    MaterialAlertDialogBuilder(activity).setTitle(R.string.unsaved_changes_prompt)
+                        .setPositiveButton(R.string.yes) { _, _ ->
+                            runOnDefaultDispatcher { activity.saveAndExit() }
                         }
+                        .setNegativeButton(R.string.no) { _, _ ->
+                            showMoveDialog() // discard the edits and move
+                        }
+                        .setNeutralButton(android.R.string.cancel, null)
+                        .show()
+                } else {
+                    showMoveDialog()
                 }
-                val scrollView = ScrollView(context).apply {
-                    addView(view)
-                }
-                MaterialAlertDialogBuilder(activity).setView(scrollView).show()
                 true
             }
 

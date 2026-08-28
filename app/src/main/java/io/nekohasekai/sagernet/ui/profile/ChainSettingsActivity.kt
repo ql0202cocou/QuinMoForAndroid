@@ -185,6 +185,12 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
             if (testProfileContains(entity, profile)) return false
         }
 
+        // reverse check: the candidate's own subtree must not contain the chain
+        // being edited, or adding it would close a loop (chain A holds chain B
+        // while B is being edited to add A)
+        val editing = ProfileManager.getProfile(DataStore.editingId)
+        if (editing != null && testProfileContains(profile, editing)) return false
+
         return true
     }
 

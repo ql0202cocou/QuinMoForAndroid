@@ -306,7 +306,7 @@ object RawUpdater : GroupUpdater() {
                                             ssPlugin.apply {
                                                 add("v2ray-plugin")
                                                 add("mode=" + (opts["mode"]?.toString() ?: ""))
-                                                if (opts["mode"]?.toString() == "true") add("tls")
+                                                if (opts["tls"]?.toString() == "true") add("tls")
                                                 add("host=" + (opts["host"]?.toString() ?: ""))
                                                 add("path=" + (opts["path"]?.toString() ?: ""))
                                                 if (opts["mux"]?.toString() == "true") add("mux=8")
@@ -508,6 +508,9 @@ object RawUpdater : GroupUpdater() {
                                                 when (echOpt.key) {
                                                     "enable" -> bean.enableECH =
                                                         echOpt.value.toString() == "true"
+
+                                                    "config" -> bean.echConfig =
+                                                        echOpt.value?.toString() ?: ""
                                                 }
                                             }
                                         }
@@ -539,6 +542,15 @@ object RawUpdater : GroupUpdater() {
                                         "alpn" -> {
                                             val alpn = (opt.value as? (List<String>))
                                             bean.alpn = alpn?.joinToString("\n")
+                                        }
+
+                                        "ech-opts" -> (opt.value as? Map<String, Any?>)?.also {
+                                            // AnyTLSBean has no enableECH; a non-blank
+                                            // echConfig enables ECH on both builders.
+                                            if (it["enable"]?.toString() != "false") {
+                                                bean.echConfig =
+                                                    it["config"]?.toString() ?: ""
+                                            }
                                         }
                                     }
                                 }

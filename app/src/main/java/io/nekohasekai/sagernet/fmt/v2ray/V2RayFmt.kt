@@ -189,6 +189,10 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
             (url.queryParameter("pqv") ?: url.queryParameter("mldsa65Verify"))?.let {
                 realityMldsa65Verify = it
             }
+            (url.queryParameter("ech") ?: url.queryParameter("echConfig"))?.let {
+                echConfig = it
+                enableECH = true
+            }
         }
     }
 
@@ -500,6 +504,9 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
                 }
                 if (utlsFingerprint.isNotBlank()) {
                     builder.addQueryParameter("fp", utlsFingerprint)
+                }
+                if (echConfig.isNotBlank()) {
+                    builder.addQueryParameter("ech", echConfig)
                 }
                 if (realityPubKey.isNotBlank()) {
                     builder.setQueryParameter("security", "reality")

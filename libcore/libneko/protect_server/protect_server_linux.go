@@ -43,7 +43,7 @@ func GetFdFromConn(l net.Conn) int {
 	return fd
 }
 
-func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)) io.Closer {
+func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)) (io.Closer, error) {
 	if verbose {
 		log.Println("ServeProtect", path, fwmark)
 	}
@@ -51,7 +51,7 @@ func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)
 	os.Remove(path)
 	l, err := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	os.Chmod(path, 0777)
 
@@ -97,5 +97,5 @@ func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)
 		}
 	}(protectCtl)
 
-	return l
+	return l, nil
 }

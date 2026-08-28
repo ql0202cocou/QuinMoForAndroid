@@ -31,8 +31,10 @@ object SubscriptionUpdater {
         var minDelay =
             subscriptions.minByOrNull { it.subscription!!.autoUpdateDelay }!!.subscription!!.autoUpdateDelay.toLong()
         val now = System.currentTimeMillis() / 1000L
+        // Seconds until the soonest-due subscription; an overdue one makes this
+        // negative, so no initial delay is set and the update runs immediately.
         var minInitDelay =
-            subscriptions.minOf { now - it.subscription!!.lastUpdated - (minDelay * 60) }
+            subscriptions.minOf { it.subscription!!.lastUpdated + (minDelay * 60) - now }
         if (minDelay < 15) minDelay = 15
         if (minInitDelay > 60) minInitDelay = 60
 

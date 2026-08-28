@@ -42,6 +42,8 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
             }.start()
         }
 
+        fun destroy() = process.destroy()
+
         @DelicateCoroutinesApi
         suspend fun looper(onRestartCallback: (suspend () -> Unit)?) {
             var running = true
@@ -112,6 +114,12 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
         Logs.i("start process: ${Commandline.toString(cmd)}")
         Guard(cmd, env).apply {
             start() // if start fails, IOException will be thrown directly
+            if (!coroutineContext[Job]!!.isActive) {
+                // close() already cancelled this pool: the looper launch below
+                // would never run and nothing else would kill this process
+                destroy()
+                return
+            }
             launch { looper(onRestartCallback) }
         }
         processCount += 1

@@ -51,6 +51,9 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         box.setAsMain()
         super.launch() // start box
         runOnDefaultDispatcher {
+            // The service may have stopped before this block runs; creating a
+            // looper now would spin on an already closed box.
+            if (isClosed()) return@runOnDefaultDispatcher
             looper = service?.let { TrafficLooper(it.data, this) }
             looper?.start()
         }

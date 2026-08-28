@@ -84,17 +84,26 @@ fun buildConfig(
     val selectorNames = ArrayList<String>()
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
 
-    fun ProxyEntity.resolveChainInternal(): MutableList<ProxyEntity> {
+    fun ProxyEntity.resolveChainInternal(visiting: MutableSet<Long> = mutableSetOf()): MutableList<ProxyEntity> {
         val bean = requireBean()
         if (bean is ChainBean) {
-            val beans = SagerDatabase.proxyDao.getEntities(bean.proxies)
-            val beansMap = beans.associateBy { it.id }
-            val beanList = ArrayList<ProxyEntity>()
-            for (proxyId in bean.proxies) {
-                val item = beansMap[proxyId] ?: continue
-                beanList.addAll(item.resolveChainInternal())
+            // Guard against chain loops in already-corrupted data: track the
+            // recursion stack and fail loudly instead of overflowing it.
+            if (!visiting.add(id)) {
+                error("chain loop detected: profile $id (${bean.name})")
             }
-            return beanList.asReversed()
+            try {
+                val beans = SagerDatabase.proxyDao.getEntities(bean.proxies)
+                val beansMap = beans.associateBy { it.id }
+                val beanList = ArrayList<ProxyEntity>()
+                for (proxyId in bean.proxies) {
+                    val item = beansMap[proxyId] ?: continue
+                    beanList.addAll(item.resolveChainInternal(visiting))
+                }
+                return beanList.asReversed()
+            } finally {
+                visiting.remove(id)
+            }
         }
         return mutableListOf(this)
     }

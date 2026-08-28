@@ -26,6 +26,7 @@ import moe.matsuri.nb4a.net.LocalResolverImpl
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
 import moe.matsuri.nb4a.proxy.anytls.buildMihomoConfig
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 
 abstract class BoxInstance(
@@ -39,7 +40,11 @@ abstract class BoxInstance(
     val pluginConfigs = hashMapOf<Int, Pair<Int, String>>()
     val externalInstances = hashMapOf<Int, AbstractInstance>()
     open lateinit var processes: GuardedProcessPool
-    private var cacheFiles = ArrayList<File>()
+
+    // Written by init/launch on one thread while close() may purge it from
+    // another (TestInstance cancellation); a plain ArrayList can CME there and
+    // the runCatching in close() would silently skip box.close().
+    private val cacheFiles = CopyOnWriteArrayList<File>()
 
     // Concurrent TestInstances share these directories, so let the filesystem
     // pick the name — a timestamp only makes collisions rarer, not impossible.
@@ -113,6 +118,10 @@ abstract class BoxInstance(
     }
 
     override fun launch() {
+        // A cancelled TestInstance may reach here after close(): starting the
+        // box and plugins now would leak them, so bail out instead.
+        if (isClosed()) return
+
         // TODO move, this is not box
         val cacheDir = File(SagerNet.application.cacheDir, "tmpcfg")
 
@@ -241,7 +250,8 @@ abstract class BoxInstance(
         // config file is already gone.
         if (::processes.isInitialized) processes.close(GlobalScope + Dispatchers.IO)
 
-        cacheFiles.removeAll { it.delete(); true }
+        cacheFiles.forEach { it.delete() }
+        cacheFiles.clear()
 
         if (::box.isInitialized) {
             box.close()
