@@ -1368,9 +1368,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                 notifyItemMoved(from, to)
             }
 
-            fun commitMove() = runOnDefaultDispatcher {
-                updated.forEach { SagerDatabase.proxyDao.updateProxy(it) }
-                updated.clear()
+            fun commitMove() {
+                // swap out the pending moves on the main thread: move() adds
+                // to `updated` there while the write below iterates it
+                val updated = HashSet(updated)
+                this.updated.clear()
+                runOnDefaultDispatcher {
+                    updated.forEach { SagerDatabase.proxyDao.updateProxy(it) }
+                }
             }
 
             fun remove(pos: Int) {
@@ -1441,19 +1446,19 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             override suspend fun onUpdated(data: TrafficData) {
-                try {
-                    val index = configurationIdList.indexOf(data.id)
-                    if (index != -1) {
-                        val holder = layoutManager.findViewByPosition(index)
-                            ?.let { configurationListView.getChildViewHolder(it) } as ConfigurationHolder?
-                        if (holder != null) {
-                            onMainDispatcher {
-                                holder.bind(holder.entity, data)
-                            }
+                onMainDispatcher {
+                    try {
+                        // touch the list on the main thread: this callback runs
+                        // on a background dispatcher while it mutates the list
+                        val index = configurationIdList.indexOf(data.id)
+                        if (index != -1) {
+                            val holder = layoutManager.findViewByPosition(index)
+                                ?.let { configurationListView.getChildViewHolder(it) } as ConfigurationHolder?
+                            holder?.bind(holder.entity, data)
                         }
+                    } catch (e: Exception) {
+                        Logs.w(e)
                     }
-                } catch (e: Exception) {
-                    Logs.w(e)
                 }
             }
 
@@ -1503,8 +1508,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
 
-                configurationList.clear()
-                configurationList.putAll(newProfiles.associateBy { it.id })
                 val newProfileIds = newProfiles.map { it.id }
 
                 var selectedProfileIndex = -1
@@ -1515,6 +1518,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
 
                 configurationListView.post {
+                    // mutate the lists on the main thread: this runs on a
+                    // background dispatcher while the main thread reads them
+                    configurationList.clear()
+                    configurationList.putAll(newProfiles.associateBy { it.id })
                     configurationIdList.clear()
                     configurationIdList.addAll(newProfileIds)
                     notifyDataSetChanged()

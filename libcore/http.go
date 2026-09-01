@@ -369,18 +369,19 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 				return
 			}
 
-			// Count the success before the send: the deferred check above
-			// must not observe a window where the winner was already sent
-			// but not yet counted.
-			successCount.Add(1)
-			select {
-			case successCh <- raceResult{i, rsp}:
-				// 第一个成功的请求，不要关闭 body
-			case <-waitCtx.Done():
-				// 主 goroutine 已取走胜者并返回（waitCancel 随 defer 触发），
-				// 迟到的响应永远无人接收，直接关闭 body
+			// The first success wins; every later one has no receiver left
+			// (the winner was already taken, or the wait timed out), so
+			// close its body in place instead of racing a buffered send
+			// against waitCtx.Done(), where Go picks randomly between the
+			// two ready cases. The deferred check above must not observe a
+			// window where the winner was already sent but not yet counted.
+			if successCount.Add(1) != 1 {
+				// 非第一个成功者，无人接收，直接关闭 body
 				rsp.Body.Close()
+				return
 			}
+			// 只有第一个成功者会 send，容量 1 的 channel 不会阻塞
+			successCh <- raceResult{i, rsp}
 		}(f, reqCtx)
 	}
 

@@ -169,11 +169,8 @@ object RawUpdater : GroupUpdater() {
         Logs.d("toDelete profiles: ${toDelete.size}")
         Logs.d("toReplace profiles: ${toReplace.size}")
 
-        // 下载期间分组可能已被删除，继续写入会留下指向不存在分组的孤儿节点
-        if (SagerDatabase.groupDao.getById(proxyGroup.id) == null) {
-            error("Group ${proxyGroup.id} was deleted during the update")
-        }
-
+        // 分组删除的检查移入下面的事务里，与写入保持原子
+        val toInsert = ArrayList<ProxyEntity>()
         val toUpdate = ArrayList<ProxyEntity>()
         val added = mutableListOf<String>()
         val updated = mutableMapOf<String, String>()
@@ -215,50 +212,60 @@ object RawUpdater : GroupUpdater() {
                 }
             } else {
                 changed++
-                SagerDatabase.proxyDao.addProxy(
-                    ProxyEntity(
-                        groupId = proxyGroup.id, userOrder = userOrder
-                    ).apply {
-                        putBean(bean)
-                    })
+                toInsert.add(ProxyEntity(
+                    groupId = proxyGroup.id, userOrder = userOrder
+                ).apply {
+                    putBean(bean)
+                })
                 added.add(name)
                 Logs.d("Inserted profile: $name")
             }
             userOrder++
         }
 
-        SagerDatabase.proxyDao.updateProxy(toUpdate).also {
-            Logs.d("Updated profiles: $it")
-        }
-
-        SagerDatabase.proxyDao.deleteProxy(toDelete).also {
-            Logs.d("Deleted profiles: $it")
-        }
-        // 被删节点可能是其他分组的 frontProxy/landingProxy，清理悬挂引用
-        if (toDelete.isNotEmpty()) GroupManager.resetDanglingGroupProxies()
-
-        val existCount = SagerDatabase.proxyDao.countByGroup(proxyGroup.id).toInt()
-
-        if (existCount != proxies.size) {
-            Logs.e("Exist profiles: $existCount, new profiles: ${proxies.size}")
-        }
-
-        subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
-        // 更新期间用户可能改过分组设置：重新读取当前行，只合并本流程负责写的
-        // 字段（远端分组名 / 订阅下发的节点解析 DNS / lastUpdated /
-        // subscriptionUserinfo），分组已被删除时（上面的检查之后）跳过写回
-        SagerDatabase.groupDao.getById(proxyGroup.id)?.also { current ->
-            if (remoteGroupName != null) current.name = remoteGroupName
-            if (subscriptionNameserver != null) {
-                current.proxyServerNameserver = subscriptionNameserver
+        // 写入整体放在一个事务里：进程在写入中途死亡不会留下新旧两套节点并存。
+        // 通知 UI 的回调（finishUpdate / onUpdateSuccess）必须留在事务外
+        SagerDatabase.instance.runInTransaction {
+            // 下载期间分组可能已被删除，继续写入会留下指向不存在分组的孤儿节点
+            if (SagerDatabase.groupDao.getById(proxyGroup.id) == null) {
+                error("Group ${proxyGroup.id} was deleted during the update")
             }
-            // 传入的 subscription 是更新开始时的旧快照，整体回写会覆盖用户
-            // 期间改的 link/deduplication 等；以新鲜行的 bean 为基础合并
-            current.subscription?.apply {
-                lastUpdated = subscription.lastUpdated
-                subscriptionUserinfo = subscription.subscriptionUserinfo
+
+            SagerDatabase.proxyDao.insert(toInsert)
+
+            SagerDatabase.proxyDao.updateProxy(toUpdate).also {
+                Logs.d("Updated profiles: $it")
             }
-            SagerDatabase.groupDao.updateGroup(current)
+
+            SagerDatabase.proxyDao.deleteProxy(toDelete).also {
+                Logs.d("Deleted profiles: $it")
+            }
+            // 被删节点可能是其他分组的 frontProxy/landingProxy，清理悬挂引用
+            if (toDelete.isNotEmpty()) GroupManager.resetDanglingGroupProxies()
+
+            val existCount = SagerDatabase.proxyDao.countByGroup(proxyGroup.id).toInt()
+
+            if (existCount != proxies.size) {
+                Logs.e("Exist profiles: $existCount, new profiles: ${proxies.size}")
+            }
+
+            subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
+            // 更新期间用户可能改过分组设置：重新读取当前行，只合并本流程负责写的
+            // 字段（远端分组名 / 订阅下发的节点解析 DNS / lastUpdated /
+            // subscriptionUserinfo），分组已被删除时（上面的检查之后）跳过写回
+            SagerDatabase.groupDao.getById(proxyGroup.id)?.also { current ->
+                if (remoteGroupName != null) current.name = remoteGroupName
+                if (subscriptionNameserver != null) {
+                    current.proxyServerNameserver = subscriptionNameserver
+                }
+                // 传入的 subscription 是更新开始时的旧快照，整体回写会覆盖用户
+                // 期间改的 link/deduplication 等；以新鲜行的 bean 为基础合并
+                current.subscription?.apply {
+                    lastUpdated = subscription.lastUpdated
+                    subscriptionUserinfo = subscription.subscriptionUserinfo
+                }
+                SagerDatabase.groupDao.updateGroup(current)
+            }
         }
         finishUpdate(proxyGroup)
 
@@ -290,13 +297,19 @@ object RawUpdater : GroupUpdater() {
 
                 val globalClientFingerprint = yaml["global-client-fingerprint"]?.toString() ?: ""
 
-                for (proxy in (yaml["proxies"] as? (List<Map<String, Any?>>) ?: error(
+                // List<*> without the Map type argument: a generic List<Map> cast is
+                // erased, so the compiler checkcasts each element AFTER the loop's
+                // runCatching guard and one "- ss://..." string entry would kill the
+                // whole update with a ClassCastException
+                for (proxyEntry in (yaml["proxies"] as? List<*> ?: error(
                     app.getString(R.string.no_proxies_found_in_file)
                 ))) {
                     // Note: YAML numbers parsed as "Long"
 
                     // Skip a single broken node instead of failing the whole update
                     runCatching {
+                        val proxy = proxyEntry as? Map<String, Any?>
+                            ?: error("proxy entry is not a map")
                         when (proxy["type"] as String) {
                             "socks5" -> {
                                 proxies.add(SOCKSBean().apply {

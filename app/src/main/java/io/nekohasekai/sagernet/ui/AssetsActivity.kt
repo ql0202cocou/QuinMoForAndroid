@@ -159,12 +159,14 @@ class AssetsActivity : ThemedActivity() {
             val filesDir = getExternalFilesDir(null) ?: filesDir
             val files = filesDir.listFiles()
                 ?.filter { it.isFile && it.name.endsWith(".db") && it.name !in assetNames }
-            assets.clear()
-            assets.add(File(filesDir, "geoip.db"))
-            assets.add(File(filesDir, "geosite.db"))
-            if (files != null) assets.addAll(files)
 
             layout.refreshLayout.post {
+                // mutate the list on the main thread: this runs on a
+                // background dispatcher while the main thread reads it
+                assets.clear()
+                assets.add(File(filesDir, "geoip.db"))
+                assets.add(File(filesDir, "geosite.db"))
+                if (files != null) assets.addAll(files)
                 notifyDataSetChanged()
             }
         }

@@ -84,7 +84,7 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
                                     cont.tryResume(Libcore.urlTest(box, link, timeout))
                                 }
                             } else {
-                                if (processes.processCount > 0) {
+                                if (processes.processCount.get() > 0) {
                                     // wait for plugin start
                                     delay(500)
                                 }

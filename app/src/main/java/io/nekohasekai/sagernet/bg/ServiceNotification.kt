@@ -25,6 +25,7 @@ import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.ui.SwitchActivity
 import io.nekohasekai.sagernet.utils.Theme
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
@@ -218,9 +219,18 @@ class ServiceNotification(
     }
 
     fun destroy() {
-        destroyed.set(true)
-        listenPostSpeed = false
-        ServiceCompat.stopForeground(service as Service, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        // update() checks `destroyed` under buildLock on Go callback threads;
+        // take the same lock so a notify cannot slip in between the flag
+        // check and stopForeground. Called on the main thread; the lock is
+        // never held across a suspension, so runBlocking cannot deadlock.
+        val service = service as Service
+        runBlocking {
+            buildLock.withLock {
+                destroyed.set(true)
+                listenPostSpeed = false
+                ServiceCompat.stopForeground(service, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            }
+        }
         service.unregisterReceiver(this)
     }
 }

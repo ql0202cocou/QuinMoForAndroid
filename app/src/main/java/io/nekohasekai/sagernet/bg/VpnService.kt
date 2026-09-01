@@ -220,12 +220,15 @@ class VpnService : BaseVpnService(),
 
         metered = DataStore.meteredNetwork
         if (Build.VERSION.SDK_INT >= 29) builder.setMetered(metered)
-        conn = builder.establish() ?: throw NullConnectionException()
+        val c = builder.establish() ?: throw NullConnectionException()
+        // killProcesses (main thread) may null conn between establish() and
+        // the fd read below; keep a local reference
+        conn = c
 
         // the VPN is up, so the permission-request notification is obsolete
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID_VPN_REQUEST)
 
-        return conn!!.fd
+        return c.fd
     }
 
     fun updateUnderlyingNetwork(builder: Builder? = null) {

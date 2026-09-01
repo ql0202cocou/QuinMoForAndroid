@@ -37,7 +37,11 @@ abstract class GroupUpdater {
     data class Progress(
         var max: Int
     ) {
-        var progress by AtomicInteger()
+        // incremented from the concurrent DNS lookup threads; keep the
+        // AtomicInteger reachable so incrementAndGet() can be used — ++ on
+        // the delegated Int is a non-atomic get+set and loses increments
+        val progressAtomic = AtomicInteger()
+        var progress by progressAtomic
     }
 
     protected suspend fun forceResolve(
@@ -85,7 +89,7 @@ abstract class GroupUpdater {
                     Logs.d("Lookup ${profile.serverAddress} failed: ${e.readableMessage}", e)
                 }
                 if (groupId != null) {
-                    progress.progress++
+                    progress.progressAtomic.incrementAndGet()
                     GroupManager.postReload(groupId)
                 }
             })

@@ -308,9 +308,14 @@ data class ProxyEntity(
 
                             is HysteriaBean -> {
                                 append("\n\n")
+                                var caFile: File? = null
                                 append(bean.buildHysteria1Config(port) {
                                     File.createTempFile("hysteria_", ".ca", app.cacheDir)
+                                        .also { caFile = it }
                                 })
+                                // the exported JSON keeps the path, but the temp
+                                // file itself must not linger in cacheDir
+                                caFile?.let { runCatching { it.delete() } }
                             }
 
                             is VMessBean -> {

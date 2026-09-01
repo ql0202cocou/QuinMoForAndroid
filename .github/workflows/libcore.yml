@@ -11,29 +11,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.ref }}
       - name: LibCore Cache
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: app/libs/libcore.aar
           # only the core build inputs belong in the key; hashing all of buildScript/**
           # forced a full gomobile rebuild on unrelated script edits (e.g. plugins.sh bumps)
           # exclusions keep the post-job key re-evaluation off the gitignored build outputs
-          key: libcore-${{ hashFiles('.github/workflows/libcore.yml', 'run', 'buildScript/lib/core.sh', 'buildScript/lib/core/**', 'buildScript/init/env.sh', 'buildScript/init/env_ndk.sh', 'libcore/**', '!libcore/.build/**', '!libcore/libcore.aar') }}
+          # the toolchain versions are pinned in the key so a Go/NDK bump forces a rebuild
+          key: libcore-go1.25-ndk25.0.8775105-${{ hashFiles('.github/workflows/libcore.yml', 'run', 'buildScript/lib/core.sh', 'buildScript/lib/core/**', 'buildScript/init/env.sh', 'buildScript/init/env_ndk.sh', 'libcore/**', '!libcore/.build/**', '!libcore/libcore.aar') }}
       - name: Install Golang
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: ^1.25
+          # pinned to the 1.25 line; ^1.25 drifted to 1.26.x while go.mod says 1.25.0
+          go-version: '1.25'
           cache-dependency-path: libcore/go.sum
+      - name: Install NDK 25.0.8775105
+        if: steps.cache.outputs.cache-hit != 'true'
+        # ubuntu-latest images ship only the latest NDK (27.x); without this step
+        # buildScript/init/env_ndk.sh silently falls back to it and the core is
+        # built with the wrong NDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;25.0.8775105" > /dev/null
       - name: Native Build
         if: steps.cache.outputs.cache-hit != 'true'
         run: ./run lib core
       - name: Upload LibCore
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: libcore-aar
           path: app/libs/libcore.aar

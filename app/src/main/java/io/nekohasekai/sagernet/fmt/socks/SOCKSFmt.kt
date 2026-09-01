@@ -28,8 +28,13 @@ fun parseSOCKS(link: String): SOCKSBean {
         if (password.isNullOrBlank() && !username.isNullOrBlank()) {
             try {
                 val n = username.decodeBase64UrlSafe()
-                username = n.substringBefore(":")
-                password = n.substringAfter(":")
+                // Only adopt the decoded value when it really is a v2rayN
+                // "user:pass" blob; a plain-text username can itself be valid
+                // base64 ("user" etc.) and must not be rewritten.
+                if (n.contains(":")) {
+                    username = n.substringBefore(":")
+                    password = n.substringAfter(":")
+                }
             } catch (_: Exception) {
             }
         }

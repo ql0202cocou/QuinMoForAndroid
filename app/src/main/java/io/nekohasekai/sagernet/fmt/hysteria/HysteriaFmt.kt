@@ -180,7 +180,8 @@ fun JSONObject.parseHysteria1Json(): HysteriaBean {
     return HysteriaBean().apply {
         protocolVersion = 1
         serverAddress = optString("server").substringBeforeLast(":")
-        serverPorts = optString("server").substringAfterLast(":")
+        // Without a ":" substringAfterLast returns the whole host; default to 443.
+        serverPorts = optString("server").substringAfterLast(":", "").ifBlank { "443" }
         uploadMbps = getIntNya("up_mbps")
         downloadMbps = getIntNya("down_mbps")
         obfuscation = getStr("obfs")

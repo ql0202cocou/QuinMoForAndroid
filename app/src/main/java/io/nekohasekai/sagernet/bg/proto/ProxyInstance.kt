@@ -18,7 +18,9 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     var lastSelectorGroupId = -1L
     var displayProfileName = ServiceNotification.genTitle(profile)
 
-    // for TrafficLooper
+    // for TrafficLooper (written on the Default dispatcher in launch(),
+    // read on the main thread in BaseService.persistStats and close())
+    @Volatile
     var looper: TrafficLooper? = null
 
     override fun buildConfig() {

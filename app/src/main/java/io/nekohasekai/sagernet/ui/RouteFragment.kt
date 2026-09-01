@@ -164,11 +164,16 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             notifyItemMoved(from, to)
         }
 
-        fun commitMove() = runOnDefaultDispatcher {
-            if (updated.isNotEmpty()) {
-                SagerDatabase.rulesDao.updateRules(updated.toList())
-                updated.clear()
-                needReload()
+        fun commitMove() {
+            // swap out the pending moves on the main thread: move() adds
+            // to `updated` there while the write below iterates it
+            val updated = HashSet(updated)
+            this.updated.clear()
+            runOnDefaultDispatcher {
+                if (updated.isNotEmpty()) {
+                    SagerDatabase.rulesDao.updateRules(updated.toList())
+                    needReload()
+                }
             }
         }
 

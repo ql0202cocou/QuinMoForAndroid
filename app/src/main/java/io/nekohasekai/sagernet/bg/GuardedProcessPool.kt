@@ -16,6 +16,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : CoroutineScope {
@@ -111,13 +112,12 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
     }
 
     override val coroutineContext = Dispatchers.Main.immediate + Job()
-    var processCount = 0
+    val processCount = AtomicInteger(0)
 
     // every successfully started guard, so close() can reap processes whose
     // looper coroutine never ran (pool cancelled after the isActive check)
     private val guards = CopyOnWriteArrayList<Guard>()
 
-    @MainThread
     fun start(
         cmd: List<String>,
         env: MutableMap<String, String> = mutableMapOf(),
@@ -135,7 +135,7 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
             }
             launch { looper(onRestartCallback) }
         }
-        processCount += 1
+        processCount.incrementAndGet()
     }
 
     @MainThread

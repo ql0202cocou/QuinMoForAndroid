@@ -36,7 +36,9 @@ class MTUPreference
                 .setPositiveButton(android.R.string.ok) { _, _ ->
                     val mtu = view.text.toString().toIntOrNull() ?: return@setPositiveButton
                     if (mtu < 1000 || mtu > 10000) return@setPositiveButton
-                    value = mtu.toString()
+                    // go through the change listener so SettingsPreferenceFragment's
+                    // reloadListener fires; only persist when it accepts the value
+                    if (callChangeListener(mtu.toString())) value = mtu.toString()
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()

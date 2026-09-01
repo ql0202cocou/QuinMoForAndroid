@@ -10,13 +10,18 @@ on:
         description: "Git ref to check out (empty = caller's ref)"
         required: false
         type: string
+      retention-days:
+        description: "Retention of the APKs artifact in days (release uses the default; preview has no publish job so the artifact is the only product)"
+        required: false
+        type: number
+        default: 1
 jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.ref }}
       - name: Download LibCore
@@ -25,9 +30,9 @@ jobs:
           name: libcore-aar
           path: app/libs
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
       - name: Plugin cores cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: app/executableSo
           key: plugins-${{ hashFiles('buildScript/lib/plugins.sh') }}
@@ -41,7 +46,11 @@ jobs:
       - name: Gradle Build
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
-          echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
+          # only point ndk.dir at NDK 25 when it is actually installed; the app has
+          # no externalNativeBuild, and a dangling path just spams CXX1102 warnings
+          if [ -d "${ANDROID_HOME}/ndk/25.0.8775105" ]; then
+            echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
+          fi
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
           export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
           ./run init action gradle
@@ -52,9 +61,10 @@ jobs:
             exit 1
           fi
           echo "APK=$(dirname "$APK")" >> $GITHUB_ENV
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: APKs
           path: ${{ env.APK }}
-          # hand-off for the publish job only; published APKs live as release assets
-          retention-days: 1
+          # release: hand-off for the publish job only; published APKs live as release assets
+          # preview: no publish job — the artifact IS the product, so preview.yml passes 7
+          retention-days: ${{ inputs.retention-days }}

@@ -129,7 +129,7 @@ fun buildSingBoxOutboundShadowsocksBean(bean: ShadowsocksBean): SingBoxOptions.O
         method = bean.method
         if (bean.plugin.isNotBlank()) {
             plugin = bean.plugin.substringBefore(";")
-            plugin_opts = bean.plugin.substringAfter(";")
+            plugin_opts = bean.plugin.substringAfter(";", "")
             if (plugin == "none") {
                 plugin = null
                 plugin_opts = null

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"sync"
 
 	"github.com/matsuridayo/libneko/neko_common"
 	"github.com/matsuridayo/libneko/syscallw"
@@ -76,6 +77,9 @@ func SetupLog(maxSize int, path string) (err error) {
 }
 
 type logWriter struct {
+	// mu serializes Write/Truncate/Close in-process; the flock in Write only
+	// excludes other processes, flock on the same fd is a no-op in-process.
+	mu      sync.Mutex
 	writers []io.Writer
 }
 
@@ -83,6 +87,9 @@ func (w *logWriter) Write(p []byte) (int, error) {
 	if LogWriterDisable {
 		return len(p), nil
 	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	for _, w := range w.writers {
 		if w == nil {
@@ -102,6 +109,9 @@ func (w *logWriter) Write(p []byte) (int, error) {
 }
 
 func (w *logWriter) Truncate() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	for _, w := range w.writers {
 		if w == nil {
 			continue
@@ -113,6 +123,9 @@ func (w *logWriter) Truncate() {
 }
 
 func (w *logWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	for _, w := range w.writers {
 		if w == nil {
 			continue

@@ -228,9 +228,14 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             notifyItemMoved(from, to)
         }
 
-        fun commitMove() = runOnDefaultDispatcher {
-            updated.forEach { SagerDatabase.groupDao.updateGroup(it) }
-            updated.clear()
+        fun commitMove() {
+            // swap out the pending moves on the main thread: move() adds
+            // to `updated` there while the write below iterates it
+            val updated = HashSet(updated)
+            this.updated.clear()
+            runOnDefaultDispatcher {
+                updated.forEach { SagerDatabase.groupDao.updateGroup(it) }
+            }
         }
 
         fun remove(index: Int) {
@@ -526,6 +531,8 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             runOnDefaultDispatcher {
                 val size = SagerDatabase.proxyDao.countByGroup(group.id)
                 onMainDispatcher {
+                    // the holder may have been recycled while counting
+                    if (proxyGroup.id != group.id) return@onMainDispatcher
                     @Suppress("DEPRECATION") when (group.type) {
                         GroupType.BASIC -> {
                             if (size == 0L) {

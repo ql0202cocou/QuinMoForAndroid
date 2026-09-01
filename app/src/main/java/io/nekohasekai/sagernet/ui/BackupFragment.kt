@@ -225,6 +225,8 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
         }
 
         onMainDispatcher {
+            // the user may have left while the file was read in the background
+            if (!isAdded) return@onMainDispatcher
             val import = LayoutImportBinding.inflate(layoutInflater)
             if (!content.has("profiles")) {
                 import.backupConfigurations.isVisible = false

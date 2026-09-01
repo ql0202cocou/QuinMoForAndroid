@@ -9,4 +9,7 @@ jobs:
     uses: ./.github/workflows/build-apk.yml
     with:
       gradle-task: app:assemblePreviewRelease
+      # no publish job here: the artifact is the only product, keep it downloadable
+      # until the manual prerelease is cut (default 1 day would be gone by then)
+      retention-days: 7
     secrets: inherit
