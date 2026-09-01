@@ -38,6 +38,9 @@ class VpnService : BaseVpnService(),
 
     }
 
+    // written by gomobile Go threads in startVpn, read/closed by the main
+    // thread in killProcesses
+    @Volatile
     var conn: ParcelFileDescriptor? = null
 
     private var metered = false
@@ -223,7 +226,27 @@ class VpnService : BaseVpnService(),
         val c = builder.establish() ?: throw NullConnectionException()
         // killProcesses (main thread) may null conn between establish() and
         // the fd read below; keep a local reference
+        conn?.let { stale ->
+            // a previous openTun lost the race against killProcesses
+            try {
+                stale.close()
+            } catch (e: IOException) {
+                Logs.w(e)
+            }
+        }
         conn = c
+        // killProcesses may already have run while establish() blocked: the
+        // service is stopping and nothing would ever close this fd. Don't
+        // hand the dead fd number back to the Go side either.
+        if (!data.state.started) {
+            try {
+                c.close()
+            } catch (e: IOException) {
+                Logs.w(e)
+            }
+            conn = null
+            throw IOException("service is stopping")
+        }
 
         // the VPN is up, so the permission-request notification is obsolete
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID_VPN_REQUEST)

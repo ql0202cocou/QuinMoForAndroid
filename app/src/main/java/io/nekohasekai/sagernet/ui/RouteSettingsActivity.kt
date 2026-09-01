@@ -131,9 +131,17 @@ class RouteSettingsActivity(
                     ProfileSelectActivity.EXTRA_PROFILE_ID, 0
                 )
             ) ?: return@runOnDefaultDispatcher
+            // Set pending before the DataStore writes so the re-init either
+            // re-applies it (callback ran first) or loses to these writes.
+            pendingRouteOutbound = profile.id
             DataStore.routeOutboundRule = profile.id
+            DataStore.routeOutbound = 3
             onMainDispatcher {
-                outbound.value = "3"
+                // The fragment may not be committed yet on a process-death
+                // restore; it reads the DataStore values when created.
+                if (::outbound.isInitialized) {
+                    outbound.value = "3"
+                }
             }
         }
     }
@@ -146,6 +154,12 @@ class RouteSettingsActivity(
 
     lateinit var outbound: OutboundPreference
     lateinit var apps: AppListPreference
+
+    // A redelivered activity result (process death while the picker was
+    // foreground) may run before the async re-init; init() must re-apply
+    // this so the entity values do not overwrite the user's selection.
+    @Volatile
+    private var pendingRouteOutbound: Long? = null
 
     fun PreferenceFragmentCompat.viewCreated(view: View, savedInstanceState: Bundle?) {
         outbound = findPreference(Key.ROUTE_OUTBOUND)!!
@@ -243,6 +257,13 @@ class RouteSettingsActivity(
                         return@runOnDefaultDispatcher
                     }
                     ruleEntity.init()
+                }
+
+                // Re-apply a picker result redelivered before this init ran,
+                // so the user's selection wins over the entity values.
+                pendingRouteOutbound?.let {
+                    DataStore.routeOutboundRule = it
+                    DataStore.routeOutbound = 3
                 }
 
                 onMainDispatcher {

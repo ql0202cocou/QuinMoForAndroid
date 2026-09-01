@@ -28,7 +28,7 @@ class TrojanGoSettingsActivity : ProfileSettingsActivity<TrojanGoBean>() {
         if (encryption.startsWith("ss;")) {
             DataStore.serverEncryption = "ss"
             DataStore.serverMethod = encryption.substringAfter(";").substringBefore(":")
-            DataStore.serverPassword1 = encryption.substringAfter(":")
+            DataStore.serverPassword1 = encryption.substringAfter(":", "")
         } else {
             DataStore.serverEncryption = encryption
         }

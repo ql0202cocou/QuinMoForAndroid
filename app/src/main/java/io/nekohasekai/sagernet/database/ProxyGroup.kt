@@ -40,7 +40,7 @@ data class ProxyGroup(
             output.writeString(name)
             output.writeInt(type)
             // a corrupted backup restore can leave a subscription group without one
-            val subscription = subscription ?: SubscriptionBean()
+            val subscription = subscription ?: SubscriptionBean().apply { initializeDefaultValues() }
             subscription.serializeForShare(output)
 
         } else {

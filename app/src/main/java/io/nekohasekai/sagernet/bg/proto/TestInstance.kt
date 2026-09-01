@@ -71,6 +71,15 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
                             // them, so bail out instead.
                             if (isClosed()) throw CancellationException("test cancelled")
                             init()
+                            if (isClosed()) {
+                                // Cancellation ran close() while init() was still
+                                // working: box.close() was skipped (box not yet
+                                // assigned) and cache files created later survive.
+                                // launch() would bail on isClosed() and leak both,
+                                // so finish the cleanup close() started.
+                                closeAfterLateInit()
+                                throw CancellationException("test cancelled")
+                            }
                             launch()
                             val controller = mihomoController
                             if (controller != null) {

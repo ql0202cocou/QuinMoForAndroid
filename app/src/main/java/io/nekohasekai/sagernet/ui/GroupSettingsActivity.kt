@@ -42,6 +42,15 @@ class GroupSettingsActivity(
     private lateinit var frontProxyPreference: OutboundPreference
     private lateinit var landingProxyPreference: OutboundPreference
 
+    // A redelivered activity result (process death while the picker was
+    // foreground) may run before the async re-init; init() must re-apply
+    // these so the entity values do not overwrite the user's selection.
+    @Volatile
+    private var pendingFrontProxy: Long? = null
+
+    @Volatile
+    private var pendingLandingProxy: Long? = null
+
     fun ProxyGroup.init() {
         DataStore.groupName = name ?: ""
         DataStore.groupType = type
@@ -245,6 +254,17 @@ class GroupSettingsActivity(
                     entity.init()
                 }
 
+                // Re-apply a picker result redelivered before this init ran,
+                // so the user's selection wins over the entity values.
+                pendingFrontProxy?.let {
+                    DataStore.frontProxy = it
+                    DataStore.frontProxyTmp = 3
+                }
+                pendingLandingProxy?.let {
+                    DataStore.landingProxy = it
+                    DataStore.landingProxyTmp = 3
+                }
+
                 onMainDispatcher {
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.settings, MyPreferenceFragmentCompat())
@@ -381,9 +401,17 @@ class GroupSettingsActivity(
             val profile = ProfileManager.getProfile(
                 it.data!!.getLongExtra(ProfileSelectActivity.EXTRA_PROFILE_ID, 0)
             ) ?: return@runOnDefaultDispatcher
+            // Set pending before the DataStore writes so the re-init either
+            // re-applies it (callback ran first) or loses to these writes.
+            pendingFrontProxy = profile.id
             DataStore.frontProxy = profile.id
+            DataStore.frontProxyTmp = 3
             onMainDispatcher {
-                frontProxyPreference.value = "3"
+                // The fragment may not be committed yet on a process-death
+                // restore; it reads the DataStore values when created.
+                if (::frontProxyPreference.isInitialized) {
+                    frontProxyPreference.value = "3"
+                }
             }
         }
     }
@@ -395,9 +423,13 @@ class GroupSettingsActivity(
             val profile = ProfileManager.getProfile(
                 it.data!!.getLongExtra(ProfileSelectActivity.EXTRA_PROFILE_ID, 0)
             ) ?: return@runOnDefaultDispatcher
+            pendingLandingProxy = profile.id
             DataStore.landingProxy = profile.id
+            DataStore.landingProxyTmp = 3
             onMainDispatcher {
-                landingProxyPreference.value = "3"
+                if (::landingProxyPreference.isInitialized) {
+                    landingProxyPreference.value = "3"
+                }
             }
         }
     }

@@ -127,7 +127,7 @@ fun TrojanGoBean.buildTrojanGoConfig(port: Int): String {
             encryption.startsWith("ss;") -> put("shadowsocks", JSONObject().apply {
                 put("enabled", true)
                 put("method", encryption.substringAfter(";").substringBefore(":"))
-                put("password", encryption.substringAfter(":"))
+                put("password", encryption.substringAfter(":", ""))
             })
         }
     }.toStringPretty()

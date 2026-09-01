@@ -262,16 +262,41 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer waitCancel()
 
-	successCh := make(chan raceResult, 1)
+	// Unbuffered: the winner's send is a rendezvous with the wait below, so
+	// a success arriving after the wait returned cannot park a response in
+	// the channel buffer with nobody left to close its body.
+	successCh := make(chan raceResult)
 	var finalErr error
 	var failedCount atomic.Uint32
 	var successCount atomic.Uint32
 	var mu sync.Mutex
 
+	// Clone below is a shallow copy, so the racing requests would share one
+	// body reader, and a failed socks5 attempt on the fallback path may
+	// already have consumed it. Buffer the body once and hand each request
+	// its own reader.
+	var bodyBytes []byte
+	if r.request.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(r.request.Body)
+		r.request.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		r.request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	}
+	newBody := func() io.ReadCloser {
+		return io.NopCloser(bytes.NewReader(bodyBytes))
+	}
+
 	funcs := []requestFunc{
 		// Http(s) With Ech
 		func(ctx context.Context) (response *http.Response, err error) {
 			request := r.request.Clone(ctx)
+			if bodyBytes != nil {
+				request.Body = newBody()
+				request.GetBody = func() (io.ReadCloser, error) { return newBody(), nil }
+			}
 			echClient := &http.Client{
 				Transport: &http.Transport{
 					DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -295,6 +320,10 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 		// H3 HTTPS
 		func(ctx context.Context) (response *http.Response, err error) {
 			request := r.request.Clone(ctx)
+			if bodyBytes != nil {
+				request.Body = newBody()
+				request.GetBody = func() (io.ReadCloser, error) { return newBody(), nil }
+			}
 			h3Transport := &http3.Transport{
 				TLSClientConfig: r.tls.Clone(),
 				QUICConfig: &quic.Config{
@@ -371,17 +400,24 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 
 			// The first success wins; every later one has no receiver left
 			// (the winner was already taken, or the wait timed out), so
-			// close its body in place instead of racing a buffered send
-			// against waitCtx.Done(), where Go picks randomly between the
-			// two ready cases. The deferred check above must not observe a
-			// window where the winner was already sent but not yet counted.
+			// close its body in place instead of racing a send against
+			// waitCtx.Done(), where Go picks randomly between the two ready
+			// cases. The deferred check above must not observe a window
+			// where the winner was already sent but not yet counted.
 			if successCount.Add(1) != 1 {
 				// 非第一个成功者，无人接收，直接关闭 body
 				rsp.Body.Close()
 				return
 			}
-			// 只有第一个成功者会 send，容量 1 的 channel 不会阻塞
-			successCh <- raceResult{i, rsp}
+			select {
+			case successCh <- raceResult{i, rsp}:
+				// Body ownership passes to the receiver.
+			case <-waitCtx.Done():
+				// The wait already returned (timeout or all requests
+				// failed), so nobody will ever receive; close the body in
+				// place, otherwise the h3 transport tied to it leaks.
+				rsp.Body.Close()
+			}
 		}(f, reqCtx)
 	}
 

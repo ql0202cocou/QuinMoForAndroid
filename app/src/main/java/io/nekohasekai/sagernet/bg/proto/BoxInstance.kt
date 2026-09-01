@@ -53,6 +53,11 @@ abstract class BoxInstance(
         return File.createTempFile(prefix + "_", ".$ext", dir).also { cacheFiles.add(it) }
     }
 
+    private fun deleteCacheFiles() {
+        cacheFiles.forEach { it.delete() }
+        cacheFiles.clear()
+    }
+
     fun isInitialized(): Boolean {
         return ::config.isInitialized && ::box.isInitialized
     }
@@ -234,6 +239,16 @@ abstract class BoxInstance(
         return closed.get()
     }
 
+    // TestInstance cancellation can run close() while init() is still
+    // working: box is not yet assigned (box.close() skipped) and cache
+    // files created afterwards survive deleteCacheFiles. The CAS in
+    // close() makes a second close() a no-op, so a caller that finds
+    // itself closed right after init() finishes the cleanup here.
+    protected fun closeAfterLateInit() {
+        deleteCacheFiles()
+        if (::box.isInitialized) runCatching { box.close() }
+    }
+
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
@@ -242,11 +257,6 @@ abstract class BoxInstance(
             runCatching {
                 instance.close()
             }
-        }
-
-        val deleteCacheFiles = {
-            cacheFiles.forEach { it.delete() }
-            cacheFiles.clear()
         }
 
         // Stop the plugin processes before deleting their config files: the

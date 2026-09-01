@@ -106,7 +106,10 @@ class TrafficLooper
             ignore = true
             // post traffic when switch
             if (DataStore.profileTrafficStatistics) {
-                data.proxy?.config?.trafficMap?.get(tag)?.firstOrNull()?.let {
+                // find by id, not firstOrNull(): a chained/grouped tag maps to
+                // several entities in an unordered set; selectorNowId still
+                // holds the OLD id here (updated below), which is the one we want
+                data.proxy?.config?.trafficMap?.get(tag)?.firstOrNull { it.id == selectorNowId }?.let {
                     it.rx = rx
                     it.tx = tx
                     runOnDefaultDispatcher {
@@ -177,7 +180,13 @@ class TrafficLooper
                 proxy.box.setV2rayStats(tags.joinToString("\n"))
             }
 
-            trafficUpdater.updateAll()
+            // mutually exclusive with @Synchronized selectMain: an interleaved
+            // selector switch would otherwise add the same TAG_PROXY diff to
+            // both the old and the new item (once in updateOne, once via the
+            // per-tag diff cache), double-counting it
+            synchronized(this) {
+                trafficUpdater.updateAll()
+            }
             if (!sc.isActive) return
 
             // add all non-bypass to "main"

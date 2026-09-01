@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
 import com.simplecityapps.recyclerview_fastscroll.views.FastScrollRecyclerView
 import io.nekohasekai.sagernet.BuildConfig
+import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
@@ -189,6 +190,20 @@ class AppListActivity : ThemedActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // The route editor's state lives in the in-memory profileCacheStore
+        // and dies with the process. On a process-death restore the route
+        // editor re-initializes asynchronously, so routePackages may still
+        // be blank here; starting from it would corrupt the app list on the
+        // next edit. Bail out and let the user re-enter from the editor.
+        // (read as Int: routeOutbound is persisted via stringToInt, so the
+        // row's string field stays null even after the editor's init)
+        if (savedInstanceState != null &&
+            DataStore.profileCacheStore.getInt(Key.ROUTE_OUTBOUND) == null
+        ) {
+            finish()
+            return
+        }
 
         binding = LayoutAppListBinding.inflate(layoutInflater)
         setContentView(binding.root)

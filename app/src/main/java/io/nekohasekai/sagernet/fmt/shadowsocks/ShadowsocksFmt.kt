@@ -48,6 +48,7 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
         }
 
         val methodAndPswd = link.username.decodeBase64UrlSafe()
+        if (!methodAndPswd.contains(":")) error("invalid ss method/password")
 
         return ShadowsocksBean().apply {
             serverAddress = link.host

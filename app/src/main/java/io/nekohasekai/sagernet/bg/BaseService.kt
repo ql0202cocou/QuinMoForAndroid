@@ -44,8 +44,15 @@ class BaseService {
     interface ExpectedException
 
     class Data internal constructor(private val service: Interface) {
+        // written on the main thread, read on binder threads and by gomobile
+        // Go threads (NativeInterface selector_OnProxySelected)
+        @Volatile
         var state = State.Stopped
+
+        @Volatile
         var proxy: ProxyInstance? = null
+
+        @Volatile
         var notification: ServiceNotification? = null
 
         val receiver = broadcastReceiver { ctx, intent ->

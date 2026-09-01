@@ -262,10 +262,10 @@ fun buildConfig(
             if (profileList.isEmpty()) {
                 error("chain profile ${entity.id} (${entity.requireBean().displayName()}) has no valid member")
             }
-            val chainTrafficSet = HashSet<ProxyEntity>().apply {
-                plusAssign(profileList)
-                add(entity)
-            }
+            // dedup by id and keep insertion order: a HashSet<ProxyEntity>
+            // collapses two fully identical entities (the collapsed node's
+            // traffic never lands in the DB) and iterates in arbitrary order
+            val chainTrafficList = (profileList + entity).distinctBy { it.id }
 
             var currentOutbound: SingBoxOption
             lateinit var pastOutbound: SingBoxOption
@@ -491,7 +491,7 @@ fun buildConfig(
                 pastEntity = proxyEntity
             }
 
-            trafficMap[chainTagOut] = chainTrafficSet.toList()
+            trafficMap[chainTagOut] = chainTrafficList
             return chainTagOut
         }
 

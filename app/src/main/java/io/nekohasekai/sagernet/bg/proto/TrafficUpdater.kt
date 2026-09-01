@@ -52,7 +52,9 @@ class TrafficUpdater(
         )
     }
 
-    suspend fun updateAll() {
+    // not suspend: called inside TrafficLooper's synchronized block, which
+    // forbids suspension points (none are needed here)
+    fun updateAll() {
         val updated = mutableMapOf<String, TrafficLooperData>() // diffs
         items.forEach { item ->
             if (item.ignore) return@forEach

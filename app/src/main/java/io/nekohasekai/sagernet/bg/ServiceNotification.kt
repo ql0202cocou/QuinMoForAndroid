@@ -56,6 +56,8 @@ class ServiceNotification(
         }
     }
 
+    // written on the main thread, read by TrafficLooper on Dispatchers.Default
+    @Volatile
     var listenPostSpeed = true
 
     suspend fun postNotificationSpeedUpdate(stats: SpeedDisplayData) {

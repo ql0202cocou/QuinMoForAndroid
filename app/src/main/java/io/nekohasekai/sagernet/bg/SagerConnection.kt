@@ -34,6 +34,8 @@ class SagerConnection(
         const val CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND = 3
         const val CONNECTION_ID_RESTART_BG = 4
 
+        // written on Dispatchers.Default (triggerFullRestart), read on binder threads
+        @Volatile
         var restartingApp = false
     }
 
