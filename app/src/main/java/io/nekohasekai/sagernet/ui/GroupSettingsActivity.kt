@@ -245,9 +245,6 @@ class GroupSettingsActivity(
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.settings, MyPreferenceFragmentCompat())
                         .commit()
-
-                    DataStore.dirty = false
-                    DataStore.profileCacheStore.registerChangeListener(this@GroupSettingsActivity)
                 }
             }
 
@@ -323,6 +320,15 @@ class GroupSettingsActivity(
             super.onViewCreated(view, savedInstanceState)
 
             ViewCompat.setOnApplyWindowInsetsListener(listView, ListListener)
+
+            activity?.apply {
+                // Only clear dirty on first creation; resetting it after a
+                // recreation (rotation) would silently drop unsaved edits.
+                if (savedInstanceState == null) {
+                    DataStore.dirty = false
+                }
+                DataStore.profileCacheStore.registerChangeListener(this)
+            }
         }
 
         fun onMenuItemSelected(item: MenuItem) = when (item.itemId) {

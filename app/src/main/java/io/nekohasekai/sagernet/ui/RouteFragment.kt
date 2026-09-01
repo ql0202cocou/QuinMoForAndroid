@@ -39,6 +39,12 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
 
         ruleListView = view.findViewById(R.id.route_list)
         ruleListView.layoutManager = FixedLinearLayoutManager(ruleListView)
+
+        // onViewCreated can run again (rotation): unregister the previous
+        // adapter before replacing it
+        if (::ruleAdapter.isInitialized) {
+            ProfileManager.removeListener(ruleAdapter)
+        }
         ruleAdapter = RuleAdapter()
         ProfileManager.addListener(ruleAdapter)
         ruleListView.adapter = ruleAdapter

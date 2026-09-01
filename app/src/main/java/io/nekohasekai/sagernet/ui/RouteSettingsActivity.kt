@@ -245,9 +245,6 @@ class RouteSettingsActivity(
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.settings, MyPreferenceFragmentCompat())
                         .commit()
-
-                    DataStore.dirty = false
-                    DataStore.profileCacheStore.registerChangeListener(this@RouteSettingsActivity)
                 }
             }
 
@@ -337,6 +334,12 @@ class RouteSettingsActivity(
 
             activity?.apply {
                 viewCreated(view, savedInstanceState)
+                // Only clear dirty on first creation; resetting it after a
+                // recreation (rotation) would silently drop unsaved edits.
+                if (savedInstanceState == null) {
+                    DataStore.dirty = false
+                }
+                DataStore.profileCacheStore.registerChangeListener(this)
             }
         }
 

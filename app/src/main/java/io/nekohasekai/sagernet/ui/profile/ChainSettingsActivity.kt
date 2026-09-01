@@ -35,6 +35,13 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
 
     val proxyList = ArrayList<ProxyEntity>()
 
+    // Keep the cache in sync with proxyList so a rotation (which rebuilds
+    // proxyList from DataStore.serverProtocol in reload()) does not lose
+    // unsaved member edits.
+    fun updateProxiesCache() {
+        DataStore.serverProtocol = proxyList.joinToString(",") { it.id.toString() }
+    }
+
     override fun ChainBean.init() {
         DataStore.profileName = name
         DataStore.serverProtocol = proxies.joinToString(",")
@@ -139,12 +146,14 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
             proxyList[to - 1] = proxyList[from - 1]
             proxyList[from - 1] = toMove
             notifyItemMoved(from, to)
+            updateProxiesCache()
             DataStore.dirty = true
         }
 
         fun remove(index: Int) {
             proxyList.removeAt(index - 1)
             notifyItemRemoved(index)
+            updateProxiesCache()
             DataStore.dirty = true
         }
 
@@ -250,6 +259,7 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
                             proxyList.add(profile)
                             configurationAdapter.notifyItemInserted(proxyList.size)
                         }
+                        updateProxiesCache()
                     }
                 }
             }

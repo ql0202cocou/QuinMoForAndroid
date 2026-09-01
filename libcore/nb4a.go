@@ -114,13 +114,17 @@ func sendFdToProtect(fd int, path string) error {
 		return fmt.Errorf("failed to send: %w", err)
 	}
 
-	dummy := []byte{1}
+	dummy := []byte{0}
 	n, err := unix.Read(socketFd, dummy)
 	if err != nil {
 		return fmt.Errorf("failed to receive: %w", err)
 	}
 	if n != 1 {
 		return fmt.Errorf("socket closed unexpectedly")
+	}
+	// protect_server writes 1 on success and 0 when setting SO_MARK failed
+	if dummy[0] != 1 {
+		return fmt.Errorf("protect failed")
 	}
 	return nil
 }

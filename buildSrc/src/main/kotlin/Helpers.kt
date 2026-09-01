@@ -121,8 +121,12 @@ fun Project.setupAppCommon() {
 }
 
 fun Project.setupApp() {
-    val pkgName = requireMetadata().getProperty("PACKAGE_NAME")
-    val verName = requireMetadata().getProperty("VERSION_NAME")
+    val pkgName = requireNotNull(requireMetadata().getProperty("PACKAGE_NAME")) {
+        "PACKAGE_NAME is missing in nb4a.properties"
+    }
+    val verName = requireNotNull(requireMetadata().getProperty("VERSION_NAME")) {
+        "VERSION_NAME is missing in nb4a.properties"
+    }
     val verCode = requireNotNull(requireMetadata().getProperty("VERSION_CODE")) {
         "VERSION_CODE is missing in nb4a.properties"
     }.toInt() * 5
@@ -178,6 +182,7 @@ fun Project.setupApp() {
                         project.name,
                         "NekoBox-" + requireMetadata().getProperty("PRE_VERSION_NAME")
                     ).replace("-preview", "")
+                        .replace("-release", "")
                 } else {
                     outputFileName.replace(project.name, "NekoBox-$versionName")
                         .replace("-release", "")

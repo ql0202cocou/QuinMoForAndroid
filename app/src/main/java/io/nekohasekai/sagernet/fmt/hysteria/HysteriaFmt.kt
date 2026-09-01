@@ -348,6 +348,9 @@ fun hopPortsToSingboxList(s: String): List<String> {
         val pRange = it.replace("-", ":")
         if (pRange.split(":").size == 2) {
             pRange
+        } else if (it.toIntOrNull() != null) {
+            // single port, keep it as-is
+            it
         } else {
             null
         }

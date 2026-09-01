@@ -309,9 +309,10 @@ fun buildConfig(
                     tagOut = TAG_PROXY
                 }
 
-                // selector human readable name
+                // selector human readable name: use the profile being built,
+                // not profileList[0] (which is the group's landing proxy when set)
                 if (buildSelector && index == 0) {
-                    tagOut = selectorName(bean.displayName())
+                    tagOut = selectorName(entity.requireBean().displayName())
                 }
 
 

@@ -247,9 +247,11 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 	var connectionTracker adapter.ConnectionTracker
 	// test i
 	if i != nil {
+		i.access.Lock()
 		if i.v2api != nil {
 			connectionTracker = i.v2api.StatsService()
 		}
+		i.access.Unlock()
 		return speedtest.UrlTest(boxapi.CreateProxyHttpClient(i.Box, connectionTracker), link, timeout, speedtest.UrlTestStandard_RTT)
 	}
 	// test direct
@@ -257,10 +259,14 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 	if main == nil {
 		return speedtest.UrlTest(boxapi.CreateProxyHttpClient(nil, nil), link, timeout, speedtest.UrlTestStandard_RTT)
 	}
-	// test mainInstance
+	// test mainInstance (getMainInstance released mainInstanceAccess already,
+	// so taking main.access here cannot deadlock against Close's b.access ->
+	// mainInstanceAccess order)
+	main.access.Lock()
 	if main.v2api != nil {
 		connectionTracker = main.v2api.StatsService()
 	}
+	main.access.Unlock()
 	return speedtest.UrlTest(boxapi.CreateProxyHttpClient(main.Box, connectionTracker), link, timeout, speedtest.UrlTestStandard_RTT)
 }
 

@@ -113,7 +113,7 @@ class BaseService {
                 Runtime.getRuntime().exit(0)
                 return
             }
-            if (!callbackIdMap.contains(cb)) {
+            if (!callbackIdMap.containsKey(cb)) {
                 callbacks.register(cb)
             }
             callbackIdMap[cb] = id
@@ -283,8 +283,13 @@ class BaseService {
                 // ConnectivityThread via runBlocking. The serial dispatcher
                 // keeps the callbacks ordered.
                 runOnSerialDispatcher {
-                    // Lost is reported with a null network
-                    if (network == null) return@runOnSerialDispatcher
+                    // Lost is reported with a null network; drop the stale
+                    // reference like the main-process listener does
+                    if (network == null) {
+                        SagerNet.underlyingNetwork = null
+                        upstreamInterfaceName = null
+                        return@runOnSerialDispatcher
+                    }
                     SagerNet.connectivity.getLinkProperties(network)?.also { link ->
                         SagerNet.underlyingNetwork = network
                         DataStore.vpnService?.updateUnderlyingNetwork()

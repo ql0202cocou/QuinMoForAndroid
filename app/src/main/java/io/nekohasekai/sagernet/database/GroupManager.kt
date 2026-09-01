@@ -108,7 +108,9 @@ object GroupManager {
         SagerDatabase.instance.runInTransaction {
             SagerDatabase.groupDao.deleteById(groupId)
             SagerDatabase.proxyDao.deleteByGroup(groupId)
+            resetDanglingGroupProxies()
         }
+        if (DataStore.selectedGroup == groupId) resetSelectedGroup()
         iterator { groupRemoved(groupId) }
         SubscriptionUpdater.reconfigureUpdater()
     }
@@ -124,9 +126,35 @@ object GroupManager {
         SagerDatabase.instance.runInTransaction {
             SagerDatabase.groupDao.deleteGroup(group)
             SagerDatabase.proxyDao.deleteByGroup(group.map { it.id }.toLongArray())
+            resetDanglingGroupProxies()
         }
+        if (group.any { it.id == DataStore.selectedGroup }) resetSelectedGroup()
         for (proxyGroup in group) iterator { groupRemoved(proxyGroup.id) }
         SubscriptionUpdater.reconfigureUpdater()
+    }
+
+    // Profiles deleted with their group may still be referenced as another
+    // group's frontProxy/landingProxy; ConfigBuilder.resolveChain would get
+    // null from getById and silently drop the user's front/landing proxy.
+    fun resetDanglingGroupProxies() {
+        SagerDatabase.groupDao.allGroups().forEach { group ->
+            var changed = false
+            if (group.frontProxy > 0L && SagerDatabase.proxyDao.getById(group.frontProxy) == null) {
+                group.frontProxy = -1L
+                changed = true
+            }
+            if (group.landingProxy > 0L && SagerDatabase.proxyDao.getById(group.landingProxy) == null) {
+                group.landingProxy = -1L
+                changed = true
+            }
+            if (changed) SagerDatabase.groupDao.updateGroup(group)
+        }
+    }
+
+    // Mirrors the fallback in DataStore.currentGroup(): fall back to the first
+    // remaining group, or -1 so currentGroup() recreates the ungrouped group.
+    private fun resetSelectedGroup() {
+        DataStore.selectedGroup = SagerDatabase.groupDao.allGroups().firstOrNull()?.id ?: -1L
     }
 
 }

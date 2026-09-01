@@ -110,6 +110,8 @@ object ProfileManager {
         if (DataStore.selectedProxy == profileId) {
             DataStore.selectedProxy = 0L
         }
+        // the profile may be referenced as a group's frontProxy/landingProxy
+        GroupManager.resetDanglingGroupProxies()
         iterator { onRemoved(groupId, profileId) }
         if (SagerDatabase.proxyDao.countByGroup(groupId) > 1) {
             GroupManager.rearrange(groupId)

@@ -30,7 +30,7 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         pbm.writeToCacheAll(this)
 
         DataStore.profileCacheStore.putString("pluginName", plugin.substringBefore(";"))
-        DataStore.profileCacheStore.putString("pluginConfig", plugin.substringAfter(";"))
+        DataStore.profileCacheStore.putString("pluginConfig", plugin.substringAfter(";", ""))
     }
 
     override fun ShadowsocksBean.serialize() {

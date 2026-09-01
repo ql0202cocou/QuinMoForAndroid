@@ -11,10 +11,12 @@ import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean
+import io.nekohasekai.sagernet.fmt.tuic.TuicBean
 import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.isTLS
 import io.nekohasekai.sagernet.ktx.*
 import kotlinx.coroutines.*
+import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.*
@@ -87,8 +89,11 @@ abstract class GroupUpdater {
             })
         }
 
-        lookupJobs.joinAll()
-        lookupPool.close()
+        try {
+            lookupJobs.joinAll()
+        } finally {
+            lookupPool.close()
+        }
     }
 
     protected fun rewriteAddress(
@@ -114,6 +119,12 @@ abstract class GroupUpdater {
                 }
                 is HysteriaBean -> {
                     if (sni.isBlank()) sni = bean.serverAddress
+                }
+                is TuicBean -> {
+                    if (sni.isNullOrBlank()) sni = bean.serverAddress
+                }
+                is AnyTLSBean -> {
+                    if (sni.isNullOrBlank()) sni = bean.serverAddress
                 }
             }
 

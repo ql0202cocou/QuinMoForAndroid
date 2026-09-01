@@ -11,6 +11,7 @@ import io.nekohasekai.sagernet.fmt.TAG_PROXY
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import kotlinx.coroutines.*
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 class TrafficLooper
@@ -20,8 +21,10 @@ class TrafficLooper
 
     private var job: Job? = null
     private val stopped = AtomicBoolean(false)
-    private val idMap = mutableMapOf<Long, TrafficUpdater.TrafficLooperData>() // id to 1 data
-    private val tagMap = mutableMapOf<String, TrafficUpdater.TrafficLooperData>() // tag to 1 data
+    // loop() fills these on one Default thread while selectMain() (via
+    // NativeInterface.selector_OnProxySelected) reads/writes them on another
+    private val idMap = ConcurrentHashMap<Long, TrafficUpdater.TrafficLooperData>() // id to 1 data
+    private val tagMap = ConcurrentHashMap<String, TrafficUpdater.TrafficLooperData>() // tag to 1 data
 
     suspend fun stop() {
         // both ProxyInstance.launch's post-close recheck and close() can end
@@ -57,10 +60,19 @@ class TrafficLooper
     }
 
     fun start() {
+        // stop() may have already won the CAS (close() raced ProxyInstance.launch);
+        // launching now would leave a loop on a closed box that stop() can never cancel
+        if (stopped.get()) return
         job = sc.launch { loop() }
+        // stop() won the CAS between the check above and the job assignment, saw a
+        // null job and skipped cancelAndJoin; cancel here so the loop cannot leak
+        if (stopped.get()) job?.cancel()
     }
 
+    @Volatile
     var selectorNowId = -114514L
+
+    @Volatile
     var selectorNowFakeTag = ""
 
     fun selectMain(id: Long) {

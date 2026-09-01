@@ -93,7 +93,9 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
                 authPayload.title = resources.getString(R.string.password)
             } else {
                 authType.isVisible = true
-                authPayload.isVisible = true
+                // keep honoring the auth-type toggle above: TYPE_NONE hides
+                // the payload field
+                authPayload.isVisible = authType.value != "${HysteriaBean.TYPE_NONE}"
                 protocol.isVisible = true
                 alpn.isVisible = true
                 //

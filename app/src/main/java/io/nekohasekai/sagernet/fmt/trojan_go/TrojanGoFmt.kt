@@ -67,7 +67,7 @@ fun TrojanGoBean.toUri(): String {
             }
         }
     }
-    if (type.isNotBlank() && type != "none") {
+    if (encryption.isNotBlank() && encryption != "none") {
         builder.addQueryParameter("encryption", encryption)
     }
     if (plugin.isNotBlank()) {

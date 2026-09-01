@@ -39,8 +39,6 @@ jobs:
               "platforms;android-36" "build-tools;36.0.0" > /dev/null
           fi
       - name: Gradle Build
-        env:
-          BUILD_PLUGIN: none
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties

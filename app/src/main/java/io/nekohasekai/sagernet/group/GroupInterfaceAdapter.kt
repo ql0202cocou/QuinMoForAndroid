@@ -1,27 +1,50 @@
 package io.nekohasekai.sagernet.group
 
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProxyGroup
+import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
+import io.nekohasekai.sagernet.ktx.tryResume
 import io.nekohasekai.sagernet.ui.ThemedActivity
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interface {
 
     override suspend fun confirm(message: String): Boolean {
-        return suspendCoroutine {
+        return suspendCancellableCoroutine { c ->
+            // CancellableContinuation hides the ktx tryResume extension behind
+            // its internal member; view it as a plain Continuation instead.
+            val cont = c as Continuation<Boolean>
             runOnMainDispatcher {
+                if (context.isFinishing || context.isDestroyed) {
+                    cont.tryResume(false)
+                    return@runOnMainDispatcher
+                }
                 MaterialAlertDialogBuilder(context).setTitle(R.string.confirm)
                     .setMessage(message)
-                    .setPositiveButton(R.string.yes) { _, _ -> it.resume(true) }
-                    .setNegativeButton(R.string.no) { _, _ -> it.resume(false) }
-                    .setOnCancelListener { _ -> it.resume(false) }
+                    .setPositiveButton(R.string.yes) { _, _ -> cont.tryResume(true) }
+                    .setNegativeButton(R.string.no) { _, _ -> cont.tryResume(false) }
+                    // Buttons dismiss the dialog too; tryResume ignores the second call.
+                    // A dismissed dialog counts as refusal.
+                    .setOnDismissListener { _ -> cont.tryResume(false) }
                     .show()
+                // onDismiss is NOT fired when the activity is destroyed (the dialog
+                // just leaks its window), so resume on ON_DESTROY as well, or the
+                // coroutine would hang forever with the group's updating lock held.
+                context.lifecycle.addObserver(object : DefaultLifecycleObserver {
+                    override fun onDestroy(owner: LifecycleOwner) {
+                        cont.tryResume(false)
+                    }
+                })
             }
         }
     }
@@ -70,11 +93,16 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
             onMainDispatcher {
                 delay(1000L)
 
-                MaterialAlertDialogBuilder(context).setTitle(
-                        context.getString(
-                                R.string.group_diff, group.displayName()
-                        )
-                ).setMessage(status.trim()).setPositiveButton(android.R.string.ok, null).show()
+                // Showing a dialog on a destroyed activity throws BadTokenException;
+                // don't let it bubble up and misreport the successful update as failed.
+                if (context.isFinishing || context.isDestroyed) return@onMainDispatcher
+                runCatching {
+                    MaterialAlertDialogBuilder(context).setTitle(
+                            context.getString(
+                                    R.string.group_diff, group.displayName()
+                            )
+                    ).setMessage(status.trim()).setPositiveButton(android.R.string.ok, null).show()
+                }.onFailure { Logs.w(it) }
             }
 
         }

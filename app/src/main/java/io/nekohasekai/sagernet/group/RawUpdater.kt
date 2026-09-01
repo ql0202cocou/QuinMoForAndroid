@@ -178,6 +178,10 @@ object RawUpdater : GroupUpdater() {
                 // 更新订阅，保留自定义覆写设置
                 bean.customOutboundJson = existsBean.customOutboundJson
                 bean.customConfigJson = existsBean.customConfigJson
+                // Apply the subscription order even when the content also changed,
+                // otherwise a reordered+edited node stays at its old position.
+                val reordered = entity.userOrder != userOrder
+                entity.userOrder = userOrder
                 when {
                     existsBean != bean -> {
                         changed++
@@ -188,10 +192,9 @@ object RawUpdater : GroupUpdater() {
                         Logs.d("Updated profile: $name")
                     }
 
-                    entity.userOrder != userOrder -> {
+                    reordered -> {
                         entity.putBean(bean)
                         toUpdate.add(entity)
-                        entity.userOrder = userOrder
 
                         Logs.d("Reordered profile: $name")
                     }
@@ -578,6 +581,23 @@ object RawUpdater : GroupUpdater() {
                                             bean.authPayload = opt.value.toString()
                                         }
 
+                                        "auth" -> {
+                                            bean.authPayloadType = HysteriaBean.TYPE_BASE64
+                                            bean.authPayload = opt.value.toString()
+                                        }
+
+                                        "protocol" -> {
+                                            when (opt.value.toString()) {
+                                                "faketcp" -> bean.protocol =
+                                                    HysteriaBean.PROTOCOL_FAKETCP
+
+                                                "wechat-video" -> bean.protocol =
+                                                    HysteriaBean.PROTOCOL_WECHAT_VIDEO
+                                            }
+                                        }
+
+                                        "ca", "ca-str" -> bean.caText = opt.value.toString()
+
                                         "sni" -> bean.sni = opt.value.toString()
 
                                         "skip-cert-verify" -> bean.allowInsecure =
@@ -676,6 +696,11 @@ object RawUpdater : GroupUpdater() {
                                             opt.value.toString() == "true"
 
                                         "sni" -> bean.sni = opt.value.toString()
+
+                                        "ca-str" -> bean.caText = opt.value.toString()
+
+                                        "fast-open" -> bean.fastConnect =
+                                            opt.value.toString() == "true"
 
                                         "alpn" -> {
                                             val alpn = (opt.value as? (List<String>))

@@ -222,15 +222,25 @@ func (r *httpRequest) Execute() (resp HTTPResponse, err error) {
 	return httpResp, nil
 }
 
-type requestFunc func() (response *http.Response, err error)
+type requestFunc func(ctx context.Context) (response *http.Response, err error)
+
+// raceResult is the winning response together with its index in funcs, so
+// the losing requests' contexts can be cancelled once a winner is chosen.
+type raceResult struct {
+	index    int
+	response *http.Response
+}
 
 func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
-	// requests derive from ctx so the deferred cancel() aborts any
-	// goroutine still running when this function returns.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	// waitCtx bounds only the wait for a winner below. Each request
+	// derives from its own context instead: a request's context also
+	// governs reading its response body, so cancelling a context shared
+	// with the winner on return would kill the winning body while the
+	// caller is still reading it.
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer waitCancel()
 
-	successCh := make(chan *http.Response, 1)
+	successCh := make(chan raceResult, 1)
 	var finalErr error
 	var failedCount atomic.Uint32
 	var successCount atomic.Uint32
@@ -238,7 +248,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 
 	funcs := []requestFunc{
 		// Http(s) With Ech
-		func() (response *http.Response, err error) {
+		func(ctx context.Context) (response *http.Response, err error) {
 			request := r.request.Clone(ctx)
 			echClient := &http.Client{
 				Transport: &http.Transport{
@@ -261,7 +271,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 			return echClient.Do(request)
 		},
 		// H3 HTTPS
-		func() (response *http.Response, err error) {
+		func(ctx context.Context) (response *http.Response, err error) {
 			request := r.request.Clone(ctx)
 			h3Transport := &http3.Transport{
 				TLSClientConfig: r.tls.Clone(),
@@ -289,14 +299,17 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 		funcs = funcs[:1]
 	}
 
+	reqCancels := make([]context.CancelFunc, len(funcs))
 	for i, f := range funcs {
-		go func(f requestFunc) {
+		reqCtx, reqCancel := context.WithCancel(context.Background())
+		reqCancels[i] = reqCancel
+		go func(f requestFunc, reqCtx context.Context) {
 			defer device.DeferPanicToError("http", func(err error) { log.Println(err) })
 			defer func() {
 				if successCount.Load() == 0 {
 					if failedCount.Add(1) >= uint32(len(funcs)) {
-						// 全部失败了
-						cancel()
+						// 全部失败了，唤醒下方等待的 select
+						waitCancel()
 					}
 				}
 			}()
@@ -310,7 +323,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 			}
 
 			// 执行HTTP请求
-			rsp, err := f()
+			rsp, err := f(reqCtx)
 			if rsp == nil || err != nil {
 				mu.Lock()
 				finalErr = errors.Join(finalErr, fmt.Errorf("%s: %w", t, err))
@@ -331,26 +344,44 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 				return
 			}
 
+			// Count the success before the send: the deferred check above
+			// must not observe a window where the winner was already sent
+			// but not yet counted.
+			successCount.Add(1)
 			select {
-			case successCh <- rsp:
+			case successCh <- raceResult{i, rsp}:
 				// 第一个成功的请求，不要关闭 body
-				successCount.Add(1)
 			default:
 				rsp.Body.Close()
 			}
-		}(f)
+		}(f, reqCtx)
 	}
 
 	select {
 	case result := <-successCh:
-		return &httpResponse{Response: result}, nil
-	case <-ctx.Done():
+		// Abort any loser still in flight. The winner's own context is
+		// cancelled only when the caller closes the body, since cancelling
+		// it earlier would abort body reads.
+		for j, reqCancel := range reqCancels {
+			if j != result.index {
+				reqCancel()
+			}
+		}
+		result.response.Body = &bodyCloseHook{ReadCloser: result.response.Body, after: func() error {
+			reqCancels[result.index]()
+			return nil
+		}}
+		return &httpResponse{Response: result.response}, nil
+	case <-waitCtx.Done():
+		for _, reqCancel := range reqCancels {
+			reqCancel()
+		}
 		mu.Lock()
 		err := finalErr
 		mu.Unlock()
 		if err == nil {
 			// timed out before any request finished; never return (nil, nil)
-			err = ctx.Err()
+			err = waitCtx.Err()
 		}
 		return nil, err
 	}

@@ -53,6 +53,12 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         groupListView = view.findViewById(R.id.group_list)
         layoutManager = FixedLinearLayoutManager(groupListView)
         groupListView.layoutManager = layoutManager
+
+        // onViewCreated can run again (rotation): unregister the previous
+        // adapter before replacing it
+        if (::groupAdapter.isInitialized) {
+            GroupManager.removeListener(groupAdapter)
+        }
         groupAdapter = GroupAdapter()
         GroupManager.addListener(groupAdapter)
         groupListView.adapter = groupAdapter
@@ -205,7 +211,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             val first = groupList[from]
             var previousOrder = first.userOrder
             val (step, range) = if (from < to) Pair(1, from until to) else Pair(
-                -1, to + 1 downTo from
+                -1, from downTo to + 1
             )
             for (i in range) {
                 val next = groupList[i + step]

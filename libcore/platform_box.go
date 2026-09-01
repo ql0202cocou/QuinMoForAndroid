@@ -18,6 +18,7 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 	N "github.com/sagernet/sing/common/network"
+	"golang.org/x/sys/unix"
 )
 
 var boxPlatformInterfaceInstance adapter.PlatformInterface = &boxPlatformInterfaceWrapper{}
@@ -66,9 +67,10 @@ func (w *boxPlatformInterfaceWrapper) OpenInterface(options *tun.Options, platfo
 	}
 	// The original fd is owned by the Kotlin side (closed via conn.close());
 	// dup it so the sing-box tun owns its own copy and manages its lifecycle.
-	tunFd, err = syscall.Dup(tunFd)
+	// Use F_DUPFD_CLOEXEC so plugin binaries exec'd by :bg don't inherit it.
+	tunFd, err = unix.FcntlInt(uintptr(tunFd), unix.F_DUPFD_CLOEXEC, 0)
 	if err != nil {
-		return nil, fmt.Errorf("syscall.Dup: %v", err)
+		return nil, fmt.Errorf("F_DUPFD_CLOEXEC: %v", err)
 	}
 	//
 	options.FileDescriptor = int(tunFd)

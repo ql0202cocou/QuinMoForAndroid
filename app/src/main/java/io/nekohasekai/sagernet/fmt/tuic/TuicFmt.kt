@@ -50,6 +50,10 @@ fun parseTuic(url: String): TuicBean {
         link.queryParameter("disable_sni")?.let {
             if (it == "1") disableSNI = true
         }
+        // short name is our own invention, fall back to the full sing-box name
+        (link.queryParameter("zero_rtt") ?: link.queryParameter("zero_rtt_handshake"))?.let {
+            if (it == "1") reduceRTT = true
+        }
     }
 }
 
@@ -63,6 +67,7 @@ fun TuicBean.toUri(): String {
     if (alpn.isNotBlank()) builder.addQueryParameter("alpn", alpn)
     if (allowInsecure) builder.addQueryParameter("allow_insecure", "1")
     if (disableSNI) builder.addQueryParameter("disable_sni", "1")
+    if (reduceRTT) builder.addQueryParameter("zero_rtt", "1")
     if (name.isNotBlank()) builder.encodedFragment(name.urlSafe())
 
     return builder.toLink("tuic")

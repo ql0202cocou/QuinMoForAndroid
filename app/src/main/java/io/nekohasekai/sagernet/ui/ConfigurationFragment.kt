@@ -203,6 +203,13 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         groupPager = view.findViewById(R.id.group_pager)
         tabLayout = view.findViewById(R.id.group_tab)
+
+        // onViewCreated can run again (rotation): unregister the previous
+        // adapter before replacing it
+        if (::adapter.isInitialized) {
+            ProfileManager.removeListener(adapter)
+            GroupManager.removeListener(adapter)
+        }
         adapter = GroupPagerAdapter()
         ProfileManager.addListener(adapter)
         GroupManager.addListener(adapter)

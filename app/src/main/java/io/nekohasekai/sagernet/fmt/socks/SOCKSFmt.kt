@@ -42,7 +42,7 @@ fun SOCKSBean.toUri(): String {
     if (!username.isNullOrBlank()) builder.username(username)
     if (!password.isNullOrBlank()) builder.password(password)
     if (!name.isNullOrBlank()) builder.encodedFragment(name.urlSafe())
-    return builder.toLink("socks${protocolVersion()}")
+    return builder.toLink("socks${protocolVersionName()}")
 
 }
 

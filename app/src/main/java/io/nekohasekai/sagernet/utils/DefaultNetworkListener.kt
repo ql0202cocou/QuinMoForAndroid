@@ -77,7 +77,6 @@ object DefaultNetworkListener {
             runBlocking { networkActor.send(NetworkMessage.Lost(network)) }
     }
 
-    private var fallback = false
     private val request = NetworkRequest.Builder().apply {
         addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
@@ -100,7 +99,6 @@ object DefaultNetworkListener {
      */
     private fun register() {
         try {
-            fallback = false
             when (Build.VERSION.SDK_INT) {
                 in 31..Int.MAX_VALUE -> @RequiresApi(31) {
                     SagerNet.connectivity.registerBestMatchingNetworkCallback(
@@ -123,12 +121,11 @@ object DefaultNetworkListener {
             }
         } catch (e: Exception) {
             Logs.w(e)
-            fallback = true
         }
     }
 
     private fun unregister() {
-        // throws IllegalArgumentException if register() failed (fallback); an
+        // throws IllegalArgumentException if register() failed; an
         // uncaught throw here kills the actor and every later send fails
         runCatching { SagerNet.connectivity.unregisterNetworkCallback(Callback) }
             .onFailure { Logs.w(it) }

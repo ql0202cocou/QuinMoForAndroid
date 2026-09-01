@@ -17,6 +17,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import libcore.Libcore
 import moe.matsuri.nb4a.net.LocalResolverImpl
 import moe.matsuri.nb4a.proxy.anytls.MIHOMO_PROXY_NAME
+import moe.matsuri.nb4a.utils.Util
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -147,7 +148,8 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
 
     override suspend fun loadConfig() {
         // don't call destroyAllJsi here
-        if (BuildConfig.DEBUG) Logs.d(config.config)
+        // configs contain credentials; redact them before writing to the exportable log
+        if (BuildConfig.DEBUG) Logs.d(Util.redactSecrets(config.config))
         box = Libcore.newSingBoxInstance(config.config, LocalResolverImpl)
     }
 

@@ -335,6 +335,9 @@ class AppManagerActivity : ThemedActivity() {
         MaterialAlertDialogBuilder(this).setTitle(R.string.confirm)
             .setMessage(R.string.auto_select_proxy_apps_message)
             .setPositiveButton(R.string.yes) { _, _ ->
+                // loadApps() may still be running; with an empty list the
+                // filter below would wipe DataStore.individual
+                if (apps.isEmpty()) return@setPositiveButton
                 try {
                     val needProxyAppsList = getAutoProxyApps("")
                     val bypass = DataStore.bypass

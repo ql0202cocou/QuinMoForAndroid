@@ -33,25 +33,23 @@ class ColorPickerPreference
     context, attrs, defStyle
 ) {
 
-    var inited = false
-
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
 
         val widgetFrame = holder.findViewById(android.R.id.widget_frame) as LinearLayout
 
-        if (!inited) {
-            inited = true
-
-            widgetFrame.addView(
-                getNekoImageViewAtColor(
-                    context.getColorAttr(R.attr.colorPrimary),
-                    48,
-                    0
-                )
+        // The holder is recycled: rebuild the color dot on every bind instead
+        // of a one-time flag, which would skip re-adding the view after the
+        // holder is rebound
+        widgetFrame.removeAllViews()
+        widgetFrame.addView(
+            getNekoImageViewAtColor(
+                context.getColorAttr(R.attr.colorPrimary),
+                48,
+                0
             )
-            widgetFrame.visibility = View.VISIBLE
-        }
+        )
+        widgetFrame.visibility = View.VISIBLE
     }
 
     fun getNekoImageViewAtColor(color: Int, sizeDp: Int, paddingDp: Int): ImageView {

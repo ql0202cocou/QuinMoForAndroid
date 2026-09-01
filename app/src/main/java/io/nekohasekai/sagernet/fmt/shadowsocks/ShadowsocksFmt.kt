@@ -24,7 +24,10 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
                 .substringBefore("#")
                 .decodeBase64UrlSafe()).toHttpUrlOrNull()
                 ?: error("invalid jms link $url")
-                    ).newBuilder().fragment(url.substringAfter("#")).build()
+                    ).newBuilder().apply {
+                // substringAfter("#") returns the whole url when there is no '#'
+                url.substringAfter("#", "").takeIf { it.isNotEmpty() }?.let { fragment(it) }
+            }.build()
         }
 
         // ss-android style
