@@ -251,9 +251,12 @@ object RawUpdater : GroupUpdater() {
                 // SafeConstructor: never instantiate arbitrary classes from a
                 // remote subscription (CVE-2022-1471). loadAs(Map) is unsupported
                 // under it, but load() yields the same LinkedHashMap structure.
+                // A valid YAML whose root is not a map (plain cast would throw a
+                // ClassCastException out of the YAMLException catch below) falls
+                // back to the base64 / share-link parsing like any non-clash body.
                 val yaml = Yaml(SafeConstructor()).apply {
                     addTypeDescription(TypeDescription(String::class.java, "str"))
-                }.load(text) as Map<*, *>
+                }.load(text) as? Map<*, *> ?: throw YAMLException("Root node is not a map")
 
                 val globalClientFingerprint = yaml["global-client-fingerprint"]?.toString() ?: ""
 

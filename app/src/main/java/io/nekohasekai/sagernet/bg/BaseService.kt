@@ -26,6 +26,7 @@ import libcore.Libcore
 import moe.matsuri.nb4a.Protocols
 import moe.matsuri.nb4a.utils.Util
 import java.net.UnknownHostException
+import java.util.concurrent.ConcurrentHashMap
 
 class BaseService {
 
@@ -95,10 +96,12 @@ class BaseService {
         private val callbacks = object : RemoteCallbackList<ISagerNetServiceCallback>() {
             override fun onCallbackDied(callback: ISagerNetServiceCallback?, cookie: Any?) {
                 super.onCallbackDied(callback, cookie)
+                if (callback != null) callbackIdMap.remove(callback)
             }
         }
 
-        val callbackIdMap = mutableMapOf<ISagerNetServiceCallback, Int>()
+        // written on binder threads, read by TrafficLooper on Dispatchers.Default
+        val callbackIdMap = ConcurrentHashMap<ISagerNetServiceCallback, Int>()
 
         override val coroutineContext = Dispatchers.Main.immediate + Job()
 
@@ -141,12 +144,11 @@ class BaseService {
         }
 
         override fun urlTest(): Int {
-            if (data?.proxy?.box == null) {
-                error("core not started")
-            }
+            // close() nulls data on the main thread while this runs on a binder thread
+            val box = data?.proxy?.box ?: error("core not started")
             try {
                 return Libcore.urlTest(
-                    data!!.proxy!!.box, DataStore.connectionTestURL, 3000
+                    box, DataStore.connectionTestURL, 3000
                 )
             } catch (e: Exception) {
                 error(Protocols.genFriendlyMsg(e.readableMessage))
@@ -275,19 +277,27 @@ class BaseService {
         var upstreamInterfaceName: String?
 
         suspend fun preInit() {
-            DefaultNetworkListener.start(this) {
-                SagerNet.connectivity.getLinkProperties(it)?.also { link ->
-                    SagerNet.underlyingNetwork = it
-                    DataStore.vpnService?.updateUnderlyingNetwork()
-                    //
-                    val oldName = upstreamInterfaceName
-                    if (oldName != link.interfaceName) {
-                        upstreamInterfaceName = link.interfaceName
-                    }
-                    if (oldName != null && upstreamInterfaceName != null && oldName != upstreamInterfaceName) {
-                        Logs.d("Network changed: $oldName -> $upstreamInterfaceName")
-                        if (DataStore.networkChangeResetConnections) {
-                            Libcore.resetAllConnections(true)
+            DefaultNetworkListener.start(this) { network ->
+                // resetAllConnections is a blocking gomobile call; keep it off
+                // the DefaultNetworkListener actor, whose queue is fed from
+                // ConnectivityThread via runBlocking. The serial dispatcher
+                // keeps the callbacks ordered.
+                runOnSerialDispatcher {
+                    // Lost is reported with a null network
+                    if (network == null) return@runOnSerialDispatcher
+                    SagerNet.connectivity.getLinkProperties(network)?.also { link ->
+                        SagerNet.underlyingNetwork = network
+                        DataStore.vpnService?.updateUnderlyingNetwork()
+                        //
+                        val oldName = upstreamInterfaceName
+                        if (oldName != link.interfaceName) {
+                            upstreamInterfaceName = link.interfaceName
+                        }
+                        if (oldName != null && upstreamInterfaceName != null && oldName != upstreamInterfaceName) {
+                            Logs.d("Network changed: $oldName -> $upstreamInterfaceName")
+                            if (DataStore.networkChangeResetConnections) {
+                                Libcore.resetAllConnections(true)
+                            }
                         }
                     }
                 }

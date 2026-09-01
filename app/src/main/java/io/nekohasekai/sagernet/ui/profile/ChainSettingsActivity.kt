@@ -194,19 +194,32 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
         return true
     }
 
-    fun testProfileContains(profile: ProxyEntity, anotherProfile: ProxyEntity): Boolean {
+    fun testProfileContains(
+        profile: ProxyEntity,
+        anotherProfile: ProxyEntity,
+        visiting: MutableSet<Long> = mutableSetOf(),
+    ): Boolean {
         if (profile.type != 8 || anotherProfile.type != 8) return false
         if (profile.id == anotherProfile.id) return true
-        val proxies = profile.chainBean!!.proxies
-        if (proxies.contains(anotherProfile.id)) return true
-        if (proxies.isNotEmpty()) {
-            for (entity in ProfileManager.getProfiles(proxies)) {
-                if (testProfileContains(entity, anotherProfile)) {
-                    return true
+        // Guard against chain loops in already-corrupted data (A contains B,
+        // B contains A): stop descending on re-entry instead of overflowing
+        // the stack. Mirrors the visiting set in
+        // ConfigBuilder.resolveChainInternal.
+        if (!visiting.add(profile.id)) return false
+        try {
+            val proxies = profile.chainBean!!.proxies
+            if (proxies.contains(anotherProfile.id)) return true
+            if (proxies.isNotEmpty()) {
+                for (entity in ProfileManager.getProfiles(proxies)) {
+                    if (testProfileContains(entity, anotherProfile, visiting)) {
+                        return true
+                    }
                 }
             }
+            return false
+        } finally {
+            visiting.remove(profile.id)
         }
-        return false
     }
 
     var replacing = 0
@@ -220,7 +233,7 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
                     data!!.getLongExtra(
                         ProfileSelectActivity.EXTRA_PROFILE_ID, 0
                     )
-                )!!
+                ) ?: return@runOnDefaultDispatcher
 
                 if (!testProfileAllowed(profile)) {
                     onMainDispatcher {

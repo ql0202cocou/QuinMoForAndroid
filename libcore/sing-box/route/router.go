@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -40,6 +41,7 @@ type Router struct {
 	processSearcher   process.Searcher
 	processCache      freelru.Cache[processCacheKey, processCacheEntry]
 	pauseManager      pause.Manager
+	trackersAccess    sync.RWMutex
 	trackers          []adapter.ConnectionTracker
 	platformInterface adapter.PlatformInterface
 	started           bool
@@ -216,6 +218,8 @@ func (r *Router) Rules() []adapter.Rule {
 }
 
 func (r *Router) AppendTracker(tracker adapter.ConnectionTracker) {
+	r.trackersAccess.Lock()
+	defer r.trackersAccess.Unlock()
 	r.trackers = append(r.trackers, tracker)
 }
 

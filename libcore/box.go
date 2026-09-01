@@ -141,11 +141,23 @@ func (b *BoxInstance) Start() (err error) {
 	b.access.Lock()
 	defer b.access.Unlock()
 
-	defer device.DeferPanicToError("box.Start", func(err_ error) { err = err_ })
+	defer device.DeferPanicToError("box.Start", func(err_ error) {
+		// a panic interrupts the body wherever it happened; if Box.Start
+		// panicked after state was set to 1, roll back so Start can be retried
+		if b.state == 1 {
+			b.state = 0
+		}
+		err = err_
+	})
 
 	if b.state == 0 {
 		b.state = 1
-		return b.Box.Start()
+		err = b.Box.Start()
+		if err != nil {
+			// allow retry after a failed start
+			b.state = 0
+		}
+		return err
 	}
 	return errors.New("already started")
 }

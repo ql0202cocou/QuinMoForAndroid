@@ -123,6 +123,9 @@ fun HysteriaBean.toUri(): String {
             builder.addQueryParameter("peer", sni)
         }
         if (authPayload.isNotBlank()) {
+            // Known limitation: the hysteria URI format has no marker for the auth
+            // payload type, so a TYPE_BASE64 payload (JSON "auth") re-imports as
+            // TYPE_STRING and no longer round-trips.
             builder.addQueryParameter("auth", authPayload)
         }
         builder.addQueryParameter("upmbps", "$uploadMbps")

@@ -15,6 +15,7 @@ import libcore.Libcore
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.concurrent.thread
 
 class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : CoroutineScope {
@@ -31,6 +32,12 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
     ) {
         private lateinit var process: Process
 
+        // set on the looper coroutine's first dispatch; close() destroys only
+        // guards whose looper never started, started loopers clean up in their
+        // own finally (with the SIGTERM grace period on API < 24)
+        @Volatile
+        var looperStarted = false
+
         private fun streamLogger(input: InputStream, logger: (String) -> Unit) = try {
             input.bufferedReader().forEachLine(logger)
         } catch (_: IOException) {
@@ -46,9 +53,10 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
 
         @DelicateCoroutinesApi
         suspend fun looper(onRestartCallback: (suspend () -> Unit)?) {
+            looperStarted = true
             var running = true
             val cmdName = File(cmd.first()).nameWithoutExtension
-            val exitChannel = Channel<Int>()
+            val exitChannel = Channel<Int>(1) // buffered: cleanup may give up receiving, and a blocked send would leak the daemon thread
             try {
                 while (true) {
                     thread(name = "stderr-$cmdName") {
@@ -105,6 +113,10 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
     override val coroutineContext = Dispatchers.Main.immediate + Job()
     var processCount = 0
 
+    // every successfully started guard, so close() can reap processes whose
+    // looper coroutine never ran (pool cancelled after the isActive check)
+    private val guards = CopyOnWriteArrayList<Guard>()
+
     @MainThread
     fun start(
         cmd: List<String>,
@@ -114,6 +126,7 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
         Logs.i("start process: ${Commandline.toString(cmd)}")
         Guard(cmd, env).apply {
             start() // if start fails, IOException will be thrown directly
+            guards.add(this)
             if (!coroutineContext[Job]!!.isActive) {
                 // close() already cancelled this pool: the looper launch below
                 // would never run and nothing else would kill this process
@@ -128,6 +141,11 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
     @MainThread
     fun close(scope: CoroutineScope) {
         cancel()
+        // reap processes whose looper coroutine was cancelled before its
+        // first dispatch; guards with a started looper clean up in their own
+        // finally, so an unconditional destroy here would cut the graceful
+        // shutdown short
+        guards.forEach { if (!it.looperStarted) it.destroy() }
         coroutineContext[Job]!!.also { job -> scope.launch { job.cancelAndJoin() } }
     }
 }

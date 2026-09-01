@@ -242,7 +242,11 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
             activity?.apply {
                 viewCreated(view, savedInstanceState)
-                DataStore.dirty = false
+                // Only clear dirty on first creation; resetting it after a
+                // recreation (rotation) would silently drop unsaved edits.
+                if (savedInstanceState == null) {
+                    DataStore.dirty = false
+                }
                 DataStore.profileCacheStore.registerChangeListener(this)
             }
         }

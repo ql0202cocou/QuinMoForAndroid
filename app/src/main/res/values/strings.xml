@@ -166,6 +166,7 @@
     <string name="stopping">Shutting down…</string>
     <string name="vpn_error">%s</string>
     <string name="vpn_permission_denied">Permission denied to create a VPN service</string>
+    <string name="vpn_permission_required">VPN permission is required, tap to grant</string>
     <string name="reboot_required">Failed to start VPN service. You might need to reboot your
         device.</string>
     <!-- alert category -->

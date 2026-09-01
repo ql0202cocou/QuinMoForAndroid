@@ -5,9 +5,17 @@ package io.nekohasekai.sagernet.ktx
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.*
+import java.util.concurrent.Executors
 
 fun runOnDefaultDispatcher(block: suspend CoroutineScope.() -> Unit) =
     GlobalScope.launch(Dispatchers.Default, block = block)
+
+// single thread for callbacks that must run in order and may block
+// (DefaultNetworkListener -> Libcore.resetAllConnections)
+private val serialDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+
+fun runOnSerialDispatcher(block: suspend CoroutineScope.() -> Unit) =
+    GlobalScope.launch(serialDispatcher, block = block)
 
 fun Fragment.runOnLifecycleDispatcher(block: suspend CoroutineScope.() -> Unit) =
     lifecycleScope.launch(Dispatchers.Default, block = block)

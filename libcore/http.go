@@ -263,15 +263,25 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 		// H3 HTTPS
 		func() (response *http.Response, err error) {
 			request := r.request.Clone(ctx)
-			h3Client := &http.Client{
-				Transport: &http3.Transport{
-					TLSClientConfig: r.tls.Clone(),
-					QUICConfig: &quic.Config{
-						MaxIdleTimeout: time.Second,
-					},
+			h3Transport := &http3.Transport{
+				TLSClientConfig: r.tls.Clone(),
+				QUICConfig: &quic.Config{
+					MaxIdleTimeout: time.Second,
 				},
 			}
-			return h3Client.Do(request)
+			h3Client := &http.Client{
+				Transport: h3Transport,
+			}
+			response, err = h3Client.Do(request)
+			if err != nil {
+				h3Transport.Close()
+				return nil, err
+			}
+			// A http3.Transport only releases its UDP socket and receive
+			// goroutine on Close; the response body is drained and closed by
+			// the caller, so tie the transport's lifetime to it.
+			response.Body = &bodyCloseHook{ReadCloser: response.Body, after: h3Transport.Close}
+			return response, nil
 		},
 	}
 
@@ -352,6 +362,21 @@ type httpResponse struct {
 	getContentOnce sync.Once
 	content        []byte
 	contentError   error
+}
+
+// bodyCloseHook runs after once the wrapped body is closed.
+type bodyCloseHook struct {
+	io.ReadCloser
+	after func() error
+	once  sync.Once
+}
+
+func (b *bodyCloseHook) Close() error {
+	err := b.ReadCloser.Close()
+	b.once.Do(func() {
+		b.after()
+	})
+	return err
 }
 
 func (h *httpResponse) errorString() string {

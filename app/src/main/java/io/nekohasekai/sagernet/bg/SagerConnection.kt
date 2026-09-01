@@ -157,7 +157,12 @@ class SagerConnection(
         check(this.callback == null)
         this.callback = callback
         val intent = Intent(context, serviceClass).setAction(Action.SERVICE)
-        context.bindService(intent, this, Context.BIND_AUTO_CREATE)
+        if (!context.bindService(intent, this, Context.BIND_AUTO_CREATE)) {
+            // bind refused: no onServiceConnected/Disconnected will ever
+            // arrive, so roll back to allow a later retry
+            connectionActive = false
+            this.callback = null
+        }
     }
 
     fun disconnect(context: Context) {

@@ -11,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import moe.matsuri.nb4a.plugin.Plugins
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 object PackageCache {
@@ -82,7 +83,8 @@ object PackageCache {
         }
     }
 
-    private val labelMap = mutableMapOf<String, String>()
+    // written from background threads, cleared from the package-change receiver
+    private val labelMap = ConcurrentHashMap<String, String>()
     fun loadLabel(packageName: String): String {
         var label = labelMap[packageName]
         if (label != null) return label

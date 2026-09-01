@@ -98,7 +98,7 @@ class MainActivity : ThemedActivity(),
         DataStore.configurationStore.registerChangeListener(this)
         GroupManager.userInterface = GroupInterfaceAdapter(this)
 
-        if (intent?.action == Intent.ACTION_VIEW) {
+        if (savedInstanceState == null && intent?.action == Intent.ACTION_VIEW) {
             onNewIntent(intent)
         }
 

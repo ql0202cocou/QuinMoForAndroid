@@ -318,7 +318,10 @@ fun buildConfig(
                 // chain rules
                 if (index > 0) {
                     // chain route/proxy rules
-                    if (pastEntity!!.needExternal()) {
+                    // pastInboundTag is only assigned when the past profile got a
+                    // mapping inbound, which also requires canMapping() (NekoBean /
+                    // hy1 faketcp can't); those chain via detour like internal nodes
+                    if (pastEntity!!.needExternal() && pastEntity!!.requireBean().canMapping()) {
                         route.rules.add(Rule_DefaultOptions().apply {
                             inbound = listOf(pastInboundTag)
                             outbound = tagOut

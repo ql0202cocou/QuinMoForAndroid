@@ -43,7 +43,7 @@ data class ProxyGroup(
             subscription.serializeForShare(output)
 
         } else {
-            output.writeInt(1)
+            output.writeInt(2)
             output.writeLong(id)
             output.writeLong(userOrder)
             output.writeBoolean(ungrouped)
@@ -55,6 +55,9 @@ data class ProxyGroup(
             }
             output.writeInt(order)
             output.writeString(proxyServerNameserver)
+            output.writeBoolean(isSelector)
+            output.writeLong(frontProxy)
+            output.writeLong(landingProxy)
         }
     }
 
@@ -86,6 +89,11 @@ data class ProxyGroup(
             order = input.readInt()
             if (version >= 1) {
                 proxyServerNameserver = input.readString()
+            }
+            if (version >= 2) {
+                isSelector = input.readBoolean()
+                frontProxy = input.readLong()
+                landingProxy = input.readLong()
             }
         }
     }

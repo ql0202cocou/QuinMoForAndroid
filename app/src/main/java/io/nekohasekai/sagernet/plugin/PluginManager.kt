@@ -82,7 +82,11 @@ object PluginManager {
     private fun initNativeFaster(provider: ProviderInfo): String? {
         return provider.loadString(Plugins.METADATA_KEY_EXECUTABLE_PATH)
             ?.let { relativePath ->
-                File(provider.applicationInfo.nativeLibraryDir).resolve(relativePath).apply {
+                val baseDir = File(provider.applicationInfo.nativeLibraryDir)
+                val file = File(baseDir, relativePath)
+                // reject paths escaping the plugin's nativeLibraryDir (e.g. "../")
+                check(file.canonicalPath.startsWith(baseDir.canonicalPath + File.separator))
+                file.apply {
                     check(canExecute())
                 }.absolutePath
             }

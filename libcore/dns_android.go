@@ -29,6 +29,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -79,7 +80,7 @@ func init() {
 	}
 
 	// set rawQueryFunc
-	rawQueryFunc = func(networkHandle int64, request []byte) ([]byte, error) {
+	rawQueryFunc = func(ctx context.Context, networkHandle int64, request []byte) ([]byte, error) {
 		fd, err := callAndroidResNSend(uint64(networkHandle), request)
 		if err != nil {
 			return nil, err
@@ -91,14 +92,38 @@ func init() {
 		// release it (res_nclose operates on resolver state, not this fd).
 		defer unix.Close(fd)
 
-		// wait for response (timeout 5000 ms)
+		// wait for response (timeout 5000 ms), polling in short slices so a
+		// cancelled context returns promptly instead of after the full timeout
 		pfds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN | unix.POLLERR}}
-		nReady, err := unix.Poll(pfds, 5000)
-		if err != nil {
-			return nil, err
-		}
-		if nReady == 0 {
-			return nil, context.DeadlineExceeded
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				return nil, context.DeadlineExceeded
+			}
+			slice := remaining
+			if slice > 100*time.Millisecond {
+				slice = 100 * time.Millisecond
+			}
+			timeout := int(slice.Milliseconds())
+			if timeout < 1 {
+				timeout = 1
+			}
+			nReady, err := unix.Poll(pfds, timeout)
+			if err != nil {
+				if err == unix.EINTR {
+					continue
+				}
+				return nil, err
+			}
+			if nReady > 0 {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+			}
 		}
 
 		// read response into buffer

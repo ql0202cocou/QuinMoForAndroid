@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.*
 import android.widget.EditText
 import androidx.appcompat.widget.Toolbar
@@ -19,7 +20,7 @@ import moe.matsuri.nb4a.utils.WebViewUtil
 
 class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenuItemClickListener {
 
-    lateinit var mWebView: WebView
+    private var mWebView: WebView? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -34,10 +35,11 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
 
         // webview
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
-        mWebView = binding.webview
-        mWebView.settings.domStorageEnabled = true
-        mWebView.settings.javaScriptEnabled = true
-        mWebView.webViewClient = object : WebViewClient() {
+        val webView = binding.webview
+        mWebView = webView
+        webView.settings.domStorageEnabled = true
+        webView.settings.javaScriptEnabled = true
+        webView.webViewClient = object : WebViewClient() {
             override fun onReceivedError(
                 view: WebView?, request: WebResourceRequest?, error: WebResourceError?
             ) {
@@ -48,7 +50,15 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
                 super.onPageFinished(view, url)
             }
         }
-        mWebView.loadUrl(DataStore.yacdURL)
+        webView.loadUrl(DataStore.yacdURL)
+    }
+
+    override fun onDestroyView() {
+        // detach before destroy: destroying a still-attached WebView can crash
+        (mWebView?.parent as? ViewGroup)?.removeView(mWebView)
+        mWebView?.destroy()
+        mWebView = null
+        super.onDestroyView()
     }
 
     @SuppressLint("CheckResult")
@@ -63,15 +73,18 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
                     .setView(view)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         DataStore.yacdURL = view.text.toString()
-                        mWebView.loadUrl(DataStore.yacdURL)
+                        mWebView?.loadUrl(DataStore.yacdURL)
                     }
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
             R.id.close -> {
-                mWebView.onPause()
-                mWebView.removeAllViews()
-                mWebView.destroy()
+                mWebView?.onPause()
+                mWebView?.removeAllViews()
+                // detach before destroy: destroying a still-attached WebView can crash
+                (mWebView?.parent as? ViewGroup)?.removeView(mWebView)
+                mWebView?.destroy()
+                mWebView = null
             }
         }
         return true

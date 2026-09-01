@@ -178,14 +178,21 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
     }
 
     suspend fun startImport(file: Uri) {
-        val fileName = requireContext().contentResolver.query(file, null, null, null, null)
-            ?.use { cursor ->
-                cursor.moveToFirst()
-                cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
-            }
-            ?.takeIf { it.isNotBlank() } ?: file.pathSegments.last()
-            .substringAfterLast('/')
-            .substringAfter(':')
+        // The fragment may already be detached by the time this coroutine
+        // runs (user picked a file and left immediately); bail out then.
+        val fileName = try {
+            requireContext().contentResolver.query(file, null, null, null, null)
+                ?.use { cursor ->
+                    cursor.moveToFirst()
+                    cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
+                }
+                ?.takeIf { it.isNotBlank() } ?: file.pathSegments.last()
+                .substringAfterLast('/')
+                .substringAfter(':')
+        } catch (e: Exception) {
+            Logs.w(e)
+            return
+        }
 
         if (!fileName.endsWith(".json")) {
             onMainDispatcher {

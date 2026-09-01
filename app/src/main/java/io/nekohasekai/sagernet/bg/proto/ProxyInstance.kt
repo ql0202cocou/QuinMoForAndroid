@@ -54,8 +54,16 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
             // The service may have stopped before this block runs; creating a
             // looper now would spin on an already closed box.
             if (isClosed()) return@runOnDefaultDispatcher
-            looper = service?.let { TrafficLooper(it.data, this) }
-            looper?.start()
+            val trafficLooper = service?.let { TrafficLooper(it.data, this) }
+                ?: return@runOnDefaultDispatcher
+            looper = trafficLooper
+            trafficLooper.start()
+            if (isClosed()) {
+                // close() ran between the check and start(); it saw a null
+                // looper and skipped stopping it, so stop it here.
+                looper = null
+                trafficLooper.stop()
+            }
         }
     }
 

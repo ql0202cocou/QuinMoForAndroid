@@ -11,6 +11,7 @@ import io.nekohasekai.sagernet.fmt.TAG_PROXY
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import kotlinx.coroutines.*
+import java.util.concurrent.atomic.AtomicBoolean
 
 class TrafficLooper
     (
@@ -18,10 +19,14 @@ class TrafficLooper
 ) {
 
     private var job: Job? = null
+    private val stopped = AtomicBoolean(false)
     private val idMap = mutableMapOf<Long, TrafficUpdater.TrafficLooperData>() // id to 1 data
     private val tagMap = mutableMapOf<String, TrafficUpdater.TrafficLooperData>() // tag to 1 data
 
     suspend fun stop() {
+        // both ProxyInstance.launch's post-close recheck and close() can end
+        // up calling stop(); persist and broadcast only once
+        if (!stopped.compareAndSet(false, true)) return
         // wait for the loop to finish so no in-flight queryStats hits a closed box
         job?.cancelAndJoin()
         // finally traffic post

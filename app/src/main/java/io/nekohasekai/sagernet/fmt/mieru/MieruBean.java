@@ -46,14 +46,12 @@ public class MieruBean extends AbstractBean {
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(0);
+        output.writeInt(1);
         super.serialize(output);
         output.writeString(protocol);
         output.writeString(username);
         output.writeString(password);
-        if (protocol.equals("UDP")) {
-            output.writeInt(mtu);
-        }
+        output.writeInt(mtu);
     }
 
     @Override
@@ -63,7 +61,7 @@ public class MieruBean extends AbstractBean {
         protocol = input.readString();
         username = input.readString();
         password = input.readString();
-        if (protocol.equals("UDP")) {
+        if (version >= 1 || protocol.equals("UDP")) {
             mtu = input.readInt();
         }
     }

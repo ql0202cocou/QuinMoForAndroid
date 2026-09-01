@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"syscall"
+	"time"
 )
 
 func getOneFd(socket int) (int, error) {
@@ -69,6 +70,10 @@ func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)
 				socket := GetFdFromConn(c)
 				defer c.Close()
 
+				// bound the handshake so a peer that connects but never
+				// sends can't park the goroutine (and its fds) forever
+				c.SetDeadline(time.Now().Add(5 * time.Second))
+
 				fd, err := getOneFd(socket)
 				if err != nil {
 					if verbose {
@@ -80,7 +85,8 @@ func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)
 
 				if ctl == nil {
 					// linux
-					if err := syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_MARK, fwmark); err != nil {
+					err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_MARK, fwmark)
+					if err != nil {
 						log.Println("protect server syscall.SetsockoptInt:", err)
 					}
 				} else {

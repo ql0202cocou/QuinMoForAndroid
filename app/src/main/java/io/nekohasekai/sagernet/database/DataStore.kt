@@ -44,6 +44,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var runningTest = false
 
+    @Synchronized
     fun currentGroupId(): Long {
         val currentSelected = configurationStore.getLong(Key.PROFILE_GROUP, -1)
         if (currentSelected > 0L) return currentSelected
@@ -58,6 +59,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         return groupId
     }
 
+    @Synchronized
     fun currentGroup(): ProxyGroup {
         var group: ProxyGroup? = null
         val currentSelected = configurationStore.getLong(Key.PROFILE_GROUP, -1)

@@ -9,15 +9,17 @@ class TrafficUpdater(
 
     class TrafficLooperData(
         // Don't associate proxyEntity
-        var tag: String,
-        var tx: Long = 0,
-        var rx: Long = 0,
-        var txBase: Long = 0,
-        var rxBase: Long = 0,
-        var txRate: Long = 0,
-        var rxRate: Long = 0,
-        var lastUpdate: Long = 0,
-        var ignore: Boolean = false,
+        // @Volatile: read/written by TrafficLooper, TrafficUpdater and binder
+        // threads without synchronization; plain Longs could tear
+        @Volatile var tag: String,
+        @Volatile var tx: Long = 0,
+        @Volatile var rx: Long = 0,
+        @Volatile var txBase: Long = 0,
+        @Volatile var rxBase: Long = 0,
+        @Volatile var txRate: Long = 0,
+        @Volatile var rxRate: Long = 0,
+        @Volatile var lastUpdate: Long = 0,
+        @Volatile var ignore: Boolean = false,
     )
 
     private fun updateOne(item: TrafficLooperData): TrafficLooperData {

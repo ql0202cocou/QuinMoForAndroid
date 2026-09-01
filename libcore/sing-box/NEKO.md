@@ -29,6 +29,7 @@ Additional patches maintained by this fork (not from MatsuriDayo):
 | Patch | Notes |
 |---|---|
 | dns: rule action `fallback` | `option/rule_action.go` (`DNSRouteActionOptions.Fallback`, JSON `fallback`), `route/rule/rule_action.go` (`RuleActionDNSRoute.Fallback`), `dns/router.go`: when a DNS query routed by a rule with `fallback: true` fails, matching continues at the next DNS rule instead of returning the error. `Lookup` treats any non-success rcode as a failure (via `client.Lookup`'s `RcodeError`); `Exchange` was extended the same way — a non-success rcode response (NXDOMAIN & co.) also falls through, so a split-horizon server is never the final word. Used by the Android app to implement ordered multi-server fallback for per-group proxy-server nameservers. |
+| router: lock `trackers` | `route/router.go`, `route/route.go`: upstream appends to `Router.trackers` without synchronization, and the Android app calls `AppendTracker` (via `SetV2rayStats`) while the box is already routing, so the append raced the per-connection reads in `RouteConnection`/`RoutePacketConnection` (slice growth tearing). Added a `sync.RWMutex` (`trackersAccess`): `AppendTracker` takes the write lock, both route paths take the read lock. Drop if upstream adds its own locking. |
 
 How to upgrade the base: clone upstream SagerNet/sing-box, merge or rebase the
 patches onto the new tag, resolve conflicts, replace this directory with the

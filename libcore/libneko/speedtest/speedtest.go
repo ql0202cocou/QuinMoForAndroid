@@ -37,7 +37,10 @@ func UrlTest(client *http.Client, link string, timeout int32, standard int) (int
 		times = 1
 	case UrlTestStandard_Handshake:
 		times = 2
-		rt := client.Transport.(*http.Transport)
+		rt, ok := client.Transport.(*http.Transport)
+		if !ok {
+			return 0, fmt.Errorf("UrlTestStandard_Handshake requires *http.Transport, got %T", client.Transport)
+		}
 		rt.DisableKeepAlives = true
 	case UrlTestStandard_RTT:
 		times = 2

@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.bg
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,6 +10,8 @@ import android.net.ProxyInfo
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.fmt.LOCALHOST
@@ -28,6 +31,10 @@ class VpnService : BaseVpnService(),
         const val PRIVATE_VLAN4_ROUTER = "172.19.0.2"
         const val FAKEDNS_VLAN4_CLIENT = "198.18.0.0"
         const val PRIVATE_VLAN6_CLIENT = "fdfe:dcba:9876::1"
+
+        // separate from ServiceNotification (1), SubscriptionUpdater (2) and
+        // ConnectionTestNotification (1001) so none of them replaces it
+        const val NOTIFICATION_ID_VPN_REQUEST = 1002
 
     }
 
@@ -76,10 +83,25 @@ class VpnService : BaseVpnService(),
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (DataStore.serviceMode == Key.MODE_VPN) {
             if (prepare(this) != null) {
-                startActivity(
-                    Intent(
-                        this, VpnRequestActivity::class.java
-                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                // VPN permission was revoked; starting an activity from the
+                // background is silently blocked since Android 10, so ask
+                // via a notification instead.
+                NotificationManagerCompat.from(this).notify(
+                    NOTIFICATION_ID_VPN_REQUEST,
+                    NotificationCompat.Builder(this, "service-vpn-request")
+                        .setContentTitle(getString(R.string.service_vpn))
+                        .setContentText(getString(R.string.vpn_permission_required))
+                        .setContentIntent(
+                            PendingIntent.getActivity(
+                                this,
+                                0,
+                                Intent(this, VpnRequestActivity::class.java),
+                                ServiceNotification.flags
+                            )
+                        )
+                        .setSmallIcon(R.drawable.ic_service_active)
+                        .setAutoCancel(true)
+                        .build()
                 )
             } else return super<BaseService.Interface>.onStartCommand(intent, flags, startId)
         }
@@ -133,7 +155,9 @@ class VpnService : BaseVpnService(),
         val proxyApps = DataStore.proxyApps
         var bypass = DataStore.bypass
         val workaroundSYSTEM = false /* DataStore.tunImplementation == TunImplementation.SYSTEM */
-        val needBypassRootUid = workaroundSYSTEM || data.proxy!!.config.trafficMap.values.any {
+        // read once: proxy is cleared on the main thread during shutdown
+        val proxy = data.proxy ?: error("proxy not started")
+        val needBypassRootUid = workaroundSYSTEM || proxy.config.trafficMap.values.any {
             it[0].hysteriaBean?.protocol == HysteriaBean.PROTOCOL_FAKETCP
         }
 
@@ -197,6 +221,9 @@ class VpnService : BaseVpnService(),
         metered = DataStore.meteredNetwork
         if (Build.VERSION.SDK_INT >= 29) builder.setMetered(metered)
         conn = builder.establish() ?: throw NullConnectionException()
+
+        // the VPN is up, so the permission-request notification is obsolete
+        NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID_VPN_REQUEST)
 
         return conn!!.fd
     }

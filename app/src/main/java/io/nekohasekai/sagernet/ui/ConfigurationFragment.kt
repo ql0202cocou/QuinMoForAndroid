@@ -1065,6 +1065,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         lateinit var undoManager: UndoSnackbarManager<ProxyEntity>
         var adapter: ConfigurationAdapter? = null
+        var itemTouchHelper: ItemTouchHelper? = null
 
         override fun onSaveInstanceState(outState: Bundle) {
             super.onSaveInstanceState(outState)
@@ -1081,7 +1082,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                 BundleCompat.getParcelable(it, "proxyGroup", ProxyGroup::class.java)
             }?.also {
                 proxyGroup = it
-                onViewCreated(requireView(), null)
+                // The system onViewCreated call may already have run the
+                // setup; only redo it when it bailed out on the then
+                // uninitialized proxyGroup.
+                if (!::configurationListView.isInitialized) {
+                    onViewCreated(requireView(), null)
+                }
             }
         }
 
@@ -1201,9 +1207,16 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             if (!select) {
 
+                // Replace any previous instances before creating new ones
+                // (onViewCreated can re-run, see onViewStateRestored /
+                // onResume): flush pending undo actions, and detach the old
+                // helper or two helpers would handle the same drag and swap
+                // items twice.
+                if (::undoManager.isInitialized) undoManager.flush()
                 undoManager = UndoSnackbarManager(activity as MainActivity, adapter!!)
 
-                ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+                itemTouchHelper?.attachToRecyclerView(null)
+                itemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
                     ItemTouchHelper.UP or ItemTouchHelper.DOWN, ItemTouchHelper.START
                 ) {
                     override fun getSwipeDirs(
@@ -1238,7 +1251,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         super.clearView(recyclerView, viewHolder)
                         adapter?.commitMove()
                     }
-                }).attachToRecyclerView(configurationListView)
+                }).apply { attachToRecyclerView(configurationListView) }
 
             }
 

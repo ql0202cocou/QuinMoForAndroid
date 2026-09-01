@@ -127,5 +127,10 @@ object DefaultNetworkListener {
         }
     }
 
-    private fun unregister() = SagerNet.connectivity.unregisterNetworkCallback(Callback)
+    private fun unregister() {
+        // throws IllegalArgumentException if register() failed (fallback); an
+        // uncaught throw here kills the actor and every later send fails
+        runCatching { SagerNet.connectivity.unregisterNetworkCallback(Callback) }
+            .onFailure { Logs.w(it) }
+    }
 }

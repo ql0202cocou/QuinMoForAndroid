@@ -97,14 +97,18 @@ class AssetsActivity : ThemedActivity() {
 
     val importFile = registerForActivityResult(ActivityResultContracts.GetContent()) { file ->
         if (file != null) {
-            val fileName = contentResolver.query(file, null, null, null, null)?.use { cursor ->
+            // DISPLAY_NAME comes from an external document provider and may
+            // contain path separators; keep only the last segment like the
+            // fallback does, so File(filesDir, fileName) cannot escape.
+            val fileName = (contentResolver.query(file, null, null, null, null)?.use { cursor ->
                 cursor.moveToFirst()
                 cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
             }?.takeIf { it.isNotBlank() } ?: file.pathSegments.last()
                 .substringAfterLast('/')
-                .substringAfter(':')
+                .substringAfter(':'))
+                .substringAfterLast('/')
 
-            if (!fileName.endsWith(".db")) {
+            if (fileName.isBlank() || fileName == ".." || !fileName.endsWith(".db")) {
                 alert(getString(R.string.route_not_asset, fileName)).show()
                 return@registerForActivityResult
             }

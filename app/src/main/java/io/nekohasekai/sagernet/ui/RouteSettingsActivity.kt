@@ -258,7 +258,11 @@ class RouteSettingsActivity(
 
     suspend fun saveAndExit() {
 
-        if (!needSave()) {
+        val editingId = DataStore.editingId
+
+        // Only block a brand-new empty route; an existing rule left unchanged
+        // just exits without saving.
+        if (editingId == 0L && !needSave()) {
             onMainDispatcher {
                 MaterialAlertDialogBuilder(this@RouteSettingsActivity).setTitle(R.string.empty_route)
                     .setMessage(R.string.empty_route_notice)
@@ -268,14 +272,13 @@ class RouteSettingsActivity(
             return
         }
 
-        val editingId = DataStore.editingId
         if (editingId == 0L) {
             if (intent.hasExtra(EXTRA_PACKAGE_NAME)) {
                 setResult(RESULT_OK, Intent())
             }
 
             ProfileManager.createRule(RuleEntity().apply { serialize() })
-        } else {
+        } else if (needSave()) {
             val entity = SagerDatabase.rulesDao.getById(DataStore.editingId)
             if (entity == null) {
                 finish()

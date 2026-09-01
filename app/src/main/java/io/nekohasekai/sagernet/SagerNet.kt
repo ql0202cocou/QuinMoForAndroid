@@ -182,6 +182,10 @@ class SagerNet : Application(),
                             "connection-test",
                             application.getText(R.string.connection_test),
                             NotificationManager.IMPORTANCE_DEFAULT
+                        ), NotificationChannel(
+                            "service-vpn-request",
+                            application.getText(R.string.vpn_permission_required),
+                            NotificationManager.IMPORTANCE_DEFAULT
                         )
                     )
                 )

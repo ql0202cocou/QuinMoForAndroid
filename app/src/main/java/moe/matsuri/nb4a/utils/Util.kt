@@ -87,7 +87,9 @@ object Util {
         val o = mutableMapOf<String, Any?>()
         m.forEach {
             if (it.key is String) {
-                o[it.key as String] = it.value as Any
+                // value stays nullable: a JSON null must pass through so
+                // mergeMap can overwrite with it instead of crashing
+                o[it.key as String] = it.value
             }
         }
         return o

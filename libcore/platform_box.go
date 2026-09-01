@@ -35,7 +35,12 @@ func (w *boxPlatformInterfaceWrapper) UsePlatformAutoDetectInterfaceControl() bo
 func (w *boxPlatformInterfaceWrapper) AutoDetectInterfaceControl(fd int) error {
 	// call protect_path
 	if !isBgProcess {
-		_ = sendFdToProtect(fd, "protect_path")
+		// Log but don't return the error: the main-process URL test dials
+		// directly when the VPN is not running, and a missing protect socket
+		// is the normal case then — failing the dial would break the test.
+		if err := sendFdToProtect(fd, "protect_path"); err != nil {
+			log.Printf("protect fd %d via protect_path failed: %v", fd, err)
+		}
 		return nil
 	}
 	// bg process call VPNService
