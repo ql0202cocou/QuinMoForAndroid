@@ -39,6 +39,9 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
                 method = link.username
                 password = link.password
                 plugin = link.queryParameter("plugin") ?: ""
+                link.queryParameter("uot")?.let {
+                    if (it == "1" || it == "true") sUoT = true
+                }
                 name = link.fragment
                 fixPluginName()
             }
@@ -52,6 +55,9 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
             method = methodAndPswd.substringBefore(":")
             password = methodAndPswd.substringAfter(":")
             plugin = link.queryParameter("plugin") ?: ""
+            link.queryParameter("uot")?.let {
+                if (it == "1" || it == "true") sUoT = true
+            }
             name = link.fragment
             fixPluginName()
         }
@@ -85,6 +91,10 @@ fun ShadowsocksBean.toUri(): String {
 
     if (plugin.isNotBlank()) {
         builder.addQueryParameter("plugin", plugin)
+    }
+
+    if (sUoT) {
+        builder.addQueryParameter("uot", "1")
     }
 
     if (name.isNotBlank()) {

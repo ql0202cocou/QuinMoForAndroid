@@ -184,11 +184,17 @@ object Util {
     // scheme://user:password@host embedded in string values (e.g. naive "proxy" URL)
     private val URL_USERINFO_PASSWORD = Regex("""(://[^"\s:@/]+):[^"\s@/]*@""")
 
+    // scheme://password@host where the whole userinfo is the credential
+    // (trojan/vless style, no colon); runs after URL_USERINFO_PASSWORD, whose
+    // replacement contains a colon and therefore cannot be re-matched here
+    private val URL_USERINFO_BARE = Regex("""(://)[^"\s:@/]+@""")
+
     // keep credentials out of the exportable log / crash report
     fun redactSecrets(text: String): String {
         var result = SENSITIVE_JSON_VALUE.replace(text) { it.groupValues[1] + "\"***\"" }
         result = SENSITIVE_YAML_VALUE.replace(result) { it.groupValues[1] + "***" }
         result = URL_USERINFO_PASSWORD.replace(result) { it.groupValues[1] + ":***@" }
+        result = URL_USERINFO_BARE.replace(result) { it.groupValues[1] + "***@" }
         return result
     }
 }

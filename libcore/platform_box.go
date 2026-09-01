@@ -163,6 +163,11 @@ func (w *boxPlatformInterfaceWrapper) FindConnectionOwner(request *adapter.FindC
 			return nil, err
 		}
 		uid = u
+		if uid < 0 {
+			// INVALID_UID: keep parity with the procfs path, otherwise
+			// PackageNameByUid(-1) would misattribute the connection
+			return nil, E.New("connection owner: not found")
+		}
 	}
 	owner := &adapter.ConnectionOwner{UserId: uid}
 	if packageName, err := intfBox.PackageNameByUid(uid); err == nil && packageName != "" {

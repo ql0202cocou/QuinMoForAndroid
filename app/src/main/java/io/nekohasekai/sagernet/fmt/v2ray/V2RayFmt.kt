@@ -39,6 +39,16 @@ data class VmessQRCode(
     var pbk: String = "",
     @SerializedName("sid", alternate = ["shortId"])
     var sid: String = "",
+    // "pqv" matches the ducksoft query param
+    @SerializedName("pqv", alternate = ["mldsa65Verify"])
+    var pqv: String = "",
+    // "cert" matches the ducksoft query param
+    @SerializedName("cert", alternate = ["certificates"])
+    var cert: String = "",
+    var packetEncoding: String = "",
+    // ws early data, same names as the ducksoft query params
+    var ed: Int = 0,
+    var eh: String = "",
 )
 
 fun StandardV2RayBean.isTLS(): Boolean {
@@ -358,6 +368,7 @@ fun parseV2RayN(link: String): VMessBean {
             if (bean.sni.isNullOrBlank()) bean.sni = bean.host
             bean.alpn = vmessQRCode.alpn
             bean.utlsFingerprint = vmessQRCode.fp
+            if (!vmessQRCode.cert.isNullOrBlank()) bean.certificates = vmessQRCode.cert
             if (!vmessQRCode.verify_cert) bean.allowInsecure = true
             if (!vmessQRCode.ech.isNullOrBlank()) {
                 bean.echConfig = vmessQRCode.ech
@@ -366,7 +377,21 @@ fun parseV2RayN(link: String): VMessBean {
             if (vmessQRCode.tls == "reality") {
                 bean.realityPubKey = vmessQRCode.pbk
                 bean.realityShortId = vmessQRCode.sid
+                if (!vmessQRCode.pqv.isNullOrBlank()) bean.realityMldsa65Verify = vmessQRCode.pqv
             }
+        }
+    }
+
+    when (vmessQRCode.packetEncoding) {
+        // we export "packetaddr", v2rayN writes "packet"
+        "packetaddr", "packet" -> bean.packetEncoding = 1
+        "xudp" -> bean.packetEncoding = 2
+    }
+
+    if (bean.type == "ws" && vmessQRCode.ed > 0) {
+        bean.wsMaxEarlyData = vmessQRCode.ed
+        if (!vmessQRCode.eh.isNullOrBlank()) {
+            bean.earlyDataHeaderName = vmessQRCode.eh
         }
     }
 
@@ -432,10 +457,28 @@ fun VMessBean.toV2rayN(): String {
 
         if (isTLS()) {
             tls = "tls"
+            if (bean.certificates.isNotBlank()) {
+                cert = bean.certificates
+            }
             if (bean.realityPubKey.isNotBlank()) {
                 tls = "reality"
                 pbk = bean.realityPubKey
                 sid = bean.realityShortId
+                if (bean.realityMldsa65Verify.isNotBlank()) {
+                    pqv = bean.realityMldsa65Verify
+                }
+            }
+        }
+
+        when (bean.packetEncoding) {
+            1 -> packetEncoding = "packetaddr"
+            2 -> packetEncoding = "xudp"
+        }
+
+        if (net == "ws" && bean.wsMaxEarlyData > 0) {
+            ed = bean.wsMaxEarlyData
+            if (bean.earlyDataHeaderName.isNotBlank()) {
+                eh = bean.earlyDataHeaderName
             }
         }
 

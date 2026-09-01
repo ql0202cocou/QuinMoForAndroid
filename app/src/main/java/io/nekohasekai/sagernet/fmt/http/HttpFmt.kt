@@ -19,6 +19,24 @@ fun parseHttp(link: String): HttpBean {
         sni = httpUrl.queryParameter("sni")
         name = httpUrl.fragment
         setTLS(httpUrl.scheme == "https")
+        if (isTLS()) {
+            httpUrl.queryParameter("allowInsecure")?.let {
+                if (it == "1" || it == "true") allowInsecure = true
+            }
+            httpUrl.queryParameter("cert")?.let {
+                certificates = it
+            }
+            httpUrl.queryParameter("fp")?.let {
+                utlsFingerprint = it
+            }
+            httpUrl.queryParameter("alpn")?.let {
+                alpn = it
+            }
+            (httpUrl.queryParameter("ech") ?: httpUrl.queryParameter("echConfig"))?.let {
+                echConfig = it
+                enableECH = true
+            }
+        }
     }
 }
 
@@ -37,6 +55,23 @@ fun HttpBean.toUri(): String {
     }
     if (sni.isNotBlank()) {
         builder.addQueryParameter("sni", sni)
+    }
+    if (isTLS()) {
+        if (allowInsecure) {
+            builder.addQueryParameter("allowInsecure", "1")
+        }
+        if (certificates.isNotBlank()) {
+            builder.addQueryParameter("cert", certificates)
+        }
+        if (utlsFingerprint.isNotBlank()) {
+            builder.addQueryParameter("fp", utlsFingerprint)
+        }
+        if (alpn.isNotBlank()) {
+            builder.addQueryParameter("alpn", alpn.replace("\n", ","))
+        }
+        if (enableECH && echConfig.isNotBlank()) {
+            builder.addQueryParameter("ech", echConfig)
+        }
     }
     if (name.isNotBlank()) {
         builder.encodedFragment(name.urlSafe())

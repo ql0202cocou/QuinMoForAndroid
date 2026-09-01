@@ -32,8 +32,15 @@ class BootReceiver : BroadcastReceiver() {
             else -> return
         }
 
+        // keep the process alive until the reconfigure finishes, otherwise it
+        // can be killed between cancelUniqueWork and enqueue
+        val pendingResult = goAsync()
         runOnDefaultDispatcher {
-            SubscriptionUpdater.reconfigureUpdater()
+            try {
+                SubscriptionUpdater.reconfigureUpdater()
+            } finally {
+                pendingResult.finish()
+            }
         }
 
         if (!DataStore.persistAcrossReboot) {   // sanity check

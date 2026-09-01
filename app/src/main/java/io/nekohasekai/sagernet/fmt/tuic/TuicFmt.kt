@@ -35,6 +35,10 @@ fun parseTuic(url: String): TuicBean {
         link.queryParameter("sni")?.let {
             sni = it
         }
+        // short name is our own invention, matching the AnyTLS "cert" param
+        link.queryParameter("ca")?.let {
+            caText = it
+        }
         link.queryParameter("congestion_control")?.let {
             congestionController = it
         }
@@ -64,6 +68,7 @@ fun TuicBean.toUri(): String {
     builder.addQueryParameter("udp_relay_mode", udpRelayMode)
 
     if (sni.isNotBlank()) builder.addQueryParameter("sni", sni)
+    if (caText.isNotBlank()) builder.addQueryParameter("ca", caText)
     if (alpn.isNotBlank()) builder.addQueryParameter("alpn", alpn)
     if (allowInsecure) builder.addQueryParameter("allow_insecure", "1")
     if (disableSNI) builder.addQueryParameter("disable_sni", "1")

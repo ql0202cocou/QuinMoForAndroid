@@ -191,8 +191,11 @@ class MainActivity : ThemedActivity(),
 
             displayFragmentWithId(R.id.nav_group)
 
+            val message = getString(R.string.subscription_import_message, name)
+            val link = group.subscription?.link
+
             MaterialAlertDialogBuilder(this@MainActivity).setTitle(R.string.subscription_import)
-                .setMessage(getString(R.string.subscription_import_message, name))
+                .setMessage(if (!link.isNullOrBlank()) "$message\n\n$link" else message)
                 .setPositiveButton(R.string.yes) { _, _ ->
                     runOnDefaultDispatcher {
                         finishImportSubscription(group)

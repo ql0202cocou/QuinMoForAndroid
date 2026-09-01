@@ -31,12 +31,12 @@ object SubscriptionUpdater {
         var minDelay =
             subscriptions.minByOrNull { it.subscription!!.autoUpdateDelay }!!.subscription!!.autoUpdateDelay.toLong()
         val now = System.currentTimeMillis() / 1000L
-        // Seconds until the soonest-due subscription; an overdue one makes this
-        // negative, so no initial delay is set and the update runs immediately.
-        var minInitDelay =
-            subscriptions.minOf { it.subscription!!.lastUpdated + (minDelay * 60) - now }
+        // Seconds until the soonest-due subscription, each against its own
+        // autoUpdateDelay; an overdue one makes this negative, so no initial
+        // delay is set and the update runs immediately.
+        val minInitDelay =
+            subscriptions.minOf { it.subscription!!.lastUpdated + it.subscription!!.autoUpdateDelay * 60L - now }
         if (minDelay < 15) minDelay = 15
-        if (minInitDelay > 60) minInitDelay = 60
 
         // main process
         RemoteWorkManager.getInstance(app).enqueueUniquePeriodicWork(
@@ -64,33 +64,37 @@ object SubscriptionUpdater {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
 
         override suspend fun doWork(): Result {
-            var subscriptions =
-                SagerDatabase.groupDao.subscriptions().filter { it.subscription!!.autoUpdate }
-            if (!DataStore.serviceState.connected) {
-                Logs.d("work: not connected")
-                subscriptions = subscriptions.filter { !it.subscription!!.updateWhenConnectedOnly }
-            }
-
-            if (subscriptions.isNotEmpty()) for (profile in subscriptions) {
-                val subscription = profile.subscription!!
-
-                if (((System.currentTimeMillis() / 1000).toInt() - subscription.lastUpdated) < subscription.autoUpdateDelay * 60) {
-                    Logs.d("work: not updating " + profile.displayName())
-                    continue
+            try {
+                var subscriptions =
+                    SagerDatabase.groupDao.subscriptions().filter { it.subscription!!.autoUpdate }
+                if (!DataStore.serviceState.connected) {
+                    Logs.d("work: not connected")
+                    subscriptions = subscriptions.filter { !it.subscription!!.updateWhenConnectedOnly }
                 }
-                Logs.d("work: updating " + profile.displayName())
 
-                notification.setContentText(
-                    applicationContext.getString(
-                        R.string.subscription_update_message, profile.displayName()
+                if (subscriptions.isNotEmpty()) for (profile in subscriptions) {
+                    val subscription = profile.subscription!!
+
+                    if (((System.currentTimeMillis() / 1000).toInt() - subscription.lastUpdated) < subscription.autoUpdateDelay * 60) {
+                        Logs.d("work: not updating " + profile.displayName())
+                        continue
+                    }
+                    Logs.d("work: updating " + profile.displayName())
+
+                    notification.setContentText(
+                        applicationContext.getString(
+                            R.string.subscription_update_message, profile.displayName()
+                        )
                     )
-                )
-                nm.notify(2, notification.build())
+                    nm.notify(2, notification.build())
 
-                GroupUpdater.executeUpdate(profile, false)
+                    GroupUpdater.executeUpdate(profile, false)
+                }
+            } finally {
+                // also runs when the work is cancelled, so the progress
+                // notification never lingers
+                nm.cancel(2)
             }
-
-            nm.cancel(2)
 
             return Result.success()
         }

@@ -22,6 +22,7 @@ import moe.matsuri.nb4a.utils.Util
 import org.json.JSONObject
 import java.io.File
 import java.io.FileWriter
+import java.io.IOException
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -318,7 +319,18 @@ class AssetsActivity : ThemedActivity() {
             response.writeTo(cacheFile.canonicalPath)
 
             if (fileName.endsWith(".xz")) {
-                Libcore.unxz(cacheFile.absolutePath, file.absolutePath)
+                // decompress to a temp file and replace atomically: a truncated
+                // download must not leave a corrupted db behind (box may mmap it)
+                val unxzFile = File(file.parentFile, "$fileName.unxz.tmp")
+                try {
+                    Libcore.unxz(cacheFile.absolutePath, unxzFile.absolutePath)
+                    if (!unxzFile.renameTo(file)) {
+                        throw IOException("cannot replace ${file.absolutePath}")
+                    }
+                } catch (e: Exception) {
+                    unxzFile.delete()
+                    throw e
+                }
                 cacheFile.delete()
             } else {
                 cacheFile.renameTo(file)

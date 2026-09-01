@@ -129,7 +129,6 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
         }
 
         if (matches("(http|https)://.*".toRegex())) {
-            Logs.d("Try parse http link: $this")
             runCatching {
                 entities.add(parseHttp(this))
             }.onFailure {
@@ -146,9 +145,8 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             return
         }
 
-        for ((prefix, name, parse) in linkParsers) {
+        for ((prefix, _, parse) in linkParsers) {
             if (startsWith(prefix)) {
-                Logs.d("Try parse $name link: $this")
                 runCatching {
                     entities.add(parse(this))
                 }.onFailure {

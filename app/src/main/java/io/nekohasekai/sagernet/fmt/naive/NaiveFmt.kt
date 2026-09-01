@@ -19,8 +19,11 @@ fun parseNaive(link: String): NaiveBean {
         password = url.password
         sni = url.queryParameter("sni")
         certificates = url.queryParameter("cert")
-        extraHeaders = url.queryParameter("extra-headers")?.unUrlSafe()?.replace("\r\n", "\n")
+        extraHeaders = url.queryParameter("extra-headers")?.replace("\r\n", "\n")
         insecureConcurrency = url.queryParameter("insecure-concurrency")?.toIntOrNull()
+        url.queryParameter("uot")?.let {
+            if (it == "1" || it == "true") sUoT = true
+        }
         name = url.fragment
         initializeDefaultValues()
     }
@@ -43,6 +46,9 @@ fun NaiveBean.toUri(proxyOnly: Boolean = false): String {
         }
         if (extraHeaders.isNotBlank()) {
             builder.addQueryParameter("extra-headers", extraHeaders)
+        }
+        if (sUoT) {
+            builder.addQueryParameter("uot", "1")
         }
         if (name.isNotBlank()) {
             builder.encodedFragment(name.urlSafe())

@@ -169,6 +169,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var tunImplementation by configurationStore.stringToInt(Key.TUN_IMPLEMENTATION) { TunImplementation.GVISOR }
     var profileTrafficStatistics by configurationStore.boolean(Key.PROFILE_TRAFFIC_STATISTICS) { true }
 
+    // persistent: user-deleted default route rules must not be recreated on process restart
+    var rulesFirstCreate by configurationStore.boolean("rulesFirstCreate")
+
     var yacdURL by configurationStore.string("yacdURL") { "http://127.0.0.1:9090/ui" }
 
     // protocol
@@ -258,8 +261,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var subscriptionUserAgent by profileCacheStore.string(Key.SUBSCRIPTION_USER_AGENT)
     var subscriptionAutoUpdate by profileCacheStore.boolean(Key.SUBSCRIPTION_AUTO_UPDATE)
     var subscriptionAutoUpdateDelay by profileCacheStore.stringToInt(Key.SUBSCRIPTION_AUTO_UPDATE_DELAY) { 360 }
-
-    var rulesFirstCreate by profileCacheStore.boolean("rulesFirstCreate")
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
     }

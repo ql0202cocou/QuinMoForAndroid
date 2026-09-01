@@ -20,6 +20,9 @@ fun parseTrojanGo(server: String): TrojanGoBean {
         link.queryParameter("sni")?.let {
             sni = it
         }
+        link.queryParameter("allowInsecure")?.let {
+            if (it == "1" || it == "true") allowInsecure = true
+        }
         link.queryParameter("type")?.let { lType ->
             type = lType
 
@@ -52,6 +55,9 @@ fun TrojanGoBean.toUri(): String {
     val builder = linkBuilder().username(password).host(serverAddress).port(serverPort)
     if (sni.isNotBlank()) {
         builder.addQueryParameter("sni", sni)
+    }
+    if (allowInsecure) {
+        builder.addQueryParameter("allowInsecure", "1")
     }
     if (type.isNotBlank() && type != "original") {
         builder.addQueryParameter("type", type)

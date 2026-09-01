@@ -245,14 +245,19 @@ object RawUpdater : GroupUpdater() {
 
         subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
         // 更新期间用户可能改过分组设置：重新读取当前行，只合并本流程负责写的
-        // 字段（远端分组名 / 订阅下发的节点解析 DNS / subscription bean），
-        // 分组已被删除时（上面的检查之后）跳过写回
+        // 字段（远端分组名 / 订阅下发的节点解析 DNS / lastUpdated /
+        // subscriptionUserinfo），分组已被删除时（上面的检查之后）跳过写回
         SagerDatabase.groupDao.getById(proxyGroup.id)?.also { current ->
             if (remoteGroupName != null) current.name = remoteGroupName
             if (subscriptionNameserver != null) {
                 current.proxyServerNameserver = subscriptionNameserver
             }
-            current.subscription = subscription
+            // 传入的 subscription 是更新开始时的旧快照，整体回写会覆盖用户
+            // 期间改的 link/deduplication 等；以新鲜行的 bean 为基础合并
+            current.subscription?.apply {
+                lastUpdated = subscription.lastUpdated
+                subscriptionUserinfo = subscription.subscriptionUserinfo
+            }
             SagerDatabase.groupDao.updateGroup(current)
         }
         finishUpdate(proxyGroup)
@@ -748,7 +753,7 @@ object RawUpdater : GroupUpdater() {
                                 proxies.add(bean)
                             }
                         }
-                    }.onFailure { Logs.w(it) }
+                    }.onFailure { Logs.w(Util.redactSecrets(it.stackTraceToString())) }
                 }
 
                 // Fix ent
@@ -768,7 +773,7 @@ object RawUpdater : GroupUpdater() {
                 }
                 return proxies
             } catch (e: YAMLException) {
-                Logs.w(e)
+                Logs.w(Util.redactSecrets(e.stackTraceToString()))
             }
         } else if (text.contains("[Interface]")) {
             // wireguard
@@ -779,7 +784,7 @@ object RawUpdater : GroupUpdater() {
                 })
                 return proxies
             } catch (e: Exception) {
-                Logs.w(e)
+                Logs.w(Util.redactSecrets(e.stackTraceToString()))
             }
         }
 
@@ -793,7 +798,7 @@ object RawUpdater : GroupUpdater() {
             return parseProxies(text.decodeBase64UrlSafe()).takeIf { it.isNotEmpty() }
                 ?: error("Not found")
         } catch (e: Exception) {
-            Logs.w(e)
+            Logs.w(Util.redactSecrets(e.stackTraceToString()))
         }
 
         try {

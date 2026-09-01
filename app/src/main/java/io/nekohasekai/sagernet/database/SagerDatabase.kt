@@ -5,7 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import dev.matrix.roomigrant.GenerateRoomMigrations
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.fmt.KryoConverters
@@ -24,14 +25,56 @@ import java.util.concurrent.Executors
     ]
 )
 @TypeConverters(value = [KryoConverters::class, GsonConverters::class])
-@GenerateRoomMigrations
 abstract class SagerDatabase : RoomDatabase() {
 
     companion object {
+
+        // proxy_groups gains isSelector/frontProxy/landingProxy (NOT NULL, no SQL default):
+        // recreate the table; proxy_entities only gains the nullable shadowTLSBean
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `proxy_groups_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `userOrder` INTEGER NOT NULL,
+                        `ungrouped` INTEGER NOT NULL,
+                        `name` TEXT,
+                        `type` INTEGER NOT NULL,
+                        `subscription` BLOB,
+                        `order` INTEGER NOT NULL,
+                        `isSelector` INTEGER NOT NULL,
+                        `frontProxy` INTEGER NOT NULL,
+                        `landingProxy` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `proxy_groups_new` (
+                        `id`, `userOrder`, `ungrouped`, `name`, `type`, `subscription`, `order`,
+                        `isSelector`, `frontProxy`, `landingProxy`
+                    ) SELECT `id`, `userOrder`, `ungrouped`, `name`, `type`, `subscription`, `order`,
+                        0, -1, -1 FROM `proxy_groups`
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE `proxy_groups`")
+                db.execSQL("ALTER TABLE `proxy_groups_new` RENAME TO `proxy_groups`")
+                db.execSQL("ALTER TABLE `proxy_entities` ADD COLUMN `shadowTLSBean` BLOB")
+            }
+        }
+
+        // proxy_entities gains the nullable mieruBean
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `proxy_entities` ADD COLUMN `mieruBean` BLOB")
+            }
+        }
+
         val instance by lazy {
             SagerNet.application.getDatabasePath(Key.DB_PROFILE).parentFile?.mkdirs()
             Room.databaseBuilder(SagerNet.application, SagerDatabase::class.java, Key.DB_PROFILE)
-//                .addMigrations(*SagerDatabase_Migrations.build())
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .setJournalMode(JournalMode.TRUNCATE)
                 .allowMainThreadQueries()
                 .enableMultiInstanceInvalidation()

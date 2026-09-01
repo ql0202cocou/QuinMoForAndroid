@@ -33,6 +33,9 @@ fun parseSOCKS(link: String): SOCKSBean {
             } catch (_: Exception) {
             }
         }
+        url.queryParameter("uot")?.let {
+            if (it == "1" || it == "true") sUoT = true
+        }
     }
 }
 
@@ -41,6 +44,7 @@ fun SOCKSBean.toUri(): String {
     val builder = HttpUrl.Builder().scheme("http").host(serverAddress).port(serverPort)
     if (!username.isNullOrBlank()) builder.username(username)
     if (!password.isNullOrBlank()) builder.password(password)
+    if (sUoT) builder.addQueryParameter("uot", "1")
     if (!name.isNullOrBlank()) builder.encodedFragment(name.urlSafe())
     return builder.toLink("socks${protocolVersionName()}")
 

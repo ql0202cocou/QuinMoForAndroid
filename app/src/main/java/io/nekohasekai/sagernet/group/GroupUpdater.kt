@@ -17,6 +17,8 @@ import io.nekohasekai.sagernet.fmt.v2ray.isTLS
 import io.nekohasekai.sagernet.ktx.*
 import kotlinx.coroutines.*
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
+import java.io.File
+import java.io.RandomAccessFile
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.*
@@ -149,32 +151,69 @@ abstract class GroupUpdater {
                     // another update for this group is already running
                     return@coroutineScope false
                 }
-                GroupManager.postReload(proxyGroup.id)
 
-                val subscription = proxyGroup.subscription!!
-                val connected = DataStore.serviceState.connected
-                val userInterface = GroupManager.userInterface
-
-                if (byUser && (subscription.link?.startsWith("http://") == true || subscription.updateWhenConnectedOnly) && !connected) {
-                    if (userInterface == null || !userInterface.confirm(app.getString(R.string.update_subscription_warning))) {
-                        finishUpdate(proxyGroup)
-                        cancel()
-                        return@coroutineScope true
+                // cross-process mutex: periodic WorkManager updates run in :bg while
+                // manual updates run in the main process
+                val lockPair = try {
+                    val channel = RandomAccessFile(
+                        File(SagerNet.application.filesDir, "group_update_${proxyGroup.id}.lock"), "rw"
+                    ).channel
+                    val lock = channel.tryLock()
+                    if (lock == null) {
+                        channel.close()
+                        null
+                    } else {
+                        channel to lock
                     }
-                }
-
-                try {
-                    RawUpdater.doUpdate(proxyGroup, subscription, userInterface, byUser)
-                    true
-                } catch (e: CancellationException) {
-                    // don't swallow cancellation (nor report it as a failure)
-                    finishUpdate(proxyGroup)
-                    throw e
                 } catch (e: Throwable) {
                     Logs.w(e)
-                    userInterface?.onUpdateFailure(proxyGroup, e.readableMessage)
+                    null
+                }
+                if (lockPair == null) {
+                    // another process is updating this group
                     finishUpdate(proxyGroup)
-                    false
+                    return@coroutineScope false
+                }
+                val (lockChannel, fileLock) = lockPair
+
+                try {
+                    GroupManager.postReload(proxyGroup.id)
+
+                    val connected = DataStore.serviceState.connected
+                    val userInterface = GroupManager.userInterface
+                    val subscription = proxyGroup.subscription
+                    if (subscription == null) {
+                        // a corrupted backup restore can leave a subscription group without one
+                        Logs.w("Group ${proxyGroup.id} has no subscription")
+                        userInterface?.onUpdateFailure(proxyGroup, "group has no subscription")
+                        finishUpdate(proxyGroup)
+                        return@coroutineScope false
+                    }
+
+                    if (byUser && (subscription.link?.startsWith("http://") == true || subscription.updateWhenConnectedOnly) && !connected) {
+                        if (userInterface == null || !userInterface.confirm(app.getString(R.string.update_subscription_warning))) {
+                            finishUpdate(proxyGroup)
+                            cancel()
+                            return@coroutineScope true
+                        }
+                    }
+
+                    try {
+                        RawUpdater.doUpdate(proxyGroup, subscription, userInterface, byUser)
+                        true
+                    } catch (e: CancellationException) {
+                        // don't swallow cancellation (nor report it as a failure)
+                        finishUpdate(proxyGroup)
+                        throw e
+                    } catch (e: Throwable) {
+                        Logs.w(e)
+                        userInterface?.onUpdateFailure(proxyGroup, e.readableMessage)
+                        finishUpdate(proxyGroup)
+                        false
+                    }
+                } finally {
+                    runCatching { fileLock.release() }
+                    runCatching { lockChannel.close() }
                 }
             }
         }

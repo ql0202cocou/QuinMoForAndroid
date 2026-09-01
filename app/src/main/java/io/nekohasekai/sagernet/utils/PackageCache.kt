@@ -58,23 +58,25 @@ object PackageCache {
 
         val installed = app.packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         installedApps = installed.associateBy { it.packageName }
-        packageMap = installed.associate { it.packageName to it.uid }
         // swap the whole map like the fields above: packageNameByUid reads
         // this from a gomobile callback thread with no synchronization, so
-        // mutating a shared HashMap in place can corrupt a concurrent read
+        // mutating a shared HashMap in place can corrupt a concurrent read.
+        // uidMap is assigned before packageMap: awaitLoadSync early-returns on
+        // ::packageMap.isInitialized, so packageMap must be the last write.
         val newUidMap = HashMap<Int, HashSet<String>>()
         for (info in installed) {
             val uid = info.uid
             newUidMap.getOrPut(uid) { HashSet() }.add(info.packageName)
         }
         uidMap = newUidMap
+        packageMap = installed.associate { it.packageName to it.uid }
     }
 
     operator fun get(uid: Int) = uidMap[uid]
     operator fun get(packageName: String) = packageMap[packageName]
 
     fun awaitLoadSync() {
-        if (::packageMap.isInitialized) {
+        if (::packageMap.isInitialized && ::uidMap.isInitialized) {
             return
         }
         if (!registerd.get()) {

@@ -96,6 +96,10 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                 val id = proxy.config.profileTagMap
                     .filterValues { it == tag }.keys.firstOrNull() ?: -1
                 val ent = SagerDatabase.proxyDao.getById(id) ?: return@runOnDefaultDispatcher
+                // persist here too: the binder broadcast below only reaches a
+                // bound MainActivity, and an unpersisted selection is rolled
+                // back to the stale selectedProxy on the next service reload
+                DataStore.selectedProxy = id
                 // traffic & title
                 data.proxy?.apply {
                     looper?.selectMain(id)

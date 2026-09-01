@@ -162,6 +162,9 @@ class SagerConnection(
             // arrive, so roll back to allow a later retry
             connectionActive = false
             this.callback = null
+            // a failed restart connect must not leave this stuck, or every
+            // later binderDied would be swallowed
+            restartingApp = false
         }
     }
 

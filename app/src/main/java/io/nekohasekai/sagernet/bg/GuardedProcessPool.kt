@@ -150,6 +150,6 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
         // process-killing finally — has exited; callers that must outlive the
         // guards hook onto it instead of joining (joining from the main
         // thread would deadlock the loopers' Main-dispatched cleanup).
-        return scope.launch { coroutineContext[Job]!!.cancelAndJoin() }
+        return scope.launch { this@GuardedProcessPool.coroutineContext[Job]!!.cancelAndJoin() }
     }
 }

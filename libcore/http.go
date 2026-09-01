@@ -354,7 +354,9 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 			select {
 			case successCh <- raceResult{i, rsp}:
 				// 第一个成功的请求，不要关闭 body
-			default:
+			case <-waitCtx.Done():
+				// 主 goroutine 已取走胜者并返回（waitCancel 随 defer 触发），
+				// 迟到的响应永远无人接收，直接关闭 body
 				rsp.Body.Close()
 			}
 		}(f, reqCtx)
