@@ -18,6 +18,7 @@ jniLibs/
 /nkmr
 .kotlin/
 /log/
+/.preview-apks/
 
 # local agent guidance, not for the public repo
 /AGENTS.md
