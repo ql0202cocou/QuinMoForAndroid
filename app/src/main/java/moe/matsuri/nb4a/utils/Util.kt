@@ -3,6 +3,8 @@ package moe.matsuri.nb4a.utils
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Base64
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import libcore.StringBox
 import java.io.ByteArrayOutputStream
 import java.net.URLDecoder
@@ -123,7 +125,13 @@ object Util {
 
     fun mergeJSON(dst: MutableMap<String, Any?>, j: String) {
         if (j.isBlank()) return
-        val src = JavaUtil.gson.fromJson(j, dst.javaClass)
+        val element = JavaUtil.gson.fromJson(j, JsonElement::class.java)
+        // "null" parses to JsonNull and a scalar/array to a non-object;
+        // both must not reach mergeMap (NPE / opaque JsonSyntaxException)
+        if (element !is JsonObject) {
+            throw IllegalArgumentException("custom JSON must be an object")
+        }
+        val src = JavaUtil.gson.fromJson(element, dst.javaClass)
         mergeMap(dst, src)
     }
 

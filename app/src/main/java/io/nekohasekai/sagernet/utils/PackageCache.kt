@@ -20,7 +20,7 @@ object PackageCache {
     lateinit var installedPluginPackages: Map<String, PackageInfo>
     lateinit var installedApps: Map<String, ApplicationInfo>
     lateinit var packageMap: Map<String, Int>
-    val uidMap = HashMap<Int, HashSet<String>>()
+    lateinit var uidMap: Map<Int, Set<String>>
     val loaded = Mutex(true)
     var registerd = AtomicBoolean(false)
 
@@ -35,6 +35,7 @@ object PackageCache {
         loaded.unlock()
     }
 
+    @Synchronized // register() and the package-change receiver may race
     @SuppressLint("InlinedApi")
     fun reload() {
         val rawPackageInfo = app.packageManager.getInstalledPackages(
@@ -58,11 +59,15 @@ object PackageCache {
         val installed = app.packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         installedApps = installed.associateBy { it.packageName }
         packageMap = installed.associate { it.packageName to it.uid }
-        uidMap.clear()
+        // swap the whole map like the fields above: packageNameByUid reads
+        // this from a gomobile callback thread with no synchronization, so
+        // mutating a shared HashMap in place can corrupt a concurrent read
+        val newUidMap = HashMap<Int, HashSet<String>>()
         for (info in installed) {
             val uid = info.uid
-            uidMap.getOrPut(uid) { HashSet() }.add(info.packageName)
+            newUidMap.getOrPut(uid) { HashSet() }.add(info.packageName)
         }
+        uidMap = newUidMap
     }
 
     operator fun get(uid: Int) = uidMap[uid]

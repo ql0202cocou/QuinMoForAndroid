@@ -250,6 +250,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         }
 
+        // Same re-registration guard as the adapter listeners above:
+        // onViewCreated runs again after the detach/attach in onCreate,
+        // while onDestroy only unregisters once.
+        DataStore.profileCacheStore.unregisterChangeListener(this)
         DataStore.profileCacheStore.registerChangeListener(this)
     }
 

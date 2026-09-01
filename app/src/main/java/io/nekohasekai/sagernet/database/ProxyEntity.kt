@@ -339,7 +339,9 @@ data class ProxyEntity(
 
     fun singMux(): MultiplexOptions? {
         return when (type) {
-            TYPE_VMESS -> MultiplexOptions().apply {
+            // vision flow doesn't support mux: vendored sing-box silently clears the
+            // flow when multiplex is enabled (the Xray path guards this in XrayConfig)
+            TYPE_VMESS -> if (vmessBean!!.isVisionFlow) null else MultiplexOptions().apply {
                 enabled = vmessBean!!.enableMux
                 padding = vmessBean!!.muxPadding
                 max_streams = vmessBean!!.muxConcurrency

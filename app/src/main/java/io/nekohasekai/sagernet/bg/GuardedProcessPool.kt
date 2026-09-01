@@ -139,13 +139,17 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
     }
 
     @MainThread
-    fun close(scope: CoroutineScope) {
+    fun close(scope: CoroutineScope): Job {
         cancel()
         // reap processes whose looper coroutine was cancelled before its
         // first dispatch; guards with a started looper clean up in their own
         // finally, so an unconditional destroy here would cut the graceful
         // shutdown short
         guards.forEach { if (!it.looperStarted) it.destroy() }
-        coroutineContext[Job]!!.also { job -> scope.launch { job.cancelAndJoin() } }
+        // The returned Job completes once every guard looper — including its
+        // process-killing finally — has exited; callers that must outlive the
+        // guards hook onto it instead of joining (joining from the main
+        // thread would deadlock the loopers' Main-dispatched cleanup).
+        return scope.launch { coroutineContext[Job]!!.cancelAndJoin() }
     }
 }

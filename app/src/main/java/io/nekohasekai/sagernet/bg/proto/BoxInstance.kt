@@ -244,14 +244,24 @@ abstract class BoxInstance(
             }
         }
 
-        // Stop the plugin processes before deleting their config files:
-        // GuardedProcessPool.close only schedules cancelAndJoin on the given
-        // scope, so a still-alive guard could otherwise restart a plugin whose
-        // config file is already gone.
-        if (::processes.isInitialized) processes.close(GlobalScope + Dispatchers.IO)
+        val deleteCacheFiles = {
+            cacheFiles.forEach { it.delete() }
+            cacheFiles.clear()
+        }
 
-        cacheFiles.forEach { it.delete() }
-        cacheFiles.clear()
+        // Stop the plugin processes before deleting their config files: the
+        // Job returned by GuardedProcessPool.close completes once every guard
+        // looper has exited, so only then is no guard left to restart a
+        // plugin whose config file is already gone. Hook the deletion onto it
+        // instead of joining here — close() may run on the main thread, where
+        // joining would deadlock the loopers' Main-dispatched cleanup.
+        if (::processes.isInitialized) {
+            processes.close(GlobalScope + Dispatchers.IO).invokeOnCompletion {
+                deleteCacheFiles()
+            }
+        } else {
+            deleteCacheFiles()
+        }
 
         if (::box.isInitialized) {
             box.close()

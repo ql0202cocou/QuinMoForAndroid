@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.bg
 
+import android.os.Process
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
@@ -16,6 +17,7 @@ object Executable {
 
     fun killAll(alsoKillBg: Boolean = false) {
         // kill bg may fail
+        val myPid = Process.myPid()
         for (process in File("/proc").listFiles { _, name -> name.isDigitsOnly() } ?: return) {
             val exe = File(
                 try {
@@ -25,7 +27,22 @@ object Executable {
             } catch (_: IOException) {
                 continue
             }.split(Character.MIN_VALUE, limit = 2).first())
-            if (EXECUTABLES.contains(exe.name) || (alsoKillBg && exe.name.endsWith(":bg"))) try {
+            val isPlugin = EXECUTABLES.contains(exe.name)
+            if (!isPlugin && !(alsoKillBg && exe.name.endsWith(":bg"))) continue
+            if (isPlugin) {
+                // Only kill this (:bg) process's own children or orphaned
+                // leftovers of a dead one: the main process runs the same
+                // plugin binaries for TestInstance URL tests and killing
+                // those breaks concurrent tests.
+                val ppid = try {
+                    File(process, "stat").readText()
+                        .substringAfterLast(')').trim().split(' ')[1].toIntOrNull()
+                } catch (_: Exception) {
+                    null
+                } ?: continue
+                if (ppid != myPid && ppid != 1) continue
+            }
+            try {
                 Os.kill(process.name.toInt(), OsConstants.SIGKILL)
                 Logs.w("SIGKILL ${exe.name} (${process.name}) succeed")
             } catch (e: ErrnoException) {

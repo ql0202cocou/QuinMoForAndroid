@@ -77,6 +77,12 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
 
         fun updateVersion(v: Int) {
             if (v == 2) {
+                // hy2 has no protocol option; reset a stale faketcp/wechat
+                // value so serialize() cannot write back an illegal
+                // hy2+faketcp bean (canUseSingBox() = false would then route
+                // to the hysteria1 plugin, which fails with "error version: 2").
+                // Setting the preference persists to DataStore as well.
+                protocol.value = "${HysteriaBean.PROTOCOL_UDP}"
                 authPayload.isVisible = true
                 //
                 authType.isVisible = false

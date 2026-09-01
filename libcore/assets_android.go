@@ -113,12 +113,19 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 
 	extractXz := func(f asset.File) error {
 		tmpXzName := dstName + ".xz"
+		tmpName := dstName + ".tmp"
 		err := extractAsset(f, tmpXzName)
 		if err == nil {
-			err = Unxz(tmpXzName, dstName)
+			// decompress to a temp file and rename atomically, so a
+			// concurrent box start never reads a truncated asset
+			err = Unxz(tmpXzName, tmpName)
 			os.Remove(tmpXzName)
 		}
+		if err == nil {
+			err = os.Rename(tmpName, dstName)
+		}
 		if err != nil {
+			os.Remove(tmpName)
 			return fmt.Errorf("extract xz: %v", err)
 		}
 		return nil

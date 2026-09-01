@@ -87,7 +87,9 @@ func (c *Client) send(pkt *packet, conn net.PacketConn, addr net.Addr) (*respons
 			}
 			p, err := newPacketFromBytes(packetBytes[0:length])
 			if err != nil {
-				return nil, err
+				// Ignore malformed (non-STUN) packets like mismatched
+				// transIDs below: keep reading until timeout.
+				continue
 			}
 			// If transId mismatches, keep reading until get a
 			// matched packet or timeout.

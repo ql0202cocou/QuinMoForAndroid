@@ -31,6 +31,9 @@ import (
 
 var errFailConnectSocks5 = errors.New("fail connect socks5")
 
+// maxContentSize caps response bodies read by GetContent (32 MB).
+const maxContentSize = 32 * 1024 * 1024
+
 type HTTPClient interface {
 	RestrictedTLS()
 	ModernTLS()
@@ -357,8 +360,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 		}(f, reqCtx)
 	}
 
-	select {
-	case result := <-successCh:
+	succeed := func(result raceResult) *httpResponse {
 		// Abort any loser still in flight. The winner's own context is
 		// cancelled only when the caller closes the body, since cancelling
 		// it earlier would abort body reads.
@@ -371,8 +373,21 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 			reqCancels[result.index]()
 			return nil
 		}}
-		return &httpResponse{Response: result.response}, nil
+		return &httpResponse{Response: result.response}
+	}
+
+	select {
+	case result := <-successCh:
+		return succeed(result), nil
 	case <-waitCtx.Done():
+		// The deadline may win the select against a response already sent
+		// to the channel; prefer the response over a spurious timeout,
+		// otherwise its body would never be closed.
+		select {
+		case result := <-successCh:
+			return succeed(result), nil
+		default:
+		}
 		for _, reqCancel := range reqCancels {
 			reqCancel()
 		}
@@ -428,7 +443,11 @@ func (h *httpResponse) GetHeader(key string) *StringBox {
 func (h *httpResponse) GetContent() ([]byte, error) {
 	h.getContentOnce.Do(func() {
 		defer h.Body.Close()
-		h.content, h.contentError = io.ReadAll(h.Body)
+		h.content, h.contentError = io.ReadAll(io.LimitReader(h.Body, maxContentSize+1))
+		if h.contentError == nil && len(h.content) > maxContentSize {
+			h.content = nil
+			h.contentError = fmt.Errorf("content too large, limit is %d bytes", maxContentSize)
+		}
 	})
 	return h.content, h.contentError
 }

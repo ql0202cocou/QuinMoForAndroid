@@ -55,12 +55,17 @@ class BaseService {
                 // Action.SWITCH_WAKE_LOCK -> runOnDefaultDispatcher { service.switchWakeLock() }
                 PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        if (SagerNet.power.isDeviceIdleMode) {
-                            proxy?.box?.sleep()
-                        } else {
-                            proxy?.box?.wake()
-                            if (DataStore.wakeResetConnections) {
-                                Libcore.resetAllConnections(true)
+                        // box is lateinit: during Connecting data.proxy is
+                        // already set while proxy.init() has not finished
+                        val p = proxy
+                        if (p != null && p.isInitialized()) {
+                            if (SagerNet.power.isDeviceIdleMode) {
+                                p.box.sleep()
+                            } else {
+                                p.box.wake()
+                                if (DataStore.wakeResetConnections) {
+                                    Libcore.resetAllConnections(true)
+                                }
                             }
                         }
                     }
@@ -185,16 +190,23 @@ class BaseService {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
                 return
             }
-            if (canReloadSelector()) {
-                val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
-                val tag = data.proxy!!.config.profileTagMap[ent?.id] ?: ""
-                if (tag.isNotBlank() && ent != null) {
-                    // select from GUI
-                    data.proxy!!.box.selectOutbound(tag)
-                    // or select from webui
-                    // => selector_OnProxySelected
+            try {
+                if (canReloadSelector()) {
+                    val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+                    val tag = data.proxy!!.config.profileTagMap[ent?.id] ?: ""
+                    if (tag.isNotBlank() && ent != null) {
+                        // select from GUI
+                        data.proxy!!.box.selectOutbound(tag)
+                        // or select from webui
+                        // => selector_OnProxySelected
+                    }
+                    return
                 }
-                return
+            } catch (e: Throwable) {
+                // bad profile data (e.g. a chain loop) or a JNI error must not
+                // crash :bg from an uncaught exception in onReceive;
+                // fall back to a full restart below
+                Logs.w(e)
             }
             val s = data.state
             when {
@@ -231,7 +243,10 @@ class BaseService {
                 release()
                 wakeLock = null
             }
-            runOnDefaultDispatcher {
+            // post from the main queue like the preInit start send, so on a
+            // restart the Stop always reaches the listener actor before the
+            // new Start (a Default-dispatcher send could overtake it)
+            runOnMainDispatcher {
                 DefaultNetworkListener.stop(this)
             }
         }

@@ -18,8 +18,6 @@ import moe.matsuri.nb4a.ui.SimpleMenuPreference
 
 abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV2RayBean>() {
 
-    var tmpBean: StandardV2RayBean? = null
-
     private val pbm = PreferenceBindingManager()
     private val name = pbm.add(PreferenceBinding(Type.Text, "name"))
     private val serverAddress = pbm.add(PreferenceBinding(Type.Text, "serverAddress"))
@@ -60,7 +58,6 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
             this@StandardV2RaySettingsActivity.password.disable = true
         }
 
-        tmpBean = this // copy bean
         pbm.writeToCacheAll(this)
     }
 
@@ -84,11 +81,22 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
         echCategory = findPreference(Key.SERVER_ECH_CATEORY)!!
         wsCategory = findPreference(Key.SERVER_WS_CATEGORY)!!
 
+        // init() only runs on first creation; after a rotation the bean must
+        // be resolved again here (stored entity, or a fresh one for a new
+        // profile - the launching intent survives the rotation).
+        val bean = (proxyEntity?.requireBean() ?: createEntity()) as StandardV2RayBean
+        if (bean is TrojanBean) {
+            // Same binding remap as init() (needed there before
+            // writeToCacheAll, needed here for saves after a rotation).
+            uuid.fieldName = "password"
+            password.disable = true
+            uuid.preference.title = resources.getString(R.string.password)
+        }
 
         // vmess/vless/http/trojan
-        val isHttp = tmpBean is HttpBean
-        val isVmess = tmpBean is VMessBean && tmpBean?.isVLESS == false
-        val isVless = tmpBean?.isVLESS == true
+        val isHttp = bean is HttpBean
+        val isVmess = bean is VMessBean && !bean.isVLESS
+        val isVless = bean.isVLESS
 
         (serverPort.preference as EditTextPreference).bindPortPreference()
 
@@ -103,10 +111,6 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
         encryption.preference.isVisible = isVmess || isVless
         username.preference.isVisible = isHttp
         password.preference.isVisible = isHttp
-
-        if (tmpBean is TrojanBean) {
-            uuid.preference.title = resources.getString(R.string.password)
-        }
 
         encryption.preference.apply {
             this as SimpleMenuPreference

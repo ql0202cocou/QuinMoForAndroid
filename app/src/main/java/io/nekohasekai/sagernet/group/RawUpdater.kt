@@ -49,6 +49,7 @@ object RawUpdater : GroupUpdater() {
         val link = subscription.link
         var proxies: List<AbstractBean>
         var subscriptionText: String? = null
+        var remoteGroupName: String? = null
         if (link.startsWith("content://")) {
             val contentText = app.contentResolver.openInputStream(link.toUri())
                 ?.bufferedReader()
@@ -87,14 +88,16 @@ object RawUpdater : GroupUpdater() {
                     remoteName = Util.decodeFilename(remoteName)
                     if (remoteName.isNotBlank()) {
                         proxyGroup.name = remoteName
+                        remoteGroupName = remoteName
                     }
                 }
             }
         }
 
         // 订阅下发的节点解析 DNS，自动写入分组设置（在 forceResolve 之前生效）
-        subscriptionText?.let { parseProxyServerNameserver(it) }?.let {
-            proxyGroup.proxyServerNameserver = it
+        val subscriptionNameserver = subscriptionText?.let { parseProxyServerNameserver(it) }
+        if (subscriptionNameserver != null) {
+            proxyGroup.proxyServerNameserver = subscriptionNameserver
         }
 
         val proxiesMap = LinkedHashMap<String, AbstractBean>()
@@ -110,10 +113,6 @@ object RawUpdater : GroupUpdater() {
             proxiesMap[proxy.displayName()] = proxy
         }
         proxies = proxiesMap.values.toList()
-
-        if (subscription.forceResolve) {
-            forceResolve(proxies, proxyGroup.id, proxyGroup.proxyServerNameserver)
-        }
 
         val exists = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
         val duplicate = ArrayList<String>()
@@ -140,6 +139,12 @@ object RawUpdater : GroupUpdater() {
             proxies = uniqueProxies.toList().map { it.bean }
         }
 
+        // 解析在去重/改名之后、nameMap 构建之前执行：解析到同一 IP 的节点
+        // 不该被去重误删，resolve 改写 displayName 后的名字才是 nameMap 的键
+        if (subscription.forceResolve) {
+            forceResolve(proxies, proxyGroup.id, proxyGroup.proxyServerNameserver)
+        }
+
         Logs.d("New profiles: ${proxies.size}")
 
         val nameMap = proxies.associateBy { bean ->
@@ -163,6 +168,11 @@ object RawUpdater : GroupUpdater() {
 
         Logs.d("toDelete profiles: ${toDelete.size}")
         Logs.d("toReplace profiles: ${toReplace.size}")
+
+        // 下载期间分组可能已被删除，继续写入会留下指向不存在分组的孤儿节点
+        if (SagerDatabase.groupDao.getById(proxyGroup.id) == null) {
+            error("Group ${proxyGroup.id} was deleted during the update")
+        }
 
         val toUpdate = ArrayList<ProxyEntity>()
         val added = mutableListOf<String>()
@@ -224,6 +234,8 @@ object RawUpdater : GroupUpdater() {
         SagerDatabase.proxyDao.deleteProxy(toDelete).also {
             Logs.d("Deleted profiles: $it")
         }
+        // 被删节点可能是其他分组的 frontProxy/landingProxy，清理悬挂引用
+        if (toDelete.isNotEmpty()) GroupManager.resetDanglingGroupProxies()
 
         val existCount = SagerDatabase.proxyDao.countByGroup(proxyGroup.id).toInt()
 
@@ -232,7 +244,17 @@ object RawUpdater : GroupUpdater() {
         }
 
         subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
-        SagerDatabase.groupDao.updateGroup(proxyGroup)
+        // 更新期间用户可能改过分组设置：重新读取当前行，只合并本流程负责写的
+        // 字段（远端分组名 / 订阅下发的节点解析 DNS / subscription bean），
+        // 分组已被删除时（上面的检查之后）跳过写回
+        SagerDatabase.groupDao.getById(proxyGroup.id)?.also { current ->
+            if (remoteGroupName != null) current.name = remoteGroupName
+            if (subscriptionNameserver != null) {
+                current.proxyServerNameserver = subscriptionNameserver
+            }
+            current.subscription = subscription
+            SagerDatabase.groupDao.updateGroup(current)
+        }
         finishUpdate(proxyGroup)
 
         userInterface?.onUpdateSuccess(
@@ -596,7 +618,9 @@ object RawUpdater : GroupUpdater() {
                                             }
                                         }
 
-                                        "ca", "ca-str" -> bean.caText = opt.value.toString()
+                                        // clash "ca" is a local file path, only
+                                        // "ca-str" carries an inline PEM
+                                        "ca-str" -> bean.caText = opt.value.toString()
 
                                         "sni" -> bean.sni = opt.value.toString()
 

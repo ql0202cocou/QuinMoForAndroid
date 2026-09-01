@@ -10,6 +10,7 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.ConfigBuildResult.IndexEntity
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.buildSingBoxOutboundHysteriaBean
+import io.nekohasekai.sagernet.fmt.hysteria.getFirstPort
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.buildSingBoxOutboundShadowsocksBean
@@ -255,6 +256,12 @@ fun buildConfig(
             chainId: Long, entity: ProxyEntity
         ): String {
             val profileList = entity.resolveChain()
+            // A chain whose members all dangle resolves to nothing: the config would
+            // lack the outbound rules reference and sing-box would fail with a cryptic
+            // "outbound not found". Fail loudly here instead, like the loop guard.
+            if (profileList.isEmpty()) {
+                error("chain profile ${entity.id} (${entity.requireBean().displayName()}) has no valid member")
+            }
             val chainTrafficSet = HashSet<ProxyEntity>().apply {
                 plusAssign(profileList)
                 add(entity)
@@ -454,7 +461,11 @@ fun buildConfig(
                             tag = "$chainTag-mapping-${proxyEntity.id}"
 
                             override_address = bean.serverAddress
-                            override_port = bean.serverPort
+                            // HysteriaBean keeps the real port in serverPorts; serverPort is a stale default
+                            override_port = when (bean) {
+                                is HysteriaBean -> getFirstPort(bean.serverPorts)
+                                else -> bean.serverPort
+                            }
 
                             pastInboundTag = tag
 

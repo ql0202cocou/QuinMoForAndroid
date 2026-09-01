@@ -47,7 +47,9 @@ public class ShadowsocksBean extends AbstractBean {
         method = input.readString();
         password = input.readString();
         plugin = input.readString();
-        sUoT = input.readBoolean();
+        if (version >= 2) {
+            sUoT = input.readBoolean();
+        }
     }
 
     @NotNull

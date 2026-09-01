@@ -34,6 +34,11 @@ data class VmessQRCode(
     // not a v2rayN standard field; "ech" matches our ducksoft query param, "echConfig" is the fallback
     @SerializedName("ech", alternate = ["echConfig"])
     var ech: String = "",
+    // same story for REALITY: "pbk"/"sid" match the ducksoft query params
+    @SerializedName("pbk", alternate = ["publicKey"])
+    var pbk: String = "",
+    @SerializedName("sid", alternate = ["shortId"])
+    var sid: String = "",
 )
 
 fun StandardV2RayBean.isTLS(): Boolean {
@@ -358,6 +363,10 @@ fun parseV2RayN(link: String): VMessBean {
                 bean.echConfig = vmessQRCode.ech
                 bean.enableECH = true
             }
+            if (vmessQRCode.tls == "reality") {
+                bean.realityPubKey = vmessQRCode.pbk
+                bean.realityShortId = vmessQRCode.sid
+            }
         }
     }
 
@@ -425,6 +434,8 @@ fun VMessBean.toV2rayN(): String {
             tls = "tls"
             if (bean.realityPubKey.isNotBlank()) {
                 tls = "reality"
+                pbk = bean.realityPubKey
+                sid = bean.realityShortId
             }
         }
 

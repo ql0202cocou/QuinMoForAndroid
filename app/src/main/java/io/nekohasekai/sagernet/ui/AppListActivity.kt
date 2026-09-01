@@ -31,8 +31,6 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.databinding.LayoutAppListBinding
 import io.nekohasekai.sagernet.databinding.LayoutAppsItemBinding
 import io.nekohasekai.sagernet.ktx.crossFadeFrom
-import io.nekohasekai.sagernet.ktx.onMainDispatcher
-import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.coroutines.Dispatchers
@@ -240,34 +238,29 @@ class AppListActivity : ThemedActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_invert_selections -> {
-                runOnDefaultDispatcher {
-                    for (app in apps) {
-                        if (proxiedUids.contains(app.uid)) {
-                            proxiedUids.delete(app.uid)
-                        } else {
-                            proxiedUids[app.uid] = true
-                        }
-                    }
-                    DataStore.routePackages = apps.filter { isProxiedApp(it) }
-                        .joinToString("\n") { it.packageName }
-                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
-                    onMainDispatcher {
-                        appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
+                // proxiedUids is a SparseBooleanArray read by the adapter on
+                // the main thread; it is not thread-safe, so mutate it here
+                // on the main thread too.
+                for (app in apps) {
+                    if (proxiedUids.contains(app.uid)) {
+                        proxiedUids.delete(app.uid)
+                    } else {
+                        proxiedUids[app.uid] = true
                     }
                 }
+                DataStore.routePackages = apps.filter { isProxiedApp(it) }
+                    .joinToString("\n") { it.packageName }
+                apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+                appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
 
                 return true
             }
 
             R.id.action_clear_selections -> {
-                runOnDefaultDispatcher {
-                    proxiedUids.clear()
-                    DataStore.routePackages = ""
-                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
-                    onMainDispatcher {
-                        appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
-                    }
-                }
+                proxiedUids.clear()
+                DataStore.routePackages = ""
+                apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+                appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
             }
 
             R.id.action_export_clipboard -> {

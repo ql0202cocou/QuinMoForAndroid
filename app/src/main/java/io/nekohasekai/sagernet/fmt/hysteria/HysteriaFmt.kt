@@ -201,7 +201,16 @@ fun HysteriaBean.buildHysteria1Config(port: Int, cacheFile: (() -> File)?): Stri
         throw Exception("error version: $protocolVersion")
     }
     return JSONObject().apply {
-        put("server", displayAddress())
+        // When the node got a mapping inbound (chain member), finalAddress is
+        // rewritten to LOCALHOST and the plugin must dial the mapping port —
+        // displayAddress() would bypass the whole chain. Otherwise keep
+        // displayAddress(): hysteria's serverPort int is not synced with
+        // serverPorts, and port hopping only works on a direct dial.
+        if (finalAddress == LOCALHOST && serverAddress != LOCALHOST) {
+            put("server", "$LOCALHOST:$finalPort")
+        } else {
+            put("server", displayAddress())
+        }
         when (protocol) {
             HysteriaBean.PROTOCOL_FAKETCP -> {
                 put("protocol", "faketcp")
@@ -349,8 +358,9 @@ fun hopPortsToSingboxList(s: String): List<String> {
         if (pRange.split(":").size == 2) {
             pRange
         } else if (it.toIntOrNull() != null) {
-            // single port, keep it as-is
-            it
+            // single port: sing-quic's ParsePorts requires a "from:to" pair
+            // per entry, a bare port fails the whole box config load
+            "$it:$it"
         } else {
             null
         }

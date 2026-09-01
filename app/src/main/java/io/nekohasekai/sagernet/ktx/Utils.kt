@@ -39,7 +39,6 @@ import io.nekohasekai.sagernet.ui.MainActivity
 import io.nekohasekai.sagernet.ui.ThemedActivity
 import kotlinx.coroutines.delay
 import moe.matsuri.nb4a.utils.NGUtil
-import java.io.FileDescriptor
 import java.net.InetAddress
 import java.net.URLEncoder
 import java.util.concurrent.atomic.AtomicInteger
@@ -62,13 +61,6 @@ inline fun <T> Iterable<T>.forEachTry(action: (T) -> Unit) {
 
 val Throwable.readableMessage
     get() = localizedMessage.takeIf { !it.isNullOrBlank() } ?: javaClass.simpleName
-
-/**
- * https://android.googlesource.com/platform/prebuilts/runtime/+/94fec32/appcompat/hiddenapi-light-greylist.txt#9466
- */
-
-private val getInt = FileDescriptor::class.java.getDeclaredMethod("getInt$")
-val FileDescriptor.int get() = getInt.invoke(this) as Int
 
 fun parsePort(str: String?, default: Int, min: Int = 1025): Int {
     val value = str?.toIntOrNull() ?: default

@@ -23,8 +23,10 @@ fun HttpUrl.Builder.toLink(scheme: String, appendDefaultPort: Boolean = true): S
         url = url.newBuilder().port(14514).build()
         replace = true
     }
-    return url.toString().replace("${url.scheme}://", "$scheme://").let {
-        if (replace) it.replace(":14514", ":$defaultPort") else it
+    // replaceFirst: the scheme prefix and the placeholder port sit at the front;
+    // a global replace would also rewrite user-controlled path/query content
+    return url.toString().replaceFirst("${url.scheme}://", "$scheme://").let {
+        if (replace) it.replaceFirst(":14514", ":$defaultPort") else it
     }
 }
 

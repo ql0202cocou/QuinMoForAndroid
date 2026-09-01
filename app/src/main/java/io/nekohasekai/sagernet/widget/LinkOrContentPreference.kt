@@ -49,6 +49,7 @@ constructor(
                         linkLayout.isErrorEnabled = false
                     }
                     if (link.contains("\n")) {
+                        linkLayout.isErrorEnabled = true
                         linkLayout.error = "Unexpected new line"
                     }
                 } catch (e: Exception) {

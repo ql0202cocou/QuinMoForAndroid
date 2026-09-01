@@ -27,6 +27,7 @@ import io.nekohasekai.sagernet.ui.SwitchActivity
 import io.nekohasekai.sagernet.utils.Theme
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * User can customize visibility of notification since Android 8.
@@ -206,11 +207,18 @@ class ServiceNotification(
             }
         }
 
+    // stopRunner destroys the notification while Go callback threads may
+    // still be queueing title/speed posts; re-posting after destroy would
+    // revive it as a ghost notification
+    private val destroyed = AtomicBoolean(false)
+
     private suspend fun update() = useBuilder {
+        if (destroyed.get()) return@useBuilder
         NotificationManagerCompat.from(service as Service).notify(notificationId, it.build())
     }
 
     fun destroy() {
+        destroyed.set(true)
         listenPostSpeed = false
         ServiceCompat.stopForeground(service as Service, ServiceCompat.STOP_FOREGROUND_REMOVE)
         service.unregisterReceiver(this)

@@ -37,7 +37,10 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var selectedGroup by configurationStore.long(Key.PROFILE_GROUP) { currentGroupId() } // "ungrouped" group id = 1
 
     // only in bg process
+    @Volatile
     var vpnService: VpnService? = null
+
+    @Volatile
     var baseService: BaseService.Interface? = null
 
     // main
