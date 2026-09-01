@@ -224,7 +224,11 @@ class GroupSettingsActivity(
 
         guardUnsavedChanges(::needSave) { UnsavedChangesDialogFragment().apply { key() } }
 
-        if (savedInstanceState == null) {
+        // The edit state lives in the in-memory profileCacheStore and dies with
+        // the process. On a process-death restore savedInstanceState != null but
+        // the cache is empty; re-initialize from the intent extras, or the blank
+        // editor would save a garbage group.
+        if (savedInstanceState == null || DataStore.profileCacheStore.getString(Key.GROUP_TYPE) == null) {
             val editingId = intent.getLongExtra(EXTRA_GROUP_ID, 0L)
             DataStore.editingId = editingId
             runOnDefaultDispatcher {

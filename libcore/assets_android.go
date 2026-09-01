@@ -150,6 +150,13 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 		}
 	} else if f, err := asset.Open("yacd.zip"); err == nil {
 		os.RemoveAll(dstName)
+		// Remove leftover Yacd-* dirs from a previous extraction killed
+		// before the rename, so the glob below can succeed again.
+		if leftovers, _ := filepath.Glob(internalAssetsPath + "/Yacd-*"); len(leftovers) > 0 {
+			for _, leftover := range leftovers {
+				os.RemoveAll(leftover)
+			}
+		}
 		if err := extracZip(f, internalAssetsPath); err != nil {
 			return err
 		}
@@ -158,6 +165,11 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 			return fmt.Errorf("glob Yacd: %v", err)
 		}
 		if len(m) != 1 {
+			// Clean up the wreckage so the next extraction self-heals
+			// instead of failing on the same leftover forever.
+			for _, dir := range m {
+				os.RemoveAll(dir)
+			}
 			return fmt.Errorf("glob Yacd found %d result, expect 1", len(m))
 		}
 		err = os.Rename(m[0], dstName)

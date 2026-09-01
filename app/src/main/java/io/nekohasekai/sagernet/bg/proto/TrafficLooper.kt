@@ -59,6 +59,24 @@ class TrafficLooper
         Logs.d("finally traffic post done")
     }
 
+    // ACTION_SHUTDOWN kills the process without stopRunner, so stop() never
+    // runs; persist the counters without stopping the loop. Reads race the
+    // loop's TrafficUpdater writes, but a slightly stale counter beats
+    // losing it all.
+    suspend fun persistStats() {
+        if (!DataStore.profileTrafficStatistics) return
+        withContext(Dispatchers.IO) {
+            data.proxy?.config?.trafficMap?.forEach { (_, ents) ->
+                for (ent in ents) {
+                    val item = idMap[ent.id] ?: continue
+                    ent.rx = item.rx
+                    ent.tx = item.tx
+                    ProfileManager.updateProfile(ent) // update DB
+                }
+            }
+        }
+    }
+
     fun start() {
         // stop() may have already won the CAS (close() raced ProxyInstance.launch);
         // launching now would leave a loop on a closed box that stop() can never cancel
@@ -75,6 +93,10 @@ class TrafficLooper
     @Volatile
     var selectorNowFakeTag = ""
 
+    // NativeInterface.selector_OnProxySelected posts one call per selector
+    // event onto the Default pool, so rapid switches can run this
+    // read-modify-write concurrently on different threads
+    @Synchronized
     fun selectMain(id: Long) {
         Logs.d("select traffic count $TAG_PROXY to $id, old id is $selectorNowId")
         val oldData = idMap[selectorNowId]

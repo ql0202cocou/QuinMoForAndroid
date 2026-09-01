@@ -22,7 +22,11 @@ func updateRootCACerts(pem []byte) {
 	// TLS verification keeps working alongside the custom CA.
 	roots, err := x509.SystemCertPool()
 	if err != nil {
-		roots = x509.NewCertPool()
+		// Keep the current system roots untouched: replacing them with an
+		// empty pool holding only the custom CA would break public TLS
+		// verification process-wide.
+		log.Println("load system cert pool failed:", err)
+		return
 	}
 	if !roots.AppendCertsFromPEM(pem) {
 		log.Println("failed to append certificates from pem")

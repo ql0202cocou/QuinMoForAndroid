@@ -103,7 +103,11 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
         guardUnsavedChanges({ DataStore.dirty }) { UnsavedChangesDialogFragment().apply { key() } }
 
-        if (savedInstanceState == null) {
+        // The edit state lives in the in-memory profileCacheStore and dies with
+        // the process. On a process-death restore savedInstanceState != null but
+        // the cache is empty; re-initialize from the intent extras, or the blank
+        // editor would save a garbage profile.
+        if (savedInstanceState == null || DataStore.profileCacheStore.getString(Key.PROFILE_CORE) == null) {
             val editingId = intent.getLongExtra(EXTRA_PROFILE_ID, 0L)
             isSubscription = intent.getBooleanExtra(EXTRA_IS_SUBSCRIPTION, false)
             DataStore.editingId = editingId
@@ -184,9 +188,13 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                 isVisible = true // not new profile
             }
         }
-        // shared menu item
-        menu.findItem(R.id.action_custom_outbound_json)?.isVisible = true
-        menu.findItem(R.id.action_custom_config_json)?.isVisible = true
+        // shared menu item; they need an existing entity, hide them for a new
+        // profile (the click body would silently no-op on a null proxyEntity).
+        // DataStore.editingId is set synchronously in onCreate, so this is
+        // already stable when the menu is created.
+        val hasEntity = DataStore.editingId != 0L
+        menu.findItem(R.id.action_custom_outbound_json)?.isVisible = hasEntity
+        menu.findItem(R.id.action_custom_config_json)?.isVisible = hasEntity
         return true
     }
 
@@ -248,6 +256,14 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                     DataStore.dirty = false
                 }
                 DataStore.profileCacheStore.registerChangeListener(this)
+                // Re-attach the custom JSON callbacks: after a recreation the
+                // result of ConfigEditActivity arrives at this new instance
+                // while the callbacks set by the menu handler died with the
+                // old one.
+                proxyEntity?.requireBean()?.let { bean ->
+                    callbackCustom = { bean.customConfigJson = it }
+                    callbackCustomOutbound = { bean.customOutboundJson = it }
+                }
             }
         }
 

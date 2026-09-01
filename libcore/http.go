@@ -34,6 +34,19 @@ var errFailConnectSocks5 = errors.New("fail connect socks5")
 // maxContentSize caps response bodies read by GetContent (32 MB).
 const maxContentSize = 32 * 1024 * 1024
 
+const (
+	// httpDialTimeout bounds connection establishment.
+	httpDialTimeout = 10 * time.Second
+	// httpResponseHeaderTimeout bounds waiting for response headers once the
+	// request is written; it catches servers that accept and never respond.
+	httpResponseHeaderTimeout = 10 * time.Second
+	// httpOverallTimeout bounds a whole request including the body read.
+	// Bodies are capped at maxContentSize, so this leaves room for slow
+	// servers while still bounding a stalled transfer (a JNI call blocked
+	// forever would wedge the group update holding its cross-process lock).
+	httpOverallTimeout = 3 * time.Minute
+)
+
 type HTTPClient interface {
 	RestrictedTLS()
 	ModernTLS()
@@ -81,8 +94,14 @@ type httpClient struct {
 func NewHttpClient() HTTPClient {
 	client := new(httpClient)
 	client.h1h2Client.Transport = &client.h1h2Transport
+	client.h1h2Client.Timeout = httpOverallTimeout
 	client.h1h2Transport.TLSClientConfig = &client.tls
 	client.h1h2Transport.DisableKeepAlives = true
+	client.h1h2Transport.DialContext = (&net.Dialer{
+		Timeout:   httpDialTimeout,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
+	client.h1h2Transport.ResponseHeaderTimeout = httpResponseHeaderTimeout
 	return client
 }
 
@@ -112,7 +131,7 @@ func (c *httpClient) PinnedSHA256(sumHex string) {
 }
 
 func (c *httpClient) TrySocks5(port int32) {
-	dialer := new(net.Dialer)
+	dialer := &net.Dialer{Timeout: httpDialTimeout}
 	c.h1h2Transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		for {
 			socksConn, err := dialer.DialContext(ctx, "tcp", "127.0.0.1:"+strconv.Itoa(int(port)))
@@ -304,7 +323,10 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 
 	reqCancels := make([]context.CancelFunc, len(funcs))
 	for i, f := range funcs {
-		reqCtx, reqCancel := context.WithCancel(context.Background())
+		// The timeout bounds the whole request, including reading the
+		// winning body after doH3Direct returns; cancellation still happens
+		// for losers and on body Close via reqCancels.
+		reqCtx, reqCancel := context.WithTimeout(context.Background(), httpOverallTimeout)
 		reqCancels[i] = reqCancel
 		go func(f requestFunc, reqCtx context.Context) {
 			defer device.DeferPanicToError("http", func(err error) { log.Println(err) })

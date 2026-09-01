@@ -94,7 +94,7 @@ object PluginManager {
 
     // Bundle.get() is deprecated; the typed replacement cannot cover both String and Int values
     @Suppress("DEPRECATION")
-    fun ComponentInfo.loadString(key: String) = when (val value = metaData.get(key)) {
+    fun ComponentInfo.loadString(key: String) = when (val value = metaData?.get(key)) {
         is String -> value
         is Int -> SagerNet.application.packageManager.getResourcesForApplication(applicationInfo)
             .getString(value)

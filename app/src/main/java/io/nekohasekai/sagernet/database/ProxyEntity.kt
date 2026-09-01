@@ -34,11 +34,13 @@ import io.nekohasekai.sagernet.ui.profile.*
 import moe.matsuri.nb4a.SingBoxOptions.MultiplexOptions
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSSettingsActivity
+import moe.matsuri.nb4a.proxy.anytls.buildMihomoConfig
 import moe.matsuri.nb4a.proxy.anytls.toUri
 import moe.matsuri.nb4a.proxy.config.ConfigBean
 import moe.matsuri.nb4a.proxy.config.ConfigSettingActivity
 import moe.matsuri.nb4a.proxy.neko.*
 import moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSSettingsActivity
+import java.io.File
 
 @Entity(
     tableName = "proxy_entities", indices = [Index("groupId", name = "groupId")]
@@ -306,7 +308,19 @@ data class ProxyEntity(
 
                             is HysteriaBean -> {
                                 append("\n\n")
-                                append(bean.buildHysteria1Config(port, null))
+                                append(bean.buildHysteria1Config(port) {
+                                    File.createTempFile("hysteria_", ".ca", app.cacheDir)
+                                })
+                            }
+
+                            is VMessBean -> {
+                                append("\n\n")
+                                append(buildXrayConfig(bean, port))
+                            }
+
+                            is AnyTLSBean -> {
+                                append("\n\n")
+                                append(buildMihomoConfig(bean, port))
                             }
                         }
                     }

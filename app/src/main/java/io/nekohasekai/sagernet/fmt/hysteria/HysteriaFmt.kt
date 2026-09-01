@@ -40,6 +40,9 @@ fun parseHysteria1(url: String): HysteriaBean {
         link.queryParameter("downmbps")?.also {
             downloadMbps = it.toIntOrNull() ?: downloadMbps
         }
+        link.queryParameter("hopInterval")?.also {
+            hopInterval = it.toIntOrNull() ?: hopInterval
+        }
         link.queryParameter("alpn")?.also {
             alpn = it
         }
@@ -86,6 +89,15 @@ fun parseHysteria2(url: String): HysteriaBean {
         link.queryParameter("insecure")?.also {
             allowInsecure = it == "1" || it == "true"
         }
+        link.queryParameter("upmbps")?.also {
+            uploadMbps = it.toIntOrNull() ?: uploadMbps
+        }
+        link.queryParameter("downmbps")?.also {
+            downloadMbps = it.toIntOrNull() ?: downloadMbps
+        }
+        link.queryParameter("hopInterval")?.also {
+            hopInterval = it.toIntOrNull() ?: hopInterval
+        }
         link.queryParameter("obfs-password")?.also {
             obfuscation = it
         }
@@ -130,6 +142,8 @@ fun HysteriaBean.toUri(): String {
         }
         builder.addQueryParameter("upmbps", "$uploadMbps")
         builder.addQueryParameter("downmbps", "$downloadMbps")
+        // custom parameter (like anytls's cert/certfp), not part of the standard URI
+        builder.addQueryParameter("hopInterval", "$hopInterval")
         if (alpn.isNotBlank()) {
             builder.addQueryParameter("alpn", alpn)
         }
@@ -150,6 +164,9 @@ fun HysteriaBean.toUri(): String {
         if (sni.isNotBlank()) {
             builder.addQueryParameter("sni", sni)
         }
+        builder.addQueryParameter("upmbps", "$uploadMbps")
+        builder.addQueryParameter("downmbps", "$downloadMbps")
+        builder.addQueryParameter("hopInterval", "$hopInterval")
         if (obfuscation.isNotBlank()) {
             builder.addQueryParameter("obfs", "salamander")
             builder.addQueryParameter("obfs-password", obfuscation)

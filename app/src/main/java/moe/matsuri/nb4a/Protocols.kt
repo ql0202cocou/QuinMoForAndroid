@@ -4,6 +4,8 @@ import android.content.Context
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.ProxyEntity.Companion.TYPE_NEKO
 import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
+import io.nekohasekai.sagernet.fmt.hysteria.getFirstPort
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.getColorAttr
 import moe.matsuri.nb4a.proxy.config.ConfigBean
@@ -21,7 +23,12 @@ object Protocols {
             if (bean is ConfigBean) {
                 return bean.config
             }
-            return bean.serverAddress + bean.serverPort + type
+            // HysteriaBean keeps the real port in serverPorts; serverPort is a stale default
+            val port = when (bean) {
+                is HysteriaBean -> getFirstPort(bean.serverPorts)
+                else -> bean.serverPort
+            }
+            return bean.serverAddress + ":" + port + ":" + type
         }
 
         override fun hashCode(): Int {

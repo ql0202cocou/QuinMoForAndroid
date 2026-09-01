@@ -24,7 +24,7 @@ object SubscriptionUpdater {
         RemoteWorkManager.getInstance(app).cancelUniqueWork(WORK_NAME)
 
         val subscriptions = SagerDatabase.groupDao.subscriptions()
-            .filter { it.subscription!!.autoUpdate }
+            .filter { it.subscription?.autoUpdate == true }
         if (subscriptions.isEmpty()) return
 
         // PeriodicWorkRequest.MIN_PERIODIC_INTERVAL_MILLIS
@@ -66,7 +66,7 @@ object SubscriptionUpdater {
         override suspend fun doWork(): Result {
             try {
                 var subscriptions =
-                    SagerDatabase.groupDao.subscriptions().filter { it.subscription!!.autoUpdate }
+                    SagerDatabase.groupDao.subscriptions().filter { it.subscription?.autoUpdate == true }
                 if (!DataStore.serviceState.connected) {
                     Logs.d("work: not connected")
                     subscriptions = subscriptions.filter { !it.subscription!!.updateWhenConnectedOnly }

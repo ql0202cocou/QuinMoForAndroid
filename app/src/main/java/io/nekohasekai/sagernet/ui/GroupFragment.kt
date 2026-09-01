@@ -284,12 +284,15 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         }
 
         override suspend fun groupUpdated(group: ProxyGroup) {
-            val index = groupList.indexOfFirst { it.id == group.id }
-            if (index == -1) {
-                reload()
-                return
-            }
+            // This callback runs on the caller's (background) dispatcher while
+            // drag-sorting mutates groupList on the main thread; only touch the
+            // list on the main thread.
             onMainDispatcher {
+                val index = groupList.indexOfFirst { it.id == group.id }
+                if (index == -1) {
+                    runOnDefaultDispatcher { reload() }
+                    return@onMainDispatcher
+                }
                 undoManager.flush()
 
                 groupList[index] = group
@@ -298,12 +301,12 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         }
 
         override suspend fun groupUpdated(groupId: Long) {
-            val index = groupList.indexOfFirst { it.id == groupId }
-            if (index == -1) {
-                reload()
-                return
-            }
             onMainDispatcher {
+                val index = groupList.indexOfFirst { it.id == groupId }
+                if (index == -1) {
+                    runOnDefaultDispatcher { reload() }
+                    return@onMainDispatcher
+                }
                 notifyItemChanged(index)
             }
         }
@@ -536,12 +539,19 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                             groupStatus.text = if (size == 0L) {
                                 getString(R.string.group_status_empty_subscription)
                             } else {
-                                val date = Date(group.subscription!!.lastUpdated * 1000L)
-                                getString(
-                                    R.string.group_status_proxies_subscription,
-                                    size,
-                                    "${date.month + 1} - ${date.date}"
-                                )
+                                val subscription = group.subscription
+                                if (subscription == null) {
+                                    // corrupted state: a subscription group without
+                                    // the bean (GroupUpdater guards the same case)
+                                    getString(R.string.group_status_proxies, size)
+                                } else {
+                                    val date = Date(subscription.lastUpdated * 1000L)
+                                    getString(
+                                        R.string.group_status_proxies_subscription,
+                                        size,
+                                        "${date.month + 1} - ${date.date}"
+                                    )
+                                }
                             }
 
                         }

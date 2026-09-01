@@ -97,14 +97,15 @@ fun generateRuleSet(ruleSetString: List<String>, ruleSet: MutableList<RuleSet>) 
 fun SingBoxOptions.Rule_DefaultOptions.makeSingBoxRule(list: List<String>, isIP: Boolean) {
     if (isIP) {
         ip_cidr = mutableListOf<String>()
-        rule_set = mutableListOf<String>()
     } else {
-        rule_set = mutableListOf<String>()
         domain = mutableListOf<String>()
         domain_suffix = mutableListOf<String>()
         domain_regex = mutableListOf<String>()
         domain_keyword = mutableListOf<String>()
     }
+    // the domain and IP stages run as two separate calls on one rule; keep the
+    // rule_set entries already collected instead of dropping the other stage's
+    if (rule_set == null) rule_set = mutableListOf<String>()
     list.forEach {
         if (isIP) {
             if (it.startsWith("geoip:")) {
@@ -139,6 +140,7 @@ fun SingBoxOptions.Rule_DefaultOptions.makeSingBoxRule(list: List<String>, isIP:
     domain_regex?.removeIf { it.isNullOrBlank() }
     domain_keyword?.removeIf { it.isNullOrBlank() }
     if (ip_cidr?.isEmpty() == true) ip_cidr = null
+    if (rule_set?.isEmpty() == true) rule_set = null
     if (domain?.isEmpty() == true) domain = null
     if (domain_suffix?.isEmpty() == true) domain_suffix = null
     if (domain_regex?.isEmpty() == true) domain_regex = null

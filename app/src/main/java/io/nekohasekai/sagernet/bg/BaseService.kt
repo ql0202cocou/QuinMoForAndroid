@@ -285,7 +285,12 @@ class BaseService {
         }
 
         fun persistStats() {
-            // TODO NEW save app stats?
+            // ACTION_SHUTDOWN: the process is killed without stopRunner, so
+            // the looper never persists its counters; block until they are
+            // written. proxy/looper are null when not fully started.
+            runBlocking {
+                data.proxy?.looper?.persistStats()
+            }
         }
 
         // networks

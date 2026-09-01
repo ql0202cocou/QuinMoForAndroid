@@ -1022,20 +1022,20 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun groupRemoved(groupId: Long) {
-            val index = groupList.indexOfFirst { it.id == groupId }
-            if (index == -1) return
-
+            // These callbacks run on the caller's (background) dispatcher while
+            // the main thread mutates groupList; only touch the list in post.
             tabLayout.post {
+                val index = groupList.indexOfFirst { it.id == groupId }
+                if (index == -1) return@post
                 groupList.removeAt(index)
                 notifyItemRemoved(index)
             }
         }
 
         override suspend fun groupUpdated(group: ProxyGroup) {
-            val index = groupList.indexOfFirst { it.id == group.id }
-            if (index == -1) return
-
             tabLayout.post {
+                val index = groupList.indexOfFirst { it.id == group.id }
+                if (index == -1) return@post
                 tabLayout.getTabAt(index)?.text = group.displayName()
             }
         }
@@ -1043,7 +1043,8 @@ class ConfigurationFragment @JvmOverloads constructor(
         override suspend fun groupUpdated(groupId: Long) = Unit
 
         override suspend fun onAdd(profile: ProxyEntity) {
-            if (groupList.find { it.id == profile.groupId } == null) {
+            val groupMissing = onMainDispatcher { groupList.none { it.id == profile.groupId } }
+            if (groupMissing) {
                 DataStore.selectedGroup = profile.groupId
                 reload()
             }
@@ -1054,7 +1055,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         override suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean) = Unit
 
         override suspend fun onRemoved(groupId: Long, profileId: Long) {
-            val group = groupList.find { it.id == groupId } ?: return
+            val group = onMainDispatcher { groupList.find { it.id == groupId } } ?: return
             if (group.ungrouped && SagerDatabase.proxyDao.countByGroup(groupId) == 0L) {
                 reload()
             }
@@ -1413,9 +1414,11 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             override suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean) {
                 if (profile.groupId != proxyGroup.id) return
-                val index = configurationIdList.indexOf(profile.id)
-                if (index < 0) return
                 configurationListView.post {
+                    // compute the index here: this callback runs on a background
+                    // dispatcher while the main thread mutates the list
+                    val index = configurationIdList.indexOf(profile.id)
+                    if (index < 0) return@post
                     if (::undoManager.isInitialized) {
                         undoManager.flush()
                     }
@@ -1456,10 +1459,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             override suspend fun onRemoved(groupId: Long, profileId: Long) {
                 if (groupId != proxyGroup.id) return
-                val index = configurationIdList.indexOf(profileId)
-                if (index < 0) return
 
                 configurationListView.post {
+                    val index = configurationIdList.indexOf(profileId)
+                    if (index < 0) return@post
                     configurationIdList.removeAt(index)
                     configurationList.remove(profileId)
                     notifyItemRemoved(index)

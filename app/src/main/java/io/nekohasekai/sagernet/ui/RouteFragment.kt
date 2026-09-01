@@ -200,9 +200,12 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         }
 
         override suspend fun onUpdated(rule: RuleEntity) {
-            val index = ruleList.indexOfFirst { it.id == rule.id }
-            if (index == -1) return
+            // These callbacks run on the caller's (background) dispatcher while
+            // drag-sorting mutates ruleList on the main thread; only touch the
+            // list in post.
             ruleListView.post {
+                val index = ruleList.indexOfFirst { it.id == rule.id }
+                if (index == -1) return@post
                 ruleList[index] = rule
                 ruleAdapter.notifyItemChanged(index)
                 needReload()
@@ -210,15 +213,15 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         }
 
         override suspend fun onRemoved(ruleId: Long) {
-            val index = ruleList.indexOfFirst { it.id == ruleId }
-            if (index == -1) {
-                onMainDispatcher {
+            ruleListView.post {
+                val index = ruleList.indexOfFirst { it.id == ruleId }
+                if (index == -1) {
+                    needReload()
+                } else {
+                    ruleList.removeAt(index)
+                    ruleAdapter.notifyItemRemoved(index)
                     needReload()
                 }
-            } else ruleListView.post {
-                ruleList.removeAt(index)
-                ruleAdapter.notifyItemRemoved(index)
-                needReload()
             }
         }
 

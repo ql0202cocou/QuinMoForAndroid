@@ -771,7 +771,7 @@ object RawUpdater : GroupUpdater() {
                         }
                     }
                 }
-                return proxies
+                return proxies.takeIf { it.isNotEmpty() } ?: error("Not found")
             } catch (e: YAMLException) {
                 Logs.w(Util.redactSecrets(e.stackTraceToString()))
             }

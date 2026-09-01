@@ -59,6 +59,13 @@ class ConfigEditActivity : ThemedActivity() {
             getString("useConfigStore")?.let { useConfigStore = true }
         }
 
+        // The framework restores the editor text on recreation; restore the
+        // dirty flag with it, or the back guard would be bypassed after a
+        // rotation.
+        if (savedInstanceState != null) {
+            dirty = savedInstanceState.getBoolean("dirty")
+        }
+
         binding = LayoutEditConfigBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -140,6 +147,11 @@ class ConfigEditActivity : ThemedActivity() {
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root, ListListener)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("dirty", dirty)
     }
 
     fun formatText(): String? {
