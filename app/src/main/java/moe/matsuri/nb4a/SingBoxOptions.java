@@ -350,17 +350,21 @@ public class SingBoxOptions {
 
     public static class DNSServerOptions extends SingBoxOption {
 
+        public String type;
+
         public String tag;
 
-        public String address;
+        public String server;
 
-        public String address_resolver;
+        public Integer server_port;
 
-        public String address_strategy;
+        public String path;
 
-        public Long address_fallback_delay;
+        public String domain_resolver;
 
-        public String strategy;
+        public String inet4_range;
+
+        public String inet6_range;
 
         public String detour;
 
@@ -4633,6 +4637,12 @@ public class SingBoxOptions {
         public Boolean invert;
 
         public String server;
+
+        public String action;
+
+        public String rcode;
+
+        public String strategy;
 
         public Boolean disable_cache;
 

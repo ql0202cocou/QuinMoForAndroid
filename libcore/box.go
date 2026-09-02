@@ -68,7 +68,7 @@ func ResetAllConnections(system bool) {
 		// conntrack was removed in sing-box 1.13; ResetNetwork closes all connections
 		main := getMainInstance()
 		if main != nil {
-			main.Network().ResetNetwork()
+			main.Network().ResetNetwork(context.Background())
 		}
 		log.Println("Reset system connections done")
 	}
@@ -100,6 +100,7 @@ func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *Box
 	ctx = box.Context(ctx,
 		nekoboxAndroidInboundRegistry(), nekoboxAndroidOutboundRegistry(), nekoboxAndroidEndpointRegistry(),
 		nekoboxAndroidDNSTransportRegistry(localTransport), nekoboxAndroidServiceRegistry(),
+		nekoboxAndroidCertificateProviderRegistry(),
 	)
 	ctx = service.ContextWithDefaultRegistry(ctx)
 	service.MustRegister[adapter.PlatformInterface](ctx, boxPlatformInterfaceInstance)

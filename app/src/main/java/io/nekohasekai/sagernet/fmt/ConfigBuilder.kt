@@ -50,6 +50,62 @@ const val TAG_BLOCK = "block"
 
 const val LOCALHOST = "127.0.0.1"
 
+// sing-box 1.14 removed the legacy DNS server address format; map it to typed
+// servers the same way sing-box 1.13's internal upgrade did.
+private fun makeDnsServer(address: String, tag: String): DNSServerOptions {
+    fun DNSServerOptions.setAuthority(authority: String) {
+        // [v6]:port | host:port | bare v6 | host
+        var host = authority
+        var port: Int? = null
+        if (authority.startsWith("[")) {
+            val end = authority.indexOf(']')
+            host = authority.substring(1, end)
+            port = authority.substringAfter("]:", "").toIntOrNull()
+        } else if (authority.indexOf(':') >= 0 && authority.indexOf(':') == authority.lastIndexOf(':')) {
+            host = authority.substringBefore(':')
+            port = authority.substringAfter(':').toIntOrNull()
+        }
+        server = host
+        if (port != null && port > 0) server_port = port
+    }
+
+    return DNSServerOptions().apply {
+        this.tag = tag
+        if (!address.contains("://")) {
+            when (address) {
+                "local" -> type = "local"
+                else -> {
+                    type = "udp"
+                    setAuthority(address)
+                }
+            }
+            return@apply
+        }
+        val rest = address.substringAfter("://")
+        when (val scheme = address.substringBefore("://")) {
+            "tcp", "udp", "tls", "quic" -> {
+                type = scheme
+                setAuthority(rest)
+            }
+
+            "https", "h3" -> {
+                type = scheme
+                setAuthority(rest.substringBefore("/"))
+                if (rest.contains("/")) {
+                    path = "/" + rest.substringAfter("/")
+                }
+            }
+
+            "dhcp" -> {
+                type = scheme
+                if (rest != "auto") _hack_config_map["interface"] = rest
+            }
+
+            else -> throw Exception("unsupported DNS server address: $address")
+        }
+    }
+}
+
 class ConfigBuildResult(
     var config: String,
     var externalIndex: List<IndexEntity>,
@@ -201,7 +257,6 @@ fun buildConfig(
         dns = DNSOptions().apply {
             servers = mutableListOf()
             rules = mutableListOf()
-            independent_cache = true
         }
 
         fun autoDnsDomainStrategy(s: String): String? {
@@ -216,6 +271,12 @@ fun buildConfig(
                 else -> null
             }
         }
+
+        // sing-box 1.14 has no server-level strategy (legacy DNS format removed):
+        // the final server's strategy becomes the DNS default (below), the rest
+        // are carried by the rule actions routing to each server.
+        val directStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-direct"))
+        val remoteStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-remote"))
 
         inbounds = mutableListOf()
 
@@ -611,23 +672,28 @@ fun buildConfig(
 
                 when (rule.outbound) {
                     -1L -> {
-                        userDNSRuleList += makeDnsRuleObj().apply { server = "dns-direct" }
+                        userDNSRuleList += makeDnsRuleObj().apply {
+                            server = "dns-direct"
+                            strategy = directStrategy
+                        }
                     }
 
                     0L -> {
                         if (useFakeDns) userDNSRuleList += makeDnsRuleObj().apply {
                             server = "dns-fake"
+                            strategy = "ipv4_only"
                             inbound = listOf("tun-in")
                         }
                         userDNSRuleList += makeDnsRuleObj().apply {
                             server = "dns-remote"
+                            strategy = remoteStrategy
                         }
                     }
 
                     -2L -> {
                         userDNSRuleList += makeDnsRuleObj().apply {
-                            server = "dns-block"
-                            disable_cache = true
+                            action = "predefined"
+                            rcode = "NOERROR"
                         }
                     }
                 }
@@ -703,37 +769,32 @@ fun buildConfig(
         }
 
         dns.servers.add(DNSServerOptions().apply {
-            address = "rcode://success"
-            tag = "dns-block"
-        })
-
-        dns.servers.add(DNSServerOptions().apply {
-            address = "local"
+            type = "local"
             tag = "dns-local"
             detour = TAG_DIRECT
         })
 
         directDNS.firstOrNull().let {
-            dns.servers.add(DNSServerOptions().apply {
-                address = it ?: throw Exception("No direct DNS, check your settings!")
-                tag = "dns-direct"
+            dns.servers.add(makeDnsServer(
+                it ?: throw Exception("No direct DNS, check your settings!"), "dns-direct"
+            ).apply {
                 detour = TAG_DIRECT
-                address_resolver = "dns-local"
-                strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
+                domain_resolver = "dns-local"
             })
         }
 
         remoteDns.firstOrNull().let {
             // Always use direct DNS for urlTest
-            if (!forTest) dns.servers.add(DNSServerOptions().apply {
-                address = it ?: throw Exception("No remote DNS, check your settings!")
-                tag = "dns-remote"
-                address_resolver = "dns-direct"
-                strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
+            if (!forTest) dns.servers.add(makeDnsServer(
+                it ?: throw Exception("No remote DNS, check your settings!"), "dns-remote"
+            ).apply {
+                domain_resolver = "dns-direct"
             })
         }
 
         dns.final_ = if (forTest) "dns-direct" else "dns-remote"
+        // the final server's strategy becomes the DNS default (see directStrategy)
+        dns.strategy = if (forTest) directStrategy else remoteStrategy
 
         // dns object user rules
         if (enableDnsRouting) {
@@ -779,19 +840,16 @@ fun buildConfig(
             })
             // FakeDNS obj
             if (useFakeDns) {
-                dns.fakeip = DNSFakeIPOptions().apply {
-                    enabled = true
+                dns.servers.add(DNSServerOptions().apply {
+                    type = "fakeip"
+                    tag = "dns-fake"
                     inet4_range = "198.18.0.0/15"
                     inet6_range = "fc00::/18"
-                }
-                dns.servers.add(DNSServerOptions().apply {
-                    address = "fakeip"
-                    tag = "dns-fake"
-                    strategy = "ipv4_only"
                 })
                 dns.rules.add(DNSRule_DefaultOptions().apply {
                     inbound = listOf("tun-in")
                     server = "dns-fake"
+                    strategy = "ipv4_only"
                     disable_cache = true
                 })
             }
@@ -799,12 +857,14 @@ fun buildConfig(
             dns.rules.add(0, DNSRule_DefaultOptions().apply {
                 outbound = mutableListOf("any")
                 server = "dns-direct"
+                strategy = directStrategy
             })
             // force bypass (always top DNS rule)
             if (domainListDNSDirectForce.isNotEmpty()) {
                 dns.rules.add(0, DNSRule_DefaultOptions().apply {
                     makeSingBoxRule(domainListDNSDirectForce.toHashSet().toList())
                     server = "dns-direct"
+                    strategy = directStrategy
                 })
             }
         }
@@ -815,16 +875,14 @@ fun buildConfig(
         if (groupNameservers.isNotEmpty() && groupNsDomains.isNotEmpty()) {
             val groupRules = groupNameservers.mapIndexed { index, address ->
                 val tag = "dns-group-$index"
-                dns.servers.add(DNSServerOptions().apply {
-                    this.address = address
-                    this.tag = tag
+                dns.servers.add(makeDnsServer(address, tag).apply {
                     detour = TAG_DIRECT
-                    address_resolver = "dns-local"
-                    strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
+                    domain_resolver = "dns-local"
                 })
                 DNSRule_DefaultOptions().apply {
                     domain = groupNsDomains.toList()
                     server = tag
+                    strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
                     fallback = true
                 }
             }
