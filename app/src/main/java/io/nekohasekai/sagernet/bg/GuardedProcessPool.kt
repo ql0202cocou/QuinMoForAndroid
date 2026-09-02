@@ -39,11 +39,6 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
         @Volatile
         var looperStarted = false
 
-        // the current process has a thread blocked in waitFor (spawned at the
-        // top of the looper loop); cleared on restart until the next iteration
-        @Volatile
-        private var hasWaiter = false
-
         private fun streamLogger(input: InputStream, logger: (String) -> Unit) = try {
             input.bufferedReader().forEachLine(logger)
         } catch (_: IOException) {
@@ -63,17 +58,22 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
             var running = true
             val cmdName = File(cmd.first()).nameWithoutExtension
             val exitChannel = Channel<Int>(1) // buffered: cleanup may give up receiving, and a blocked send would leak the daemon thread
+            // called for every process right after it starts, never across a
+            // suspension point, so a live process always has a thread parked in
+            // waitFor and the cleanup below can always receive its exit code
+            fun spawnLoggers() {
+                thread(name = "stderr-$cmdName") {
+                    streamLogger(process.errorStream) { Libcore.nekoLogPrintln("[$cmdName] $it") }
+                }
+                thread(name = "stdout-$cmdName") {
+                    streamLogger(process.inputStream) { Libcore.nekoLogPrintln("[$cmdName] $it") }
+                    // this thread also acts as a daemon thread for waitFor
+                    runBlocking { exitChannel.send(process.waitFor()) }
+                }
+            }
             try {
+                spawnLoggers()
                 while (true) {
-                    thread(name = "stderr-$cmdName") {
-                        streamLogger(process.errorStream) { Libcore.nekoLogPrintln("[$cmdName] $it") }
-                    }
-                    thread(name = "stdout-$cmdName") {
-                        streamLogger(process.inputStream) { Libcore.nekoLogPrintln("[$cmdName] $it") }
-                        // this thread also acts as a daemon thread for waitFor
-                        runBlocking { exitChannel.send(process.waitFor()) }
-                    }
-                    hasWaiter = true
                     val startTime = SystemClock.elapsedRealtime()
                     val exitCode = exitChannel.receive()
                     running = false
@@ -86,11 +86,9 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
                         else -> Logs.w(IOException("$cmdName unexpectedly exits with code $exitCode"))
                     }
                     Logs.i("restart process: ${Commandline.toString(cmd)} (last exit code: $exitCode)")
-                    // clear before start(): a cancellation landing after this
-                    // point must see that the new process has no waiter yet
-                    hasWaiter = false
                     start()
                     running = true
+                    spawnLoggers() // before the suspending callback below
                     onRestartCallback?.invoke()
                 }
             } catch (e: IOException) {
@@ -98,17 +96,6 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
                 GlobalScope.launch(Dispatchers.Main) { onFatal(e) }
             } finally {
                 if (running) withContext(NonCancellable) {  // clean-up cannot be cancelled
-                    if (!hasWaiter) {
-                        // Cancellation landed between the restart above and the
-                        // next iteration's waiter threads: nothing is in waitFor
-                        // for the new process, so exitChannel would never fire
-                        // (every timeout below wasted) and the process would
-                        // zombie until GC. trySend: a racing waiter may already
-                        // hold the channel's single buffer slot.
-                        thread(name = "waitfor-$cmdName") {
-                            exitChannel.trySend(process.waitFor())
-                        }
-                    }
                     if (Build.VERSION.SDK_INT < 24) {
                         try {
                             Os.kill(pid.get(process) as Int, OsConstants.SIGTERM)

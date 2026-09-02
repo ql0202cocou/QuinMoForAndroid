@@ -1,7 +1,6 @@
 package io.nekohasekai.sagernet.fmt.v2ray
 
 import io.nekohasekai.sagernet.database.DataStore
-import io.nekohasekai.sagernet.ktx.isIpAddress
 import io.nekohasekai.sagernet.ktx.toStringPretty
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import org.json.JSONArray
@@ -66,19 +65,23 @@ fun buildXrayConfig(bean: VMessBean, port: Int): String {
 }
 
 private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
-    // 经 mapping 外核只能拨到本地地址，TLS SNI 需要显式兜底
+    // 经 mapping 外核只能拨到本地地址，TLS SNI 需要显式兜底；
+    // 与 sing-box 对齐：sni 为空时兜底为 serverAddress（IP 也一样）
     val sni = bean.sni.takeIf { it.isNotBlank() }
-        ?: bean.serverAddress.takeIf { it.isNotBlank() && !it.isIpAddress() }
+        ?: bean.serverAddress.takeIf { it.isNotBlank() }
     return JSONObject().apply {
         // transport
         when (bean.type) {
             "ws" -> {
                 put("network", "ws")
                 put("wsSettings", JSONObject().apply {
-                    val ed = bean.resolveWsEarlyData()
-                    put("path", ed.path)
-                    ed.maxEarlyData?.let { put("maxEarlyData", it) }
-                    ed.headerName?.let { put("earlyDataHeaderName", it) }
+                    // Xray only reads early data from "?ed=N" in the path; the
+                    // maxEarlyData/earlyDataHeaderName keys are silently ignored.
+                    var path = bean.path.takeIf { it.isNotBlank() } ?: "/"
+                    if (!path.contains("?ed=") && bean.wsMaxEarlyData > 0) {
+                        path += "?ed=${bean.wsMaxEarlyData}"
+                    }
+                    put("path", path)
                     if (bean.host.isNotBlank()) {
                         put("headers", JSONObject().apply { put("Host", bean.host) })
                     }

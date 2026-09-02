@@ -2,7 +2,6 @@ package moe.matsuri.nb4a.proxy.anytls
 
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.Logs
-import io.nekohasekai.sagernet.ktx.isIpAddress
 import moe.matsuri.nb4a.utils.JavaUtil
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import org.yaml.snakeyaml.Yaml
@@ -25,9 +24,10 @@ fun buildMihomoConfig(
     proxy["port"] = bean.finalPort
     proxy["password"] = bean.password
     proxy["udp"] = true
-    // 经 mapping 外核只能拨到本地地址，TLS SNI 需要显式兜底
+    // 经 mapping 外核只能拨到本地地址，TLS SNI 需要显式兜底；
+    // 与 sing-box 对齐：sni 为空时兜底为 serverAddress（IP 也一样）
     val sni = bean.sni.takeIf { it.isNotBlank() }
-        ?: bean.serverAddress.takeIf { it.isNotBlank() && !it.isIpAddress() }
+        ?: bean.serverAddress.takeIf { it.isNotBlank() }
     if (sni != null) proxy["sni"] = sni
     if (bean.alpn.isNotBlank()) proxy["alpn"] = bean.alpn.listByLineOrComma()
     // mihomo has no custom-CA option ("certificate" is the mTLS client cert), so pin the

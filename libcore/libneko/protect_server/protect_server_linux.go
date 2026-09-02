@@ -44,7 +44,7 @@ func GetFdFromConn(l net.Conn) int {
 	return fd
 }
 
-func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)) (io.Closer, error) {
+func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int) error) (io.Closer, error) {
 	if verbose {
 		log.Println("ServeProtect", path, fwmark)
 	}
@@ -56,7 +56,7 @@ func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)
 	}
 	os.Chmod(path, 0777)
 
-	go func(ctl func(fd int)) {
+	go func(ctl func(fd int) error) {
 		for {
 			c, err := l.Accept()
 			if err != nil {
@@ -91,7 +91,10 @@ func ServeProtect(path string, verbose bool, fwmark int, protectCtl func(fd int)
 					}
 				} else {
 					// android
-					ctl(fd)
+					err = ctl(fd)
+					if err != nil {
+						log.Println("protect server ctl:", err)
+					}
 				}
 
 				if err == nil {

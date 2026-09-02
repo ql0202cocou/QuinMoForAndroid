@@ -160,7 +160,8 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
 
     // not ducksoft fmt path
     if (url.pathSegments.size > 1 || url.pathSegments[0].isNotBlank()) {
-        path = url.pathSegments.joinToString("/")
+        // pathSegments drops the leading "/" ("ws" instead of "/ws")
+        path = "/" + url.pathSegments.joinToString("/")
     }
 
     type = url.queryParameter("type") ?: "tcp"
@@ -199,8 +200,9 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
                 realityMldsa65Verify = it
             }
             (url.queryParameter("ech") ?: url.queryParameter("echConfig"))?.let {
-                echConfig = it
                 enableECH = true
+                // "1" marks enable-only (query DNS for the config), a real config is base64
+                if (it != "1") echConfig = it
             }
         }
     }
@@ -371,8 +373,9 @@ fun parseV2RayN(link: String): VMessBean {
             if (!vmessQRCode.cert.isNullOrBlank()) bean.certificates = vmessQRCode.cert
             if (!vmessQRCode.verify_cert) bean.allowInsecure = true
             if (!vmessQRCode.ech.isNullOrBlank()) {
-                bean.echConfig = vmessQRCode.ech
                 bean.enableECH = true
+                // "1" marks enable-only, a real config is base64
+                if (vmessQRCode.ech != "1") bean.echConfig = vmessQRCode.ech
             }
             if (vmessQRCode.tls == "reality") {
                 bean.realityPubKey = vmessQRCode.pbk
@@ -487,8 +490,9 @@ fun VMessBean.toV2rayN(): String {
         alpn = bean.alpn.replace("\n", ",")
         fp = bean.utlsFingerprint
         verify_cert = !bean.allowInsecure
-        if (bean.enableECH && bean.echConfig.isNotBlank()) {
-            ech = bean.echConfig
+        if (bean.enableECH) {
+            // "1" marks enable-only (no pinned config)
+            ech = bean.echConfig.ifBlank { "1" }
         }
     }.let {
         NGUtil.encode(Gson().toJson(it))
@@ -542,7 +546,9 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
         }
     }
 
-    if (security.isNotBlank() && security != "none") {
+    // "none" must be written for trojan: the parser defaults a missing
+    // security param back to "tls" for trojan links
+    if (security.isNotBlank() && (security != "none" || isTrojan)) {
         builder.addQueryParameter("security", security)
         when (security) {
             "tls" -> {
@@ -561,8 +567,9 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
                 if (utlsFingerprint.isNotBlank()) {
                     builder.addQueryParameter("fp", utlsFingerprint)
                 }
-                if (echConfig.isNotBlank()) {
-                    builder.addQueryParameter("ech", echConfig)
+                if (enableECH) {
+                    // "1" marks enable-only (no pinned config)
+                    builder.addQueryParameter("ech", echConfig.ifBlank { "1" })
                 }
                 if (realityPubKey.isNotBlank()) {
                     builder.setQueryParameter("security", "reality")

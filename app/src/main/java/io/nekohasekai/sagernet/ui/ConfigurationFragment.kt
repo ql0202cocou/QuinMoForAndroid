@@ -835,9 +835,11 @@ class ConfigurationFragment @JvmOverloads constructor(
             runOnDefaultDispatcher {
                 mainJob.cancel()
                 testJobs.forEach { it.cancel() }
+                // status-only write: the snapshot was read at test start, a
+                // full-row update would roll back tx/rx persisted by :bg since
                 test.results.forEach {
                     try {
-                        ProfileManager.updateProfile(it)
+                        ProfileManager.updateStatus(it)
                     } catch (e: Exception) {
                         Logs.w(e)
                     }
@@ -906,9 +908,11 @@ class ConfigurationFragment @JvmOverloads constructor(
             runOnDefaultDispatcher {
                 mainJob.cancel()
                 testJobs.forEach { it.cancel() }
+                // status-only write: the snapshot was read at test start, a
+                // full-row update would roll back tx/rx persisted by :bg since
                 test.results.forEach {
                     try {
-                        ProfileManager.updateProfile(it)
+                        ProfileManager.updateStatus(it)
                     } catch (e: Exception) {
                         Logs.w(e)
                     }
@@ -1485,7 +1489,8 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             override suspend fun groupUpdated(groupId: Long) {
                 if (groupId != proxyGroup.id) return
-                proxyGroup = SagerDatabase.groupDao.getById(groupId)!!
+                // null when the group was deleted mid-update (e.g. subscription)
+                proxyGroup = SagerDatabase.groupDao.getById(groupId) ?: return
                 reloadProfiles()
             }
 

@@ -459,7 +459,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             val subscription = proxyGroup.subscription
             if (subscription != null && subscription.bytesUsed > 0L) { // SIP008 & Open Online Config
                 groupTraffic.isVisible = true
-                groupTraffic.text = if (subscription.bytesRemaining > 0L) {
+                var text = if (subscription.bytesRemaining > 0L) {
                     app.getString(
                         R.string.subscription_traffic, Formatter.formatFileSize(
                             app, subscription.bytesUsed
@@ -474,6 +474,14 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                         )
                     )
                 }
+                if (subscription.expiryDate > 0) {
+                    text += "\n"
+                    text += getString(
+                        R.string.subscription_expire,
+                        Util.timeStamp2Text(subscription.expiryDate.toLong() * 1000)
+                    )
+                }
+                groupTraffic.text = text
                 groupStatus.setPadding(0)
             } else if (subscription != null && !subscription.subscriptionUserinfo.isNullOrBlank()) { // Raw
                 var text = ""

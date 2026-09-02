@@ -94,46 +94,64 @@ object RawUpdater : GroupUpdater() {
             }
         }
 
-        // 订阅下发的节点解析 DNS，自动写入分组设置（在 forceResolve 之前生效）
-        val subscriptionNameserver = subscriptionText?.let { parseProxyServerNameserver(it) }
-        if (subscriptionNameserver != null) {
-            proxyGroup.proxyServerNameserver = subscriptionNameserver
+        // SIP008 / Open Online Config traffic fields shown by GroupFragment,
+        // parsed from the Subscription-Userinfo header (blank when absent):
+        // upload=…; download=…; total=…; expire=…
+        run {
+            val userinfo = subscription.subscriptionUserinfo ?: ""
+            fun value(name: String): Long =
+                "$name=([0-9]+)".toRegex().find(userinfo)?.groupValues?.get(1)?.toLongOrNull()
+                    ?: 0L
+            val used = value("upload") + value("download")
+            subscription.bytesUsed = used
+            subscription.bytesRemaining = value("total") - used
+            subscription.expiryDate = value("expire").toInt()
         }
 
-        val proxiesMap = LinkedHashMap<String, AbstractBean>()
-        for (proxy in proxies) {
-            var index = 0
-            var name = proxy.displayName()
-            while (proxiesMap.containsKey(name)) {
-                index++
-                name = name.replace(" (${index - 1})", "")
-                name = "$name ($index)"
-                proxy.name = name
-            }
-            proxiesMap[proxy.displayName()] = proxy
+        // 订阅下发的节点解析 DNS，自动写入分组设置（在 forceResolve 之前生效）。
+        // clash/YAML 订阅撤下该键时同步清空残留值；base64/分享链接订阅本就
+        // 没有此键（parseProxyServerNameserver 对非 YAML 也返回 null），不能误清
+        val subscriptionNameserver = subscriptionText?.let { parseProxyServerNameserver(it) }
+        val clearSubscriptionNameserver = subscriptionNameserver == null &&
+                subscriptionText?.contains("proxies:") == true
+        if (subscriptionNameserver != null) {
+            proxyGroup.proxyServerNameserver = subscriptionNameserver
+        } else if (clearSubscriptionNameserver) {
+            proxyGroup.proxyServerNameserver = ""
         }
-        proxies = proxiesMap.values.toList()
+
+        // nameMap 以 displayName 为键，先保证唯一；forceResolve 把无名节点的
+        // 地址改写成 IP 后 displayName 可能再次撞名，resolve 后还要再跑一遍
+        fun uniquifyNames(list: List<AbstractBean>): List<AbstractBean> {
+            val proxiesMap = LinkedHashMap<String, AbstractBean>()
+            for (proxy in list) {
+                var index = 0
+                var name = proxy.displayName()
+                while (proxiesMap.containsKey(name)) {
+                    index++
+                    name = name.replace(" (${index - 1})", "")
+                    name = "$name ($index)"
+                    proxy.name = name
+                }
+                proxiesMap[proxy.displayName()] = proxy
+            }
+            return proxiesMap.values.toList()
+        }
+        proxies = uniquifyNames(proxies)
 
         val exists = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
         val duplicate = ArrayList<String>()
         if (subscription.deduplication) {
             Logs.d("Before deduplication: ${proxies.size}")
             val uniqueProxies = LinkedHashSet<Protocols.Deduplication>()
-            val uniqueNames = HashMap<Protocols.Deduplication, String>()
+            val droppedCounts = HashMap<Protocols.Deduplication, Int>()
             for (_proxy in proxies) {
                 val proxy = Protocols.Deduplication(_proxy, _proxy.javaClass.toString())
                 if (!uniqueProxies.add(proxy)) {
-                    val index = uniqueProxies.indexOf(proxy)
-                    if (uniqueNames.containsKey(proxy)) {
-                        val name = uniqueNames[proxy]!!.replace(" ($index)", "")
-                        if (name.isNotBlank()) {
-                            duplicate.add("$name ($index)")
-                            uniqueNames[proxy] = ""
-                        }
-                    }
+                    // 只报告真正被删的节点；序号是该节点被删掉的第几份副本
+                    val index = (droppedCounts[proxy] ?: 0) + 1
+                    droppedCounts[proxy] = index
                     duplicate.add(_proxy.displayName() + " ($index)")
-                } else {
-                    uniqueNames[proxy] = _proxy.displayName()
                 }
             }
             proxies = uniqueProxies.toList().map { it.bean }
@@ -143,6 +161,9 @@ object RawUpdater : GroupUpdater() {
         // 不该被去重误删，resolve 改写 displayName 后的名字才是 nameMap 的键
         if (subscription.forceResolve) {
             forceResolve(proxies, proxyGroup.id, proxyGroup.proxyServerNameserver)
+            // resolve 把无名节点的 displayName 改写成了 IP:port，撞名的要重新
+            // 编号，否则下面 associateBy 会静默丢节点
+            proxies = uniquifyNames(proxies)
         }
 
         Logs.d("New profiles: ${proxies.size}")
@@ -192,14 +213,18 @@ object RawUpdater : GroupUpdater() {
                 when {
                     existsBean != bean -> {
                         changed++
+                        // putBean 之前取旧名：改名节点在报告里显示 旧名 => 新名
+                        val oldName = entity.displayName()
                         entity.putBean(bean)
                         toUpdate.add(entity)
-                        updated[entity.displayName()] = name
+                        updated[oldName] = name
 
                         Logs.d("Updated profile: $name")
                     }
 
                     reordered -> {
+                        // 纯重排也是变化，否则 changed==0 时误报“没有差异”
+                        changed++
                         entity.putBean(bean)
                         toUpdate.add(entity)
 
@@ -252,17 +277,22 @@ object RawUpdater : GroupUpdater() {
             subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
             // 更新期间用户可能改过分组设置：重新读取当前行，只合并本流程负责写的
             // 字段（远端分组名 / 订阅下发的节点解析 DNS / lastUpdated /
-            // subscriptionUserinfo），分组已被删除时（上面的检查之后）跳过写回
+            // subscriptionUserinfo 及流量字段），分组已被删除时（上面的检查之后）跳过写回
             SagerDatabase.groupDao.getById(proxyGroup.id)?.also { current ->
                 if (remoteGroupName != null) current.name = remoteGroupName
                 if (subscriptionNameserver != null) {
                     current.proxyServerNameserver = subscriptionNameserver
+                } else if (clearSubscriptionNameserver) {
+                    current.proxyServerNameserver = ""
                 }
                 // 传入的 subscription 是更新开始时的旧快照，整体回写会覆盖用户
                 // 期间改的 link/deduplication 等；以新鲜行的 bean 为基础合并
                 current.subscription?.apply {
                     lastUpdated = subscription.lastUpdated
                     subscriptionUserinfo = subscription.subscriptionUserinfo
+                    bytesUsed = subscription.bytesUsed
+                    bytesRemaining = subscription.bytesRemaining
+                    expiryDate = subscription.expiryDate
                 }
                 SagerDatabase.groupDao.updateGroup(current)
             }

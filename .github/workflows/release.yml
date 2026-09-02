@@ -9,7 +9,26 @@ on:
         description: "Publish: If want ignore"
         required: false
 jobs:
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Check VERSION_NAME matches the tag
+        # The tag must equal VERSION_NAME at the tagged commit, or ghr would publish a
+        # release whose name doesn't match the APK version. Alpha tags (e.g. 1.7.2-a1)
+        # follow the same rule — their nb4a.properties carries the alpha VERSION_NAME.
+        run: |
+          VERSION=$(grep '^VERSION_NAME=' nb4a.properties | cut -d= -f2 | tr -d '[:space:]')
+          if [ "$VERSION" != "${{ inputs.tag }}" ]; then
+            echo "::error::inputs.tag (${{ inputs.tag }}) does not match VERSION_NAME ($VERSION) in nb4a.properties"
+            exit 1
+          fi
   libcore:
+    needs: validate
     uses: ./.github/workflows/libcore.yml
     with:
       ref: ${{ inputs.tag }}

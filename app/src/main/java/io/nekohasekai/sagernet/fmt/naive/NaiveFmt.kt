@@ -30,7 +30,13 @@ fun parseNaive(link: String): NaiveBean {
 }
 
 fun NaiveBean.toUri(proxyOnly: Boolean = false): String {
-    val builder = linkBuilder().host(finalAddress).port(finalPort)
+    // finalAddress/finalPort are transient and get rewritten when a config is
+    // built (mapping address, SNI), so a shared link must use serverAddress/serverPort
+    val builder = if (proxyOnly) {
+        linkBuilder().host(finalAddress).port(finalPort)
+    } else {
+        linkBuilder().host(serverAddress).port(serverPort)
+    }
     if (username.isNotBlank()) {
         builder.username(username)
         if (password.isNotBlank()) {

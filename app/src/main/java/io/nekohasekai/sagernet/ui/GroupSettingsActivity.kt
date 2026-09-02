@@ -39,8 +39,10 @@ class GroupSettingsActivity(
 ) : ThemedActivity(resId),
     OnPreferenceDataStoreChangeListener {
 
-    private lateinit var frontProxyPreference: OutboundPreference
-    private lateinit var landingProxyPreference: OutboundPreference
+    // null until the preference fragment is committed; a redelivered picker
+    // result can land before that
+    private var frontProxyPreference: OutboundPreference? = null
+    private var landingProxyPreference: OutboundPreference? = null
 
     // A redelivered activity result (process death while the picker was
     // foreground) may run before the async re-init; init() must re-apply
@@ -108,8 +110,7 @@ class GroupSettingsActivity(
     ) {
         addPreferencesFromResource(R.xml.group_preferences)
 
-        frontProxyPreference = findPreference(Key.GROUP_FRONT_PROXY)!!
-        frontProxyPreference.apply {
+        frontProxyPreference = findPreference<OutboundPreference>(Key.GROUP_FRONT_PROXY)!!.apply {
             setEntries(R.array.front_proxy_entry)
             setEntryValues(R.array.front_proxy_value)
             setOnPreferenceChangeListener { _, newValue ->
@@ -124,8 +125,7 @@ class GroupSettingsActivity(
                 }
             }
         }
-        landingProxyPreference = findPreference(Key.GROUP_LANDING_PROXY)!!
-        landingProxyPreference.apply {
+        landingProxyPreference = findPreference<OutboundPreference>(Key.GROUP_LANDING_PROXY)!!.apply {
             setEntries(R.array.front_proxy_entry)
             setEntryValues(R.array.front_proxy_value)
             setOnPreferenceChangeListener { _, newValue ->
@@ -292,6 +292,9 @@ class GroupSettingsActivity(
                     entity.subscription?.link == DataStore.subscriptionLink)
             if (!keepUserInfo) {
                 entity.subscription?.subscriptionUserinfo = "";
+                // 链接或类型变了就按新订阅对待：不重置 lastUpdated 的话，
+                // 新链接的首次自动更新会按旧链接的时间点被推迟
+                entity.subscription?.lastUpdated = 0
             }
             GroupManager.updateGroup(entity.apply { serialize() })
         }
@@ -394,44 +397,38 @@ class GroupSettingsActivity(
 
     }
 
-    val selectProfileForAddFront = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
+    private fun profilePicker(
+        onSelected: (Long) -> Unit,
+        preference: () -> OutboundPreference?,
+    ) = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == Activity.RESULT_OK) runOnDefaultDispatcher {
             val profile = ProfileManager.getProfile(
                 it.data!!.getLongExtra(ProfileSelectActivity.EXTRA_PROFILE_ID, 0)
             ) ?: return@runOnDefaultDispatcher
-            // Set pending before the DataStore writes so the re-init either
-            // re-applies it (callback ran first) or loses to these writes.
-            pendingFrontProxy = profile.id
-            DataStore.frontProxy = profile.id
-            DataStore.frontProxyTmp = 3
+            // onSelected sets the pending value before the DataStore writes, so
+            // the re-init either re-applies it (callback ran first) or loses to
+            // these writes.
+            onSelected(profile.id)
             onMainDispatcher {
                 // The fragment may not be committed yet on a process-death
                 // restore; it reads the DataStore values when created.
-                if (::frontProxyPreference.isInitialized) {
-                    frontProxyPreference.value = "3"
-                }
+                preference()?.value = "3"
             }
         }
     }
 
-    val selectProfileForAddLanding = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        if (it.resultCode == Activity.RESULT_OK) runOnDefaultDispatcher {
-            val profile = ProfileManager.getProfile(
-                it.data!!.getLongExtra(ProfileSelectActivity.EXTRA_PROFILE_ID, 0)
-            ) ?: return@runOnDefaultDispatcher
-            pendingLandingProxy = profile.id
-            DataStore.landingProxy = profile.id
-            DataStore.landingProxyTmp = 3
-            onMainDispatcher {
-                if (::landingProxyPreference.isInitialized) {
-                    landingProxyPreference.value = "3"
-                }
-            }
-        }
-    }
+    // Registration order fixes the request keys the framework uses to redeliver
+    // results, so keep front before landing.
+    val selectProfileForAddFront = profilePicker({
+        pendingFrontProxy = it
+        DataStore.frontProxy = it
+        DataStore.frontProxyTmp = 3
+    }, { frontProxyPreference })
+
+    val selectProfileForAddLanding = profilePicker({
+        pendingLandingProxy = it
+        DataStore.landingProxy = it
+        DataStore.landingProxyTmp = 3
+    }, { landingProxyPreference })
 
 }

@@ -12,7 +12,7 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
-import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ktx.runOnSerialDispatcher
 import io.nekohasekai.sagernet.utils.PackageCache
 import libcore.BoxPlatformInterface
 import libcore.Libcore
@@ -24,7 +24,10 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
     //  libbox interface
 
     override fun autoDetectInterfaceControl(fd: Int) {
-        DataStore.vpnService?.protect(fd)
+        // failure must throw so the Go side (bg dial / protect server) doesn't
+        // treat an unprotected socket as protected
+        val vpn = DataStore.vpnService ?: throw Exception("no VpnService")
+        if (!vpn.protect(fd)) throw Exception("VpnService.protect failed")
     }
 
     override fun openTun(singTunOptionsJson: String, tunPlatformOptionsJson: String): Long {
@@ -90,12 +93,14 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
         }
         Libcore.resetAllConnections(true)
         DataStore.baseService?.apply {
-            runOnDefaultDispatcher {
+            // serial dispatcher: rapid switches A->B must persist in event
+            // order, the Default pool could run B's coroutine before A's
+            runOnSerialDispatcher {
                 // proxy can be nulled on service stop before this coroutine runs
-                val proxy = data.proxy ?: return@runOnDefaultDispatcher
+                val proxy = data.proxy ?: return@runOnSerialDispatcher
                 val id = proxy.config.profileTagMap
                     .filterValues { it == tag }.keys.firstOrNull() ?: -1
-                val ent = SagerDatabase.proxyDao.getById(id) ?: return@runOnDefaultDispatcher
+                val ent = SagerDatabase.proxyDao.getById(id) ?: return@runOnSerialDispatcher
                 // persist here too: the binder broadcast below only reaches a
                 // bound MainActivity, and an unpersisted selection is rolled
                 // back to the stale selectedProxy on the next service reload

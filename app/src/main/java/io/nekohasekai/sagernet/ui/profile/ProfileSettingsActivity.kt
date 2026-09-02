@@ -172,7 +172,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
     }
 
-    val child by lazy { supportFragmentManager.findFragmentById(R.id.settings) as MyPreferenceFragmentCompat }
+    val child by lazy { supportFragmentManager.findFragmentById(R.id.settings) as? MyPreferenceFragmentCompat }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.profile_config_menu, menu)
@@ -198,7 +198,8 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem) = child.onMenuItemSelected(item)
+    // the fragment may not be committed yet when the menu is clicked
+    override fun onOptionsItemSelected(item: MenuItem) = child?.onMenuItemSelected(item) == true
 
     override fun onDestroy() {
         DataStore.profileCacheStore.unregisterChangeListener(this)

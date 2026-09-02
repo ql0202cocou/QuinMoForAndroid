@@ -278,8 +278,8 @@ func goServeProtect(start bool) {
 		protectCloser = nil
 	}
 	if start {
-		closer, err := protect_server.ServeProtect("protect_path", false, 0, func(fd int) {
-			intfBox.AutoDetectInterfaceControl(int32(fd))
+		closer, err := protect_server.ServeProtect("protect_path", false, 0, func(fd int) error {
+			return intfBox.AutoDetectInterfaceControl(int32(fd))
 		})
 		if err != nil {
 			log.Println("protect server start failed:", err)

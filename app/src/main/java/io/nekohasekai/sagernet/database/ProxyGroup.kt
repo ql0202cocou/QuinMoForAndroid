@@ -36,12 +36,14 @@ data class ProxyGroup(
     override fun serializeToBuffer(output: ByteBufferOutput) {
         if (export) {
 
-            output.writeInt(0)
+            output.writeInt(1)
             output.writeString(name)
             output.writeInt(type)
             // a corrupted backup restore can leave a subscription group without one
-            val subscription = subscription ?: SubscriptionBean().apply { initializeDefaultValues() }
+            val subscription = subscription ?: SubscriptionBean().applyDefaultValues()
             subscription.serializeForShare(output)
+            // version 1: portable DoH address used to resolve the group's node domains
+            output.writeString(proxyServerNameserver)
 
         } else {
             output.writeInt(2)
@@ -52,7 +54,9 @@ data class ProxyGroup(
             output.writeInt(type)
 
             if (type == GroupType.SUBSCRIPTION) {
-                subscription?.serializeToBuffer(output)
+                // a corrupted backup restore can leave a subscription group without one
+                val subscription = subscription ?: SubscriptionBean().applyDefaultValues()
+                subscription.serializeToBuffer(output)
             }
             output.writeInt(order)
             output.writeString(proxyServerNameserver)
@@ -72,6 +76,9 @@ data class ProxyGroup(
             this.subscription = subscription
 
             subscription.deserializeFromShare(input)
+            if (version >= 1) {
+                proxyServerNameserver = input.readString()
+            }
         } else {
             val version = input.readInt()
 

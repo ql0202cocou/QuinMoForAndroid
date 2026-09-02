@@ -69,6 +69,7 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
         super.onCreate(savedInstanceState)
 
         supportActionBar!!.setTitle(R.string.chain_settings)
+        replacing = savedInstanceState?.getInt("replacing") ?: 0
         configurationList = findViewById(R.id.configuration_list)
         layoutManager = FixedLinearLayoutManager(configurationList)
         configurationList.layoutManager = layoutManager
@@ -130,13 +131,18 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
         suspend fun reload() {
             val idList = DataStore.serverProtocol.split(",")
                 .mapNotNull { it.takeIf { it.isNotBlank() }?.toLong() }
-            if (idList.isNotEmpty()) {
-                val profiles = ProfileManager.getProfiles(idList).map { it.id to it }.toMap()
-                for (id in idList) {
-                    proxyList.add(profiles[id] ?: continue)
-                }
-            }
+            val profiles = if (idList.isNotEmpty()) {
+                ProfileManager.getProfiles(idList).map { it.id to it }.toMap()
+            } else emptyMap()
+            // A process-death restore fires this twice (the restored fragment
+            // and the re-init replacement), so rebuild the list instead of
+            // appending; mutate it on the main thread where the RecyclerView
+            // reads it.
             onMainDispatcher {
+                proxyList.clear()
+                for (id in idList) {
+                    profiles[id]?.let { proxyList.add(it) }
+                }
                 notifyDataSetChanged()
             }
         }
@@ -231,7 +237,13 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
         }
     }
 
+    // survives process death so a pending replace does not turn into an append
     var replacing = 0
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt("replacing", replacing)
+    }
 
     val selectProfileForAdd =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { (resultCode, data) ->

@@ -148,7 +148,7 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 		if err := extractXz(f); err != nil {
 			return err
 		}
-	} else if f, err := asset.Open("yacd.zip"); err == nil {
+	} else if f, err := asset.Open("yacd.zip"); err == nil && name == yacdDstFolder {
 		os.RemoveAll(dstName)
 		// Remove leftover Yacd-* dirs from a previous extraction killed
 		// before the rename, so the glob below can succeed again.

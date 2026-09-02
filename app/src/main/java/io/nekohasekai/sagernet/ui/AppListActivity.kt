@@ -44,6 +44,7 @@ import kotlin.coroutines.coroutineContext
 class AppListActivity : ThemedActivity() {
     companion object {
         private const val SWITCH = "switch"
+        private const val SYS_APPS = "sys_apps"
 
         private val cachedApps
             get() = PackageCache.installedPackages.toMutableMap().apply {
@@ -234,6 +235,9 @@ class AppListActivity : ThemedActivity() {
             appsAdapter.filter.filter(it?.toString() ?: "")
         }
 
+        // the switch restores its own checked state on a config change; keep
+        // the backing field in sync with it
+        sysApps = savedInstanceState?.getBoolean(SYS_APPS) ?: false
         binding.showSystemApps.isChecked = sysApps
         binding.showSystemApps.setOnCheckedChangeListener { _, isChecked ->
             sysApps = isChecked
@@ -244,6 +248,11 @@ class AppListActivity : ThemedActivity() {
     }
 
     private var sysApps = false
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(SYS_APPS, sysApps)
+    }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.app_list_menu, menu)

@@ -250,12 +250,21 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                         .show()
                     runOnDefaultDispatcher {
                         runCatching {
-                            finishImport(
+                            val skipped = finishImport(
                                 content,
                                 import.backupConfigurations.isChecked,
                                 import.backupRules.isChecked,
                                 import.backupSettings.isChecked
                             )
+                            if (skipped > 0) {
+                                Logs.w("Backup import skipped $skipped invalid profile record(s)")
+                                onMainDispatcher {
+                                    if (!isAdded) return@onMainDispatcher
+                                    snackbar(
+                                        getString(R.string.backup_import_skipped, skipped)
+                                    ).show()
+                                }
+                            }
                             triggerFullRestart(requireContext())
                         }.onFailure {
                             Logs.w(it)
@@ -276,17 +285,33 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
 
     fun finishImport(
         content: JSONObject, profile: Boolean, rule: Boolean, setting: Boolean
-    ) {
+    ): Int {
+        var skippedProfiles = 0
         if (profile && content.has("profiles")) {
             val profiles = mutableListOf<ProxyEntity>()
             val jsonProfiles = content.getJSONArray("profiles")
             for (i in 0 until jsonProfiles.length()) {
-                val data = Util.b64Decode(jsonProfiles[i] as String)
-                val parcel = Parcel.obtain()
-                parcel.unmarshall(data, 0, data.size)
-                parcel.setDataPosition(0)
-                profiles.add(ProxyEntity.CREATOR.createFromParcel(parcel))
-                parcel.recycle()
+                val entity = runCatching {
+                    val data = Util.b64Decode(jsonProfiles[i] as String)
+                    val parcel = Parcel.obtain()
+                    try {
+                        parcel.unmarshall(data, 0, data.size)
+                        parcel.setDataPosition(0)
+                        ProxyEntity.CREATOR.createFromParcel(parcel).also {
+                            // Unknown types leave every bean null (putByteArray
+                            // has no else); the configuration list would crash
+                            // in requireBean() when binding such a record.
+                            it.requireBean()
+                        }
+                    } finally {
+                        parcel.recycle()
+                    }
+                }.getOrNull()
+                if (entity == null) {
+                    skippedProfiles++
+                    continue
+                }
+                profiles.add(entity)
             }
 
             val groups = mutableListOf<ProxyGroup>()
@@ -337,7 +362,18 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 PublicDatabase.kvPairDao.reset()
                 PublicDatabase.kvPairDao.insert(settings)
             }
+            // The imported PROFILE_GROUP may reference a group that does not
+            // exist here (e.g. a settings-only import); currentGroupId() trusts
+            // any positive value and the configuration page would stay blank.
+            // Same fallback as GroupManager.resetSelectedGroup().
+            if (DataStore.selectedGroup > 0L &&
+                SagerDatabase.groupDao.getById(DataStore.selectedGroup) == null
+            ) {
+                DataStore.selectedGroup =
+                    SagerDatabase.groupDao.allGroups().firstOrNull()?.id ?: -1L
+            }
         }
+        return skippedProfiles
     }
 
 }

@@ -34,6 +34,10 @@ fun parseHysteria1(url: String): HysteriaBean {
         link.queryParameter("insecure")?.also {
             allowInsecure = it == "1" || it == "true"
         }
+        // custom CA, our own invention (same "ca" name as tuic)
+        link.queryParameter("ca")?.also {
+            caText = it
+        }
         link.queryParameter("upmbps")?.also {
             uploadMbps = it.toIntOrNull() ?: uploadMbps
         }
@@ -89,6 +93,10 @@ fun parseHysteria2(url: String): HysteriaBean {
         link.queryParameter("insecure")?.also {
             allowInsecure = it == "1" || it == "true"
         }
+        // custom CA, our own invention (same "ca" name as tuic)
+        link.queryParameter("ca")?.also {
+            caText = it
+        }
         link.queryParameter("upmbps")?.also {
             uploadMbps = it.toIntOrNull() ?: uploadMbps
         }
@@ -129,6 +137,10 @@ fun HysteriaBean.toUri(): String {
     }
     if (allowInsecure) {
         builder.addQueryParameter("insecure", "1")
+    }
+    // custom CA, our own invention (same "ca" name as tuic)
+    if (caText.isNotBlank()) {
+        builder.addQueryParameter("ca", caText)
     }
     if (protocolVersion == 1) {
         if (sni.isNotBlank()) {
@@ -255,11 +267,13 @@ fun HysteriaBean.buildHysteria1Config(port: Int, cacheFile: (() -> File)?): Stri
             HysteriaBean.TYPE_BASE64 -> put("auth", authPayload)
             HysteriaBean.TYPE_STRING -> put("auth_str", authPayload)
         }
-        if (sni.isBlank() && finalAddress == LOCALHOST && !serverAddress.isIpAddress()) {
-            sni = serverAddress
+        // keep the SNI fallback local; writing it back to the bean would add a
+        // peer the user never set to later share links
+        val serverName = sni.ifBlank {
+            if (finalAddress == LOCALHOST && !serverAddress.isIpAddress()) serverAddress else ""
         }
-        if (sni.isNotBlank()) {
-            put("server_name", sni)
+        if (serverName.isNotBlank()) {
+            put("server_name", serverName)
         }
         if (alpn.isNotBlank()) put("alpn", alpn)
         if (caText.isNotBlank() && cacheFile != null) {

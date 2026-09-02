@@ -337,6 +337,7 @@
     <string name="invalid_backup_file">无效的备份文件</string>
     <string name="backup_import_summary">导入将覆盖现有的数据。</string>
     <string name="backup_importing">正导入…</string>
+    <string name="backup_import_skipped">已跳过 %d 条无效记录</string>
     <string name="connection_test_delete_unavailable">清理不可用配置</string>
     <string name="packet_encoding">包编码</string>
     <string name="action_switch">切换</string>

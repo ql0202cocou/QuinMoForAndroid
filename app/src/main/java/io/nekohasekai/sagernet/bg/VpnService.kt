@@ -43,6 +43,14 @@ class VpnService : BaseVpnService(),
     @Volatile
     var conn: ParcelFileDescriptor? = null
 
+    // ParcelFileDescriptor.close throws IOException; don't let it escape and
+    // skip the rest of the caller's cleanup.
+    private fun ParcelFileDescriptor.closeQuietly() = try {
+        close()
+    } catch (e: IOException) {
+        Logs.w(e)
+    }
+
     private var metered = false
 
     override var upstreamInterfaceName: String? = null
@@ -62,13 +70,7 @@ class VpnService : BaseVpnService(),
 
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun killProcesses() {
-        // ParcelFileDescriptor.close throws IOException; don't let it escape
-        // and skip the rest of the cleanup (proxy, state, stopSelf).
-        try {
-            conn?.close()
-        } catch (e: IOException) {
-            Logs.w(e)
-        }
+        conn?.closeQuietly()
         conn = null
         super.killProcesses()
     }
@@ -226,24 +228,13 @@ class VpnService : BaseVpnService(),
         val c = builder.establish() ?: throw NullConnectionException()
         // killProcesses (main thread) may null conn between establish() and
         // the fd read below; keep a local reference
-        conn?.let { stale ->
-            // a previous openTun lost the race against killProcesses
-            try {
-                stale.close()
-            } catch (e: IOException) {
-                Logs.w(e)
-            }
-        }
+        conn?.closeQuietly() // a previous openTun lost the race against killProcesses
         conn = c
         // killProcesses may already have run while establish() blocked: the
         // service is stopping and nothing would ever close this fd. Don't
         // hand the dead fd number back to the Go side either.
         if (!data.state.started) {
-            try {
-                c.close()
-            } catch (e: IOException) {
-                Logs.w(e)
-            }
+            c.closeQuietly()
             conn = null
             throw IOException("service is stopping")
         }

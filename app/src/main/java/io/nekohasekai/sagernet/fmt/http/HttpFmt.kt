@@ -33,8 +33,9 @@ fun parseHttp(link: String): HttpBean {
                 alpn = it
             }
             (httpUrl.queryParameter("ech") ?: httpUrl.queryParameter("echConfig"))?.let {
-                echConfig = it
                 enableECH = true
+                // "1" marks enable-only (query DNS for the config), a real config is base64
+                if (it != "1") echConfig = it
             }
         }
     }
@@ -69,8 +70,9 @@ fun HttpBean.toUri(): String {
         if (alpn.isNotBlank()) {
             builder.addQueryParameter("alpn", alpn.replace("\n", ","))
         }
-        if (enableECH && echConfig.isNotBlank()) {
-            builder.addQueryParameter("ech", echConfig)
+        if (enableECH) {
+            // "1" marks enable-only (no pinned config)
+            builder.addQueryParameter("ech", echConfig.ifBlank { "1" })
         }
     }
     if (name.isNotBlank()) {

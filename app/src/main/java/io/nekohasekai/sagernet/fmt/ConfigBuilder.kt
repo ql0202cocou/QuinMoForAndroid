@@ -83,6 +83,12 @@ fun buildConfig(
     val tagMap = HashMap<Long, String>()
     val globalOutbounds = HashMap<Long, String>()
     val selectorNames = ArrayList<String>()
+    // a profile named like a built-in outbound tag would collide with it
+    val reservedSelectorTags = setOf(TAG_PROXY, TAG_DIRECT, TAG_BYPASS, TAG_BLOCK)
+    // profile ids whose outbounds are already built, including chain members
+    // pulled in by resolveChain(): rebuilding them duplicates their tags and
+    // sing-box rejects the whole config
+    val builtProfiles = HashSet<Long>()
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
 
     fun ProxyEntity.resolveChainInternal(visiting: MutableSet<Long> = mutableSetOf()): MutableList<ProxyEntity> {
@@ -112,7 +118,7 @@ fun buildConfig(
     fun selectorName(name_: String): String {
         var name = name_
         var count = 0
-        while (selectorNames.contains(name)) {
+        while (selectorNames.contains(name) || name in reservedSelectorTags) {
             count++
             name = "$name_-$count"
         }
@@ -262,6 +268,8 @@ fun buildConfig(
             if (profileList.isEmpty()) {
                 error("chain profile ${entity.id} (${entity.requireBean().displayName()}) has no valid member")
             }
+            builtProfiles.add(entity.id)
+            profileList.forEach { builtProfiles.add(it.id) }
             // dedup by id and keep insertion order: a HashSet<ProxyEntity>
             // collapses two fully identical entities (the collapsed node's
             // traffic never lands in the DB) and iterates in arbitrary order
@@ -335,6 +343,13 @@ fun buildConfig(
                             outbound = tagOut
                         })
                     } else {
+                        // wireguard is an endpoint since sing-box 1.13 and endpoints
+                        // have no detour: the key would be silently dropped and the
+                        // hop would dial directly, bypassing the rest of the chain.
+                        // Fail loudly like the loop/empty-chain guards.
+                        if (pastOutbound is SingBoxOptions.Endpoint) {
+                            error("wireguard profile ${pastEntity!!.id} (${pastEntity!!.requireBean().displayName()}) must be the first hop of a chain: endpoints do not support detour")
+                        }
                         pastOutbound._hack_config_map["detour"] = tagOut
                     }
                 } else {
@@ -512,6 +527,9 @@ fun buildConfig(
         }
         // build outbounds from route item
         extraProxies.forEach { (key, p) ->
+            // already built as a selector member or inside another chain:
+            // rebuilding would duplicate its outbound/inbound tags
+            if (builtProfiles.contains(key)) return@forEach
             tagMap[key] = buildChain(key, p)
         }
 

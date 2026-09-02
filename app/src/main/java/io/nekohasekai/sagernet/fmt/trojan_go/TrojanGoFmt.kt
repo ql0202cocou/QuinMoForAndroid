@@ -112,12 +112,14 @@ fun TrojanGoBean.buildTrojanGoConfig(port: Int): String {
             })
         }
 
-        if (sni.isBlank() && finalAddress == LOCALHOST && !serverAddress.isIpAddress()) {
-            sni = serverAddress
+        // keep the SNI fallback local; writing it back to the bean would add a
+        // sni the user never set to later share links
+        val sslSni = sni.ifBlank {
+            if (finalAddress == LOCALHOST && !serverAddress.isIpAddress()) serverAddress else ""
         }
 
         put("ssl", JSONObject().apply {
-            if (sni.isNotBlank()) put("sni", sni)
+            if (sslSni.isNotBlank()) put("sni", sslSni)
             if (allowInsecure) put("verify", false)
         })
 

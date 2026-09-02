@@ -285,18 +285,23 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 		}
 		r.request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	}
-	newBody := func() io.ReadCloser {
-		return io.NopCloser(bytes.NewReader(bodyBytes))
+	// Every racing request gets its own reader over the buffered body.
+	cloneRequest := func(ctx context.Context) *http.Request {
+		request := r.request.Clone(ctx)
+		if bodyBytes != nil {
+			newBody := func() io.ReadCloser {
+				return io.NopCloser(bytes.NewReader(bodyBytes))
+			}
+			request.Body = newBody()
+			request.GetBody = func() (io.ReadCloser, error) { return newBody(), nil }
+		}
+		return request
 	}
 
 	funcs := []requestFunc{
 		// Http(s) With Ech
 		func(ctx context.Context) (response *http.Response, err error) {
-			request := r.request.Clone(ctx)
-			if bodyBytes != nil {
-				request.Body = newBody()
-				request.GetBody = func() (io.ReadCloser, error) { return newBody(), nil }
-			}
+			request := cloneRequest(ctx)
 			echClient := &http.Client{
 				Transport: &http.Transport{
 					DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -319,11 +324,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 		},
 		// H3 HTTPS
 		func(ctx context.Context) (response *http.Response, err error) {
-			request := r.request.Clone(ctx)
-			if bodyBytes != nil {
-				request.Body = newBody()
-				request.GetBody = func() (io.ReadCloser, error) { return newBody(), nil }
-			}
+			request := cloneRequest(ctx)
 			h3Transport := &http3.Transport{
 				TLSClientConfig: r.tls.Clone(),
 				QUICConfig: &quic.Config{

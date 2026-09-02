@@ -72,11 +72,9 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
                             if (isClosed()) throw CancellationException("test cancelled")
                             init()
                             if (isClosed()) {
-                                // Cancellation ran close() while init() was still
-                                // working: box.close() was skipped (box not yet
-                                // assigned) and cache files created later survive.
-                                // launch() would bail on isClosed() and leak both,
-                                // so finish the cleanup close() started.
+                                // close() ran during init(); launch() would bail
+                                // out and leak what init() built, so finish the
+                                // cleanup close() could not do
                                 closeAfterLateInit()
                                 throw CancellationException("test cancelled")
                             }

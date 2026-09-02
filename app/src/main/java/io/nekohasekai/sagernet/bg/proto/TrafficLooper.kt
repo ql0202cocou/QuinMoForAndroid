@@ -21,8 +21,8 @@ class TrafficLooper
 
     private var job: Job? = null
     private val stopped = AtomicBoolean(false)
-    // loop() fills these on one Default thread while selectMain() (via
-    // NativeInterface.selector_OnProxySelected) reads/writes them on another
+    // loop() fills these (under statsLock) while selectMain() (via
+    // NativeInterface.selector_OnProxySelected) reads/writes them on another thread
     private val idMap = ConcurrentHashMap<Long, TrafficUpdater.TrafficLooperData>() // id to 1 data
     private val tagMap = ConcurrentHashMap<String, TrafficUpdater.TrafficLooperData>() // tag to 1 data
 
@@ -42,7 +42,7 @@ class TrafficLooper
                     val item = idMap[ent.id] ?: continue
                     ent.rx = item.rx
                     ent.tx = item.tx
-                    ProfileManager.updateProfile(ent) // update DB
+                    ProfileManager.updateTraffic(ent) // update DB
                     traffic[ent.id] = TrafficData(
                         id = ent.id,
                         rx = ent.rx,
@@ -71,7 +71,7 @@ class TrafficLooper
                     val item = idMap[ent.id] ?: continue
                     ent.rx = item.rx
                     ent.tx = item.tx
-                    ProfileManager.updateProfile(ent) // update DB
+                    ProfileManager.updateTraffic(ent) // update DB
                 }
             }
         }
@@ -93,36 +93,43 @@ class TrafficLooper
     @Volatile
     var selectorNowFakeTag = ""
 
-    // NativeInterface.selector_OnProxySelected posts one call per selector
-    // event onto the Default pool, so rapid switches can run this
-    // read-modify-write concurrently on different threads
-    @Synchronized
+    // Shared by selectMain and the stats sweep in loop(): an interleaved
+    // selector switch would otherwise add the same TAG_PROXY diff to both the
+    // old and the new item (once in updateOne, once via the per-tag diff
+    // cache), double-counting it. A private lock, so the exclusion is not at
+    // the mercy of anyone holding this public object's monitor.
+    private val statsLock = Any()
+
+    // NativeInterface.selector_OnProxySelected serializes the selector events,
+    // but this read-modify-write still races the loop's stats sweep
     fun selectMain(id: Long) {
-        Logs.d("select traffic count $TAG_PROXY to $id, old id is $selectorNowId")
-        val oldData = idMap[selectorNowId]
-        val newData = idMap[id] ?: return
-        oldData?.apply {
-            tag = selectorNowFakeTag
-            ignore = true
-            // post traffic when switch
-            if (DataStore.profileTrafficStatistics) {
-                // find by id, not firstOrNull(): a chained/grouped tag maps to
-                // several entities in an unordered set; selectorNowId still
-                // holds the OLD id here (updated below), which is the one we want
-                data.proxy?.config?.trafficMap?.get(tag)?.firstOrNull { it.id == selectorNowId }?.let {
-                    it.rx = rx
-                    it.tx = tx
-                    runOnDefaultDispatcher {
-                        ProfileManager.updateProfile(it) // update DB
+        synchronized(statsLock) {
+            Logs.d("select traffic count $TAG_PROXY to $id, old id is $selectorNowId")
+            val oldData = idMap[selectorNowId]
+            val newData = idMap[id] ?: return
+            oldData?.apply {
+                tag = selectorNowFakeTag
+                ignore = true
+                // post traffic when switch
+                if (DataStore.profileTrafficStatistics) {
+                    // find by id, not firstOrNull(): a chained/grouped tag maps to
+                    // several entities in an unordered set; selectorNowId still
+                    // holds the OLD id here (updated below), which is the one we want
+                    data.proxy?.config?.trafficMap?.get(tag)?.firstOrNull { it.id == selectorNowId }?.let {
+                        it.rx = rx
+                        it.tx = tx
+                        runOnDefaultDispatcher {
+                            ProfileManager.updateTraffic(it) // update DB
+                        }
                     }
                 }
             }
-        }
-        selectorNowFakeTag = newData.tag
-        selectorNowId = id
-        newData.apply {
-            tag = TAG_PROXY
-            ignore = false
+            selectorNowFakeTag = newData.tag
+            selectorNowId = id
+            newData.apply {
+                tag = TAG_PROXY
+                ignore = false
+            }
         }
     }
 
@@ -130,7 +137,12 @@ class TrafficLooper
         val delayMs = DataStore.speedInterval.toLong()
         val showDirectSpeed = DataStore.showDirectSpeed
         val profileTrafficStatistics = DataStore.profileTrafficStatistics
-        if (delayMs == 0L) return
+        // speedInterval 0 (Disable) turns off the speed display only: keep a
+        // low-frequency counting loop so per-profile traffic statistics still
+        // accumulate and can persist on stop
+        val countingOnly = delayMs == 0L
+        if (countingOnly && !profileTrafficStatistics) return
+        val loopDelay = if (countingOnly) 1000L else delayMs
 
         var trafficUpdater: TrafficUpdater? = null
         var proxy: ProxyInstance?
@@ -141,53 +153,59 @@ class TrafficLooper
         while (sc.isActive) {
             proxy = data.proxy
             if (proxy == null) {
-                delay(delayMs)
+                delay(loopDelay)
                 continue
             }
 
             if (trafficUpdater == null) {
                 if (!proxy.isInitialized()) {
-                    delay(delayMs)
+                    delay(loopDelay)
                     continue
                 }
-                idMap.clear()
-                idMap[-1] = itemBypass
-                //
-                val tags = hashSetOf(TAG_PROXY, TAG_BYPASS)
-                proxy.config.trafficMap.forEach { (tag, ents) ->
-                    tags.add(tag)
-                    for (ent in ents) {
-                        val item = TrafficUpdater.TrafficLooperData(
-                            tag = tag,
-                            rx = ent.rx,
-                            tx = ent.tx,
-                            rxBase = ent.rx,
-                            txBase = ent.tx,
-                            ignore = proxy.config.selectorGroupId >= 0L,
-                        )
-                        idMap[ent.id] = item
-                        tagMap[tag] = item
-                        Logs.d("traffic count $tag to ${ent.id}")
+                // under statsLock: a selectMain sneaking in mid-fill would see a
+                // half-populated idMap and drop the switch (id lookup fails)
+                synchronized(statsLock) {
+                    idMap.clear()
+                    idMap[-1] = itemBypass
+                    //
+                    val tags = hashSetOf(TAG_PROXY, TAG_BYPASS)
+                    proxy.config.trafficMap.forEach { (tag, ents) ->
+                        tags.add(tag)
+                        for (ent in ents) {
+                            val item = TrafficUpdater.TrafficLooperData(
+                                tag = tag,
+                                rx = ent.rx,
+                                tx = ent.tx,
+                                rxBase = ent.rx,
+                                txBase = ent.tx,
+                                ignore = proxy.config.selectorGroupId >= 0L,
+                            )
+                            idMap[ent.id] = item
+                            tagMap[tag] = item
+                            Logs.d("traffic count $tag to ${ent.id}")
+                        }
                     }
+                    if (proxy.config.selectorGroupId >= 0L) {
+                        selectMain(proxy.config.mainEntId)
+                    }
+                    //
+                    trafficUpdater = TrafficUpdater(
+                        box = proxy.box, items = idMap.values.toList()
+                    )
+                    proxy.box.setV2rayStats(tags.joinToString("\n"))
                 }
-                if (proxy.config.selectorGroupId >= 0L) {
-                    selectMain(proxy.config.mainEntId)
-                }
-                //
-                trafficUpdater = TrafficUpdater(
-                    box = proxy.box, items = idMap.values.toList()
-                )
-                proxy.box.setV2rayStats(tags.joinToString("\n"))
             }
 
-            // mutually exclusive with @Synchronized selectMain: an interleaved
-            // selector switch would otherwise add the same TAG_PROXY diff to
-            // both the old and the new item (once in updateOne, once via the
-            // per-tag diff cache), double-counting it
-            synchronized(this) {
-                trafficUpdater.updateAll()
+            // mutually exclusive with selectMain, see statsLock
+            synchronized(statsLock) {
+                trafficUpdater?.updateAll()
             }
             if (!sc.isActive) return
+
+            if (countingOnly) {
+                delay(loopDelay)
+                continue
+            }
 
             // add all non-bypass to "main"
             var mainTxRate = 0L
@@ -236,7 +254,7 @@ class TrafficLooper
                 if (listenPostSpeed) postNotificationSpeedUpdate(speed)
             }
 
-            delay(delayMs)
+            delay(loopDelay)
         }
     }
 }

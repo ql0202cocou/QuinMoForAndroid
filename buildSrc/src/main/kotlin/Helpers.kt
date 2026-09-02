@@ -168,7 +168,9 @@ fun Project.setupApp() {
                 buildConfigField(
                     "String",
                     "PRE_VERSION_NAME",
-                    "\"${requireMetadata().getProperty("PRE_VERSION_NAME")}\""
+                    "\"${requireNotNull(requireMetadata().getProperty("PRE_VERSION_NAME")) {
+                        "PRE_VERSION_NAME is missing in nb4a.properties"
+                    }}\""
                 )
             }
         }
@@ -180,7 +182,9 @@ fun Project.setupApp() {
                 outputFileName = if (isPreview) {
                     outputFileName.replace(
                         project.name,
-                        "NekoBox-" + requireMetadata().getProperty("PRE_VERSION_NAME")
+                        "NekoBox-" + requireNotNull(requireMetadata().getProperty("PRE_VERSION_NAME")) {
+                            "PRE_VERSION_NAME is missing in nb4a.properties"
+                        }
                     ).replace("-preview", "")
                         .replace("-release", "")
                 } else {

@@ -98,6 +98,18 @@ object ProfileManager {
         }
     }
 
+    // Snapshot-safe partial writes: the entity may have been read at VPN/test
+    // start, so only the columns this caller owns go back to the DB.
+
+    suspend fun updateTraffic(profile: ProxyEntity) {
+        SagerDatabase.proxyDao.updateTraffic(profile.id, profile.tx, profile.rx)
+    }
+
+    suspend fun updateStatus(profile: ProxyEntity) {
+        SagerDatabase.proxyDao.updateStatus(profile.id, profile.status, profile.ping, profile.error)
+        iterator { onUpdated(profile, false) }
+    }
+
     suspend fun deleteProfile2(groupId: Long, profileId: Long) {
         if (SagerDatabase.proxyDao.deleteById(profileId) == 0) return
         if (DataStore.selectedProxy == profileId) {

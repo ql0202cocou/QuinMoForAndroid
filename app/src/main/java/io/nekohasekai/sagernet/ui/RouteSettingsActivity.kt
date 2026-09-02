@@ -47,6 +47,12 @@ class RouteSettingsActivity(
 ) : ThemedActivity(resId),
     OnPreferenceDataStoreChangeListener {
 
+    // A redelivered activity result (process death while the picker was
+    // foreground) may run before the async re-init; init() must re-apply
+    // this so the entity values do not overwrite the user's selection.
+    @Volatile
+    private var pendingRouteOutbound: Long? = null
+
     fun init(packageName: String?) {
         RuleEntity().apply {
             if (!packageName.isNullOrBlank()) {
@@ -154,12 +160,6 @@ class RouteSettingsActivity(
 
     lateinit var outbound: OutboundPreference
     lateinit var apps: AppListPreference
-
-    // A redelivered activity result (process death while the picker was
-    // foreground) may run before the async re-init; init() must re-apply
-    // this so the entity values do not overwrite the user's selection.
-    @Volatile
-    private var pendingRouteOutbound: Long? = null
 
     fun PreferenceFragmentCompat.viewCreated(view: View, savedInstanceState: Bundle?) {
         outbound = findPreference(Key.ROUTE_OUTBOUND)!!
@@ -312,14 +312,15 @@ class RouteSettingsActivity(
 
     }
 
-    val child by lazy { supportFragmentManager.findFragmentById(R.id.settings) as MyPreferenceFragmentCompat }
+    val child by lazy { supportFragmentManager.findFragmentById(R.id.settings) as? MyPreferenceFragmentCompat }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.profile_config_menu, menu)
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem) = child.onMenuItemSelected(item)
+    // the fragment may not be committed yet when the menu is clicked
+    override fun onOptionsItemSelected(item: MenuItem) = child?.onMenuItemSelected(item) == true
 
     override fun onDestroy() {
         DataStore.profileCacheStore.unregisterChangeListener(this)

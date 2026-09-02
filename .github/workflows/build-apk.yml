@@ -61,6 +61,20 @@ jobs:
             exit 1
           fi
           echo "APK=$(dirname "$APK")" >> $GITHUB_ENV
+      - name: Verify APK signature
+        # Release builds (oss AND preview — signing is buildType-level in Helpers.kt) must be
+        # signed. Helpers.kt only wires the signing config when KEYSTORE_PASS exists, so a
+        # missing KEYSTORE_BASE64/LOCAL_PROPERTIES secret silently produces unsigned APKs
+        # (an empty decoded keystore file fails the same way). Fail loudly before upload.
+        run: |
+          FAILED=0
+          while IFS= read -r apk; do
+            if ! "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk"; then
+              echo "::error::$apk is unsigned or failed signature verification"
+              FAILED=1
+            fi
+          done < <(find app/build/outputs/apk -name '*.apk')
+          exit $FAILED
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: APKs
