@@ -85,6 +85,9 @@ class VpnService : BaseVpnService(),
     override fun createNotification(profileName: String) =
         ServiceNotification(this, profileName, "service-vpn")
 
+    // POST_NOTIFICATIONS is requested in MainActivity; when denied, notify() is
+    // silently dropped by the system — no SecurityException to handle
+    @SuppressLint("MissingPermission")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (DataStore.serviceMode == Key.MODE_VPN) {
             if (prepare(this) != null) {

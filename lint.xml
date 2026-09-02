@@ -38,6 +38,8 @@
     <!-- 依赖刻意钉版（见 AGENTS.md 依赖封顶说明），不报新版本提醒 -->
     <issue id="NewerVersionAvailable" severity="ignore" />
     <issue id="GradleDependency" severity="ignore" />
+    <!-- Gradle/AGP 版本同属刻意钉版，不报新版本提醒 -->
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
     <!-- 分包代理与插件发现需要全量包可见性 -->
     <issue id="QueryAllPackagesPermission" severity="ignore" />
     <!-- 应用级签名权限是有意为之，勿改命名（AGENTS.md 安全节） -->

@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.bg
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -215,6 +216,9 @@ class ServiceNotification(
     // revive it as a ghost notification
     private val destroyed = AtomicBoolean(false)
 
+    // POST_NOTIFICATIONS is requested in MainActivity; when denied, notify() is
+    // silently dropped by the system — no SecurityException to handle
+    @SuppressLint("MissingPermission")
     private suspend fun update() = useBuilder {
         if (destroyed.get()) return@useBuilder
         NotificationManagerCompat.from(service as Service).notify(notificationId, it.build())

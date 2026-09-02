@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.bg
 
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -63,6 +64,9 @@ object SubscriptionUpdater {
             .setSmallIcon(R.drawable.ic_service_active)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
 
+        // POST_NOTIFICATIONS is requested in MainActivity; when denied, notify()
+        // is silently dropped by the system — no SecurityException to handle
+        @SuppressLint("MissingPermission")
         override suspend fun doWork(): Result {
             try {
                 var subscriptions =
