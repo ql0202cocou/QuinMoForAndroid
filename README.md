@@ -7,8 +7,6 @@ sing-box / universal proxy toolchain for Android.
 
 一款使用 sing-box 的 Android 通用代理软件.
 
-This repository is a fork of [MatsuriDayo/NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid), independently maintained. The fork relationship is documented only in this README and is not linked on GitHub.
-
 ## 支持的代理协议 / Supported Proxy Protocols
 
 * SOCKS (4/4a/5)
