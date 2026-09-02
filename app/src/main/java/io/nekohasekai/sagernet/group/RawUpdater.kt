@@ -856,7 +856,9 @@ object RawUpdater : GroupUpdater() {
 
     // mihomo/clash 订阅里 dns.proxy-server-nameserver（或顶层同名字段）的地址列表，
     // 每行一个；缺省时按 mihomo 语义回退 dns.nameserver（节点域名用它解析）。
-    // mihomo 特有的 system 值对 sing-box 无意义，直接丢弃
+    // mihomo 特有的 system 值对 sing-box 无意义，直接丢弃；回环/未指定地址
+    // （如指向 mihomo 自身 dns.listen 的 127.0.0.1:7874）出了原核心就是死地址，同样丢弃；
+    // #h3 之类 mihomo 私有后缀也一并剥掉，否则会漏进 sing-box 的 DoH path
     fun parseProxyServerNameserver(text: String): String? {
         if (!text.contains("proxies:")) return null
         return try {
@@ -870,8 +872,8 @@ object RawUpdater : GroupUpdater() {
                 is String -> listOf(value)
                 else -> return null
             }
-            addresses.map { it.trim() }
-                .filter { it.isNotBlank() && it != "system" }
+            addresses.map { it.trim().substringBefore("#") }
+                .filter { it.isNotBlank() && it != "system" && !it.isLocalNameserverAddress() }
                 .distinct()
                 .joinToString("\n")
                 .takeIf { it.isNotBlank() }

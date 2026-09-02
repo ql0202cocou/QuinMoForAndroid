@@ -24,7 +24,9 @@ import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.buildSingBoxOutboundStandardV2RayBean
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
 import io.nekohasekai.sagernet.fmt.wireguard.buildSingBoxEndpointWireGuardBean
+import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.isIpAddress
+import io.nekohasekai.sagernet.ktx.isLocalNameserverAddress
 import io.nekohasekai.sagernet.ktx.mkPort
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.utils.PackageCache
@@ -208,8 +210,14 @@ fun buildConfig(
     // per-group nameserver: resolve this group's node server domains with it,
     // multiple addresses (one per line) are used in order with fallback.
     // forTest honors it too: a fake node domain may only resolve through it.
+    // Loopback entries (stored by old versions or entered by hand) are dead on
+    // device — drop them here as well, not only at subscription parse time.
     val groupNameservers = group?.proxyServerNameserver?.split("\n")
-        ?.mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
+        ?.mapNotNull { dns ->
+            dns.trim().takeIf {
+                it.isNotBlank() && !it.startsWith("#") && !it.isLocalNameserverAddress()
+            }
+        }
         ?.distinct()
         ?: listOf()
     val groupNsDomains = LinkedHashSet<String>()
@@ -872,13 +880,25 @@ fun buildConfig(
         // per-group nameserver: this group's node server domains resolve via it,
         // multiple servers are tried in order (neko dns rule fallback).
         // Kept for forTest too: node domains must resolve or the test cannot dial.
+        // A mirrored/hand-entered address makeDnsServer cannot parse must not take
+        // down the whole config build — skip it and keep the remaining servers.
         if (groupNameservers.isNotEmpty() && groupNsDomains.isNotEmpty()) {
-            val groupRules = groupNameservers.mapIndexed { index, address ->
+            val groupRules = groupNameservers.mapIndexedNotNull { index, address ->
                 val tag = "dns-group-$index"
-                dns.servers.add(makeDnsServer(address, tag).apply {
-                    detour = TAG_DIRECT
-                    domain_resolver = "dns-local"
-                })
+                val dnsServer = runCatching {
+                    makeDnsServer(address, tag).apply {
+                        detour = TAG_DIRECT
+                        domain_resolver = "dns-local"
+                    }
+                }.getOrElse {
+                    // scheme + authority only: a DoH path can embed tokens
+                    Logs.w(
+                        "Skip unsupported group nameserver: " +
+                                address.substringAfter("://").substringBefore("/")
+                    )
+                    return@mapIndexedNotNull null
+                }
+                dns.servers.add(dnsServer)
                 DNSRule_DefaultOptions().apply {
                     domain = groupNsDomains.toList()
                     server = tag

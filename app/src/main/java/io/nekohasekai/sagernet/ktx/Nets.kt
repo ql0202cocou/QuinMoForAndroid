@@ -56,6 +56,21 @@ fun String.wrapIPV6Host(): String {
     }
 }
 
+// True for loopback/unspecified DNS addresses (127.0.0.1, [::1]:53, udp://0.0.0.0 …):
+// they only make sense inside the core that owns them (e.g. a mihomo config pointing
+// at its own dns.listen) and are dead ends on any real device.
+fun String.isLocalNameserverAddress(): Boolean {
+    var host = substringAfter("://").substringBefore("/").trim()
+    host = when {
+        host.startsWith("[") -> host.substringAfter("[").substringBefore("]")
+        host.count { it == ':' } == 1 -> host.substringBefore(":")
+        else -> host
+    }
+    val ip = host.substringBefore("%").parseNumericAddress()
+        ?: return host.equals("localhost", ignoreCase = true)
+    return ip.isLoopbackAddress || ip.isAnyLocalAddress
+}
+
 // Resolve via the group's proxyServerNameserver (first usable address, e.g. DoH);
 // returns null on failure so callers can fall back to system DNS.
 // Note: Libcore.lookupHost does not cache, so callers on a per-profile path
@@ -63,7 +78,10 @@ fun String.wrapIPV6Host(): String {
 fun lookupViaNameserver(nameserver: String?, domain: String): List<InetAddress>? {
     val server = nameserver
         ?.lineSequence()?.map { it.trim() }
-        ?.firstOrNull { it.isNotBlank() && !it.startsWith("#") && it != "local" }
+        ?.firstOrNull {
+            it.isNotBlank() && !it.startsWith("#") && it != "local" &&
+                    !it.isLocalNameserverAddress()
+        }
         ?: return null
     return try {
         Libcore.lookupHost(server, domain).lineSequence()
