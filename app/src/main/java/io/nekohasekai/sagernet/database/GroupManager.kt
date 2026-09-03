@@ -64,11 +64,13 @@ object GroupManager {
     }
 
     fun rearrange(groupId: Long) {
-        val entities = SagerDatabase.proxyDao.getByGroup(groupId)
-        for (index in entities.indices) {
-            entities[index].userOrder = (index + 1).toLong()
+        // userOrder only: a full-row @Update would roll back status/ping/tx/rx that
+        // TrafficLooper and URL tests persist between the read and the write
+        SagerDatabase.instance.runInTransaction {
+            SagerDatabase.proxyDao.getByGroup(groupId).forEachIndexed { index, entity ->
+                SagerDatabase.proxyDao.updateOrder(entity.id, (index + 1).toLong())
+            }
         }
-        SagerDatabase.proxyDao.updateProxy(entities)
     }
 
     suspend fun postUpdate(group: ProxyGroup) {

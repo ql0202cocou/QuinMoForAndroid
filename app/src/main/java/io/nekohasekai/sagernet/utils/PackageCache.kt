@@ -8,9 +8,8 @@ import android.content.pm.PackageManager
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.listenForPackageChanges
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import moe.matsuri.nb4a.plugin.Plugins
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -22,7 +21,9 @@ object PackageCache {
     lateinit var installedApps: Map<String, ApplicationInfo>
     lateinit var packageMap: Map<String, Int>
     lateinit var uidMap: Map<Int, Set<String>>
-    val loaded = Mutex(true)
+    // A one-shot latch, not a lock: awaitLoadSync() only waits on it, and
+    // complete() is idempotent, so a failed attempt followed by a retry is safe.
+    private val loaded = CompletableDeferred<Unit>()
     var registerd = AtomicBoolean(false)
 
     // called from init (suspend)
@@ -40,11 +41,10 @@ object PackageCache {
             registerd.set(false)
             Logs.w(e)
         } finally {
-            // awaitLoadSync() blocks on this mutex (including the gomobile
-            // callback path), so unlock even when reload() throws — a stuck
-            // lock hangs the VPN mid-start with no error. A retry after a
-            // failed attempt finds it already unlocked.
-            if (loaded.isLocked) loaded.unlock()
+            // awaitLoadSync() blocks on this latch (including the gomobile callback
+            // path), so release it even when reload() throws — a stuck latch hangs
+            // the VPN mid-start with no error.
+            loaded.complete(Unit)
         }
     }
 
@@ -96,11 +96,7 @@ object PackageCache {
             register()
             return
         }
-        runBlocking {
-            loaded.withLock {
-                // just await
-            }
-        }
+        runBlocking { loaded.await() }
     }
 
     // written from background threads, cleared from the package-change receiver

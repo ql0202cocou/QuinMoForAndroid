@@ -3,7 +3,6 @@ package io.nekohasekai.sagernet.ui
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
-import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.OpenableColumns
@@ -25,12 +24,9 @@ import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.net.toUri
 import androidx.core.os.BundleCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.size
-import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.preference.PreferenceDataStore
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -82,6 +78,7 @@ import io.nekohasekai.sagernet.ktx.showAllowingStateLoss
 import io.nekohasekai.sagernet.ktx.snackbar
 import io.nekohasekai.sagernet.ktx.startFilesForResult
 import io.nekohasekai.sagernet.ktx.tryToShow
+import io.nekohasekai.sagernet.ktx.writeToDocument
 import io.nekohasekai.sagernet.plugin.PluginManager
 import io.nekohasekai.sagernet.ui.profile.ChainSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HttpSettingsActivity
@@ -97,6 +94,7 @@ import io.nekohasekai.sagernet.ui.profile.TuicSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.WireGuardSettingsActivity
 import io.nekohasekai.sagernet.widget.QRCodeDialog
+import io.nekohasekai.sagernet.widget.padForSystemBars
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -312,17 +310,19 @@ class ConfigurationFragment @JvmOverloads constructor(
                     val proxies = mutableListOf<AbstractBean>()
                     if (fileName != null && fileName.endsWith(".zip")) {
                         // try parse wireguard zip
-                        val zip =
-                            ZipInputStream(requireContext().contentResolver.openInputStream(file)!!)
-                        while (true) {
-                            val entry = zip.nextEntry ?: break
-                            if (entry.isDirectory) continue
-                            val fileText = zip.bufferedReader().readText()
-                            RawUpdater.parseRaw(fileText, entry.name)
-                                ?.let { pl -> proxies.addAll(pl) }
-                            zip.closeEntry()
+                        // use(): a throwing parseRaw used to leak the fd
+                        ZipInputStream(
+                            requireContext().contentResolver.openInputStream(file)!!
+                        ).use { zip ->
+                            while (true) {
+                                val entry = zip.nextEntry ?: break
+                                if (entry.isDirectory) continue
+                                val fileText = zip.bufferedReader().readText()
+                                RawUpdater.parseRaw(fileText, entry.name)
+                                    ?.let { pl -> proxies.addAll(pl) }
+                                zip.closeEntry()
+                            }
                         }
-                        zip.closeQuietly()
                     } else {
                         val fileText =
                             requireContext().contentResolver.openInputStream(file)!!.use {
@@ -520,22 +520,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                         }
                     }
                     if (toClear.isNotEmpty()) {
-                        val groupId = toClear.first().groupId
                         onMainDispatcher {
                             MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                                 .setMessage(R.string.delete_confirm_prompt)
                                 .setPositiveButton(R.string.yes) { _, _ ->
                                     runOnDefaultDispatcher {
-                                        for (profile in toClear) {
-                                            ProfileManager.deleteProfile2(
-                                                profile.groupId, profile.id
-                                            )
-                                        }
-                                        // deleteProfile2 skips these; pay for them once per bulk delete
-                                        GroupManager.resetDanglingGroupProxies()
-                                        if (SagerDatabase.proxyDao.countByGroup(groupId) > 1) {
-                                            GroupManager.rearrange(groupId)
-                                        }
+                                        ProfileManager.deleteProfiles(toClear)
                                     }
                                 }
                                 .setNegativeButton(R.string.no, null)
@@ -557,7 +547,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                         }
                     }
                     if (toClear.isNotEmpty()) {
-                        val groupId = toClear.first().groupId
                         onMainDispatcher {
                             MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                                 .setMessage(
@@ -574,16 +563,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 )
                                 .setPositiveButton(R.string.yes) { _, _ ->
                                     runOnDefaultDispatcher {
-                                        for (profile in toClear) {
-                                            ProfileManager.deleteProfile2(
-                                                profile.groupId, profile.id
-                                            )
-                                        }
-                                        // deleteProfile2 skips these; pay for them once per bulk delete
-                                        GroupManager.resetDanglingGroupProxies()
-                                        if (SagerDatabase.proxyDao.countByGroup(groupId) > 1) {
-                                            GroupManager.rearrange(groupId)
-                                        }
+                                        ProfileManager.deleteProfiles(toClear)
                                     }
                                 }
                                 .setNegativeButton(R.string.no, null)
@@ -1209,20 +1189,9 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             configurationListView = view.findViewById(R.id.configuration_list)
-            if (Build.VERSION.SDK_INT >= 35) {
-                // Edge-to-edge: the XML's fixed 48dp bottom padding predates
-                // edge-to-edge; never let the gesture pill cover list content.
-                val listBottomPadding = configurationListView.paddingBottom
-                ViewCompat.setOnApplyWindowInsetsListener(configurationListView) { v, insets ->
-                    v.updatePadding(
-                        bottom = maxOf(
-                            listBottomPadding,
-                            insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-                        )
-                    )
-                    insets
-                }
-            }
+            // The XML's fixed 48dp bottom padding predates edge-to-edge and already
+            // clears the FAB; never let the gesture pill cover list content either.
+            configurationListView.padForSystemBars(bottomAtLeast = true)
             layoutManager = FixedLinearLayoutManager(configurationListView)
             configurationListView.layoutManager = layoutManager
             adapter = ConfigurationAdapter()
@@ -1800,33 +1769,9 @@ class ConfigurationFragment @JvmOverloads constructor(
     private val exportConfig =
         registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { data ->
             if (data != null) {
-                runOnDefaultDispatcher {
-                    try {
-                        val content = DataStore.serverConfig
-                        if (content.isBlank()) {
-                            // profileCacheStore died with the process; writing now
-                            // would truncate the picked document to 0 bytes
-                            onMainDispatcher {
-                                snackbar(getString(R.string.action_export_err)).show()
-                            }
-                            return@runOnDefaultDispatcher
-                        }
-                        (requireActivity() as MainActivity).contentResolver.openOutputStream(data)!!
-                            .bufferedWriter()
-                            .use {
-                                it.write(content)
-                            }
-                        onMainDispatcher {
-                            snackbar(getString(R.string.action_export_msg)).show()
-                        }
-                    } catch (e: Exception) {
-                        Logs.w(e)
-                        onMainDispatcher {
-                            snackbar(e.readableMessage).show()
-                        }
-                    }
-
-                }
+                // profileCacheStore dies with the process; a blank config must not
+                // truncate the picked document
+                runOnDefaultDispatcher { writeToDocument(data, DataStore.serverConfig) }
             }
         }
 

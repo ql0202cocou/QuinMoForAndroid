@@ -50,8 +50,12 @@ public class WireGuardBean extends AbstractBean {
         privateKey = input.readString();
         peerPublicKey = input.readString();
         peerPreSharedKey = input.readString();
-        mtu = input.readInt();
-        reserved = input.readString();
+        // This fork's history starts at version 2, so every record it wrote carries
+        // both fields and the guards are no-ops. They only matter for a v0/v1 record
+        // restored from an old upstream backup: the version int was already read and
+        // then ignored here, leaving the trailing reads to fail on a short buffer.
+        if (version >= 1) mtu = input.readInt();
+        if (version >= 2) reserved = input.readString();
     }
 
     @Override

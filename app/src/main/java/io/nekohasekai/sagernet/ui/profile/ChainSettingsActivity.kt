@@ -42,6 +42,10 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
         DataStore.serverProtocol = proxyList.joinToString(",") { it.id.toString() }
     }
 
+    // Inverse of updateProxiesCache().
+    fun cachedProxyIds(): List<Long> =
+        DataStore.serverProtocol.split(",").filter { it.isNotBlank() }.map { it.toLong() }
+
     override fun ChainBean.init() {
         DataStore.profileName = name
         DataStore.serverProtocol = proxies.joinToString(",")
@@ -129,8 +133,7 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
     inner class ProxiesAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
         suspend fun reload() {
-            val idList = DataStore.serverProtocol.split(",")
-                .mapNotNull { it.takeIf { it.isNotBlank() }?.toLong() }
+            val idList = cachedProxyIds()
             val profiles = if (idList.isNotEmpty()) {
                 ProfileManager.getProfiles(idList).map { it.id to it }.toMap()
             } else emptyMap()
@@ -142,8 +145,7 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
                 // A select-profile callback may have written the cache while
                 // the profiles were loading; retry instead of rebuilding the
                 // list from stale ids and wiping that selection.
-                val currentIds = DataStore.serverProtocol.split(",")
-                    .mapNotNull { it.takeIf { it.isNotBlank() }?.toLong() }
+                val currentIds = cachedProxyIds()
                 if (currentIds != idList) {
                     runOnDefaultDispatcher { reload() }
                     return@onMainDispatcher
@@ -279,9 +281,7 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
                         // through the same cache instead of indexing proxyList
                         // (replacing can also be out of range then); a pending
                         // reload picks the change up via its stale-cache retry.
-                        val ids = DataStore.serverProtocol.split(",")
-                            .mapNotNull { it.takeIf { it.isNotBlank() }?.toLong() }
-                            .toMutableList()
+                        val ids = cachedProxyIds().toMutableList()
                         if (replacing in 1..ids.size) {
                             ids[replacing - 1] = profile.id
                         } else {

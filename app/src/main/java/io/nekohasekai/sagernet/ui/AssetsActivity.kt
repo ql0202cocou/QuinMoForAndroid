@@ -21,7 +21,6 @@ import libcore.Libcore
 import moe.matsuri.nb4a.utils.Util
 import org.json.JSONObject
 import java.io.File
-import java.io.FileWriter
 import java.io.IOException
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
@@ -128,18 +127,27 @@ class AssetsActivity : ThemedActivity() {
                 val outFile = File(filesDir, fileName).apply {
                     parentFile?.mkdirs()
                 }
+                // copy aside and rename: a failed copy must not leave a truncated
+                // db where the previous, working one was
+                val tmpFile = File(outFile.parentFile, outFile.name + ".tmp")
+                // GlobalScope: an escaping IOException (unreadable document, revoked
+                // permission, full disk) would take the whole app down
+                try {
+                    contentResolver.openInputStream(file)?.use(tmpFile.outputStream())
+                        ?: error("cannot open $fileName")
+                    if (!tmpFile.renameTo(outFile)) error("cannot replace " + outFile.name)
 
-                contentResolver.openInputStream(file)?.use(outFile.outputStream())
+                    File(outFile.parentFile, outFile.nameWithoutExtension + ".version.txt")
+                        .writeText("Custom")
 
-                File(outFile.parentFile, outFile.nameWithoutExtension + ".version.txt").apply {
-                    if (isFile) delete()
-                    createNewFile()
-                    val fw = FileWriter(this)
-                    fw.write("Custom")
-                    fw.close()
+                    adapter.reloadAssets()
+                } catch (e: Exception) {
+                    Logs.w(e)
+                    onMainDispatcher { alert(e.readableMessage).show() }
+                } finally {
+                    // no-op after a successful rename; drops a half-copied db otherwise
+                    tmpFile.delete()
                 }
-
-                adapter.reloadAssets()
             }
 
         }

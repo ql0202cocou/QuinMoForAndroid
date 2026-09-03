@@ -26,12 +26,15 @@ get_latest_release() {
 download_verified() {
   local repo="$1" version="$2" file="$3"
   local base="https://github.com/$repo/releases/download/$version"
-  curl -fLSs -o "$file" "$base/$file"
+  # one invocation for both so curl reuses the connection
+  curl -fLSs -o "$file" "$base/$file" -o "$file.sha256sum" "$base/$file.sha256sum"
   # shasum, not sha256sum: the dev machines are macOS (same as plugins.sh)
-  local expect=$(curl -fLSs "$base/$file.sha256sum" | awk '{print $1}')
+  local expect=$(awk '{print $1}' "$file.sha256sum")
   [ -n "$expect" ] || { echo "no sha256sum published for $file"; exit 1; }
   local actual=$(shasum -a 256 "$file" | awk '{print $1}')
   [ "$actual" = "$expect" ] || { echo "sha256 mismatch for $file: $actual != $expect"; exit 1; }
+  # everything left in $TMP is moved into the assets dir, so drop the checksum
+  rm -f "$file.sha256sum"
 }
 
 ####

@@ -110,15 +110,25 @@ object ProfileManager {
         iterator { onUpdated(profile, false) }
     }
 
-    // Bulk-delete path: listeners fire per profile, but the expensive fixups
-    // (dangling front/landing proxies, rearrange) are left to the caller to
-    // run once per batch instead of per profile.
-    suspend fun deleteProfile2(groupId: Long, profileId: Long) {
+    private suspend fun deleteProfile2(groupId: Long, profileId: Long) {
         if (SagerDatabase.proxyDao.deleteById(profileId) == 0) return
         if (DataStore.selectedProxy == profileId) {
             DataStore.selectedProxy = 0L
         }
         iterator { onRemoved(groupId, profileId) }
+    }
+
+    // Bulk-delete path: listeners fire per profile, but the expensive fixups
+    // (dangling front/landing proxies, rearrange) run once for the whole batch
+    // instead of per profile.
+    suspend fun deleteProfiles(profiles: List<ProxyEntity>) {
+        if (profiles.isEmpty()) return
+        for (profile in profiles) deleteProfile2(profile.groupId, profile.id)
+        GroupManager.resetDanglingGroupProxies()
+        val groupId = profiles.first().groupId
+        if (SagerDatabase.proxyDao.countByGroup(groupId) > 1) {
+            GroupManager.rearrange(groupId)
+        }
     }
 
     suspend fun deleteProfile(groupId: Long, profileId: Long) {

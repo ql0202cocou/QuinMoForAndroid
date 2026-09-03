@@ -7,6 +7,7 @@ import (
 	"io"
 	"libcore/device"
 	"log"
+	"net/http"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -243,44 +244,36 @@ func (b *BoxInstance) SelectOutbound(tag string) bool {
 	return false
 }
 
+// newProxyHttpClient builds a client dialing through b. It holds b.access across the
+// whole build: a concurrent Close could otherwise tear the box down between the state
+// check and CreateProxyHttpClient, panicking inside it.
+func (b *BoxInstance) newProxyHttpClient() (*http.Client, error) {
+	b.access.Lock()
+	defer b.access.Unlock()
+	if b.state == 2 {
+		return nil, errors.New("instance is closed")
+	}
+	var connectionTracker adapter.ConnectionTracker
+	if b.v2api != nil {
+		connectionTracker = b.v2api.StatsService()
+	}
+	return boxapi.CreateProxyHttpClient(b.Box, connectionTracker), nil
+}
+
 func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err error) {
 	defer device.DeferPanicToError("box.UrlTest", func(err_ error) { err = err_ })
-	var connectionTracker adapter.ConnectionTracker
-	// test i
-	if i != nil {
-		i.access.Lock()
-		if i.state == 2 {
-			i.access.Unlock()
-			return 0, errors.New("instance is closed")
+	if i == nil {
+		// test mainInstance, or direct when there is none (getMainInstance released
+		// mainInstanceAccess already, so taking i.access below cannot deadlock
+		// against Close's b.access -> mainInstanceAccess order)
+		if i = getMainInstance(); i == nil {
+			return speedtest.UrlTest(boxapi.CreateProxyHttpClient(nil, nil), link, timeout, speedtest.UrlTestStandard_RTT)
 		}
-		if i.v2api != nil {
-			connectionTracker = i.v2api.StatsService()
-		}
-		httpClient := boxapi.CreateProxyHttpClient(i.Box, connectionTracker)
-		i.access.Unlock()
-		return speedtest.UrlTest(httpClient, link, timeout, speedtest.UrlTestStandard_RTT)
 	}
-	// test direct
-	main := getMainInstance()
-	if main == nil {
-		return speedtest.UrlTest(boxapi.CreateProxyHttpClient(nil, nil), link, timeout, speedtest.UrlTestStandard_RTT)
+	httpClient, err := i.newProxyHttpClient()
+	if err != nil {
+		return 0, err
 	}
-	// test mainInstance (getMainInstance released mainInstanceAccess already,
-	// so taking main.access here cannot deadlock against Close's b.access ->
-	// mainInstanceAccess order)
-	main.access.Lock()
-	if main.state == 2 {
-		main.access.Unlock()
-		return 0, errors.New("instance is closed")
-	}
-	if main.v2api != nil {
-		connectionTracker = main.v2api.StatsService()
-	}
-	// build the client while still holding access: a concurrent Close could
-	// otherwise tear down the box between the state check and here, panicking
-	// inside CreateProxyHttpClient
-	httpClient := boxapi.CreateProxyHttpClient(main.Box, connectionTracker)
-	main.access.Unlock()
 	return speedtest.UrlTest(httpClient, link, timeout, speedtest.UrlTestStandard_RTT)
 }
 

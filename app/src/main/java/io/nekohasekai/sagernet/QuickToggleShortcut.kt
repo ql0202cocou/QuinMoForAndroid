@@ -32,6 +32,7 @@ import androidx.core.graphics.drawable.IconCompat
 import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.bg.stateOrStopped
 import io.nekohasekai.sagernet.database.DataStore
 
 @Suppress("DEPRECATION")
@@ -60,13 +61,13 @@ class QuickToggleShortcut : Activity(), SagerConnection.Callback {
             // but must not change DataStore.selectedProxy. (Pinned shortcuts
             // are only queryable on API 25+; below that the extra is ignored
             // unless it names the current selection.)
+            connection.connect(this, this)
             if (profileId >= 0 && profileId != DataStore.selectedProxy &&
                 ShortcutManagerCompat.getShortcuts(this, ShortcutManagerCompat.FLAG_MATCH_PINNED)
                     .none { it.id == "shortcut-profile-$profileId" }
             ) {
                 profileId = -1L
             }
-            connection.connect(this, this)
             if (Build.VERSION.SDK_INT >= 25) {
                 getSystemService<ShortcutManager>()!!.reportShortcutUsed(if (profileId >= 0) "shortcut-profile-$profileId" else "toggle")
             }
@@ -74,7 +75,7 @@ class QuickToggleShortcut : Activity(), SagerConnection.Callback {
     }
 
     override fun onServiceConnected(service: ISagerNetService) {
-        val state = BaseService.State.values()[service.state]
+        val state = service.stateOrStopped
         when {
             state.canStop -> {
                 if (profileId == DataStore.selectedProxy || profileId == -1L) {

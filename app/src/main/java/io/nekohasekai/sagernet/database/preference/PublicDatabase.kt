@@ -16,7 +16,8 @@ abstract class PublicDatabase : RoomDatabase() {
                 .setJournalMode(JournalMode.TRUNCATE)
                 .allowMainThreadQueries()
                 .enableMultiInstanceInvalidation()
-                .fallbackToDestructiveMigration()
+                // see SagerDatabase: a destructive fallback would wipe every setting
+                // on a downgrade instead of failing loudly
                 // single thread keeps the submitted runnables in order, off the main thread
                 .setQueryExecutor(Executors.newSingleThreadExecutor())
                 .build()

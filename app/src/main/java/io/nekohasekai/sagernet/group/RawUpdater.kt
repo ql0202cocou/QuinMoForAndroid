@@ -917,13 +917,12 @@ object RawUpdater : GroupUpdater() {
                 yaml["proxy-server-nameserver"],
                 dns?.get("nameserver")
             ).firstNotNullOfOrNull { candidate ->
-                when (candidate) {
+                val entries = when (candidate) {
                     is List<*> -> candidate.mapNotNull { it?.toString() }
                     is String -> listOf(candidate)
                     else -> emptyList()
-                }.map { it.trim().substringBefore("#") }
-                    .filter { it.isNotBlank() && it != "system" && !it.isLocalNameserverAddress() }
-                    .distinct()
+                }
+                entries.joinToString("\n").usableNameservers()
                     .joinToString("\n")
                     .takeIf { it.isNotBlank() }
             }

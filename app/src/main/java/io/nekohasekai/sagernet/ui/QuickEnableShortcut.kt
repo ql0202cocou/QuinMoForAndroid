@@ -29,6 +29,7 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.bg.stateOrStopped
 
 class QuickEnableShortcut : Activity(), SagerConnection.Callback {
     private val connection = SagerConnection(SagerConnection.CONNECTION_ID_SHORTCUT)
@@ -42,7 +43,7 @@ class QuickEnableShortcut : Activity(), SagerConnection.Callback {
     }
 
     override fun onServiceConnected(service: ISagerNetService) {
-        val state = BaseService.State.values()[service.state]
+        val state = service.stateOrStopped
         if (state == BaseService.State.Stopped) {
             SagerNet.startService()
         }

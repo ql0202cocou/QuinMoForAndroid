@@ -32,6 +32,8 @@ import moe.matsuri.nb4a.utils.toBytesString
 import java.lang.NumberFormatException
 import java.util.*
 
+private const val KEY_SELECTED_GROUP = "selectedGroupId"
+
 class GroupFragment : ToolbarFragment(R.layout.layout_group),
     Toolbar.OnMenuItemClickListener {
 
@@ -44,6 +46,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         activity = requireActivity() as MainActivity
+        savedInstanceState?.let { selectedGroupId = it.getLong(KEY_SELECTED_GROUP) }
 
         ViewCompat.setOnApplyWindowInsetsListener(view, ListListener)
         toolbar.setTitle(R.string.menu_group)
@@ -136,31 +139,26 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         return true
     }
 
-    private lateinit var selectedGroup: ProxyGroup
+    // The picker outlives this fragment: after process death the result is
+    // redelivered to a fresh instance whose menu click never ran, so the id has to
+    // come from the saved state rather than a field set by that click.
+    private var selectedGroupId = 0L
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putLong(KEY_SELECTED_GROUP, selectedGroupId)
+    }
 
     private val exportProfiles =
         registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { data ->
             if (data != null) {
+                val groupId = selectedGroupId
                 runOnDefaultDispatcher {
-                    val profiles = SagerDatabase.proxyDao.getByGroup(selectedGroup.id)
-                    val links = profiles.filter { it.haveLink() }
-                        .joinToString("\n") { it.toStdLink(compact = true) }
-                    try {
-                        (requireActivity() as MainActivity).contentResolver.openOutputStream(
-                            data
-                        )!!.bufferedWriter().use {
-                            it.write(links)
-                        }
-                        onMainDispatcher {
-                            snackbar(getString(R.string.action_export_msg)).show()
-                        }
-                    } catch (e: Exception) {
-                        Logs.w(e)
-                        onMainDispatcher {
-                            snackbar(e.readableMessage).show()
-                        }
-                    }
-
+                    val profiles = SagerDatabase.proxyDao.getByGroup(groupId)
+                    // writeToDocument refuses a blank export instead of truncating
+                    // the picked file: a group with no shareable node writes nothing
+                    writeToDocument(data, profiles.filter { it.haveLink() }
+                        .joinToString("\n") { it.toStdLink(compact = true) })
                 }
             }
         }
@@ -364,7 +362,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 R.id.action_export_clipboard -> {
                     runOnDefaultDispatcher {
-                        val profiles = SagerDatabase.proxyDao.getByGroup(selectedGroup.id)
+                        val profiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
                         val links = profiles.filter { it.haveLink() }
                             .joinToString("\n") { it.toStdLink(compact = true) }
                         onMainDispatcher {
@@ -415,7 +413,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
 
             optionsButton.setOnClickListener {
-                selectedGroup = proxyGroup
+                selectedGroupId = proxyGroup.id
 
                 val popup = PopupMenu(requireContext(), it)
                 popup.menuInflater.inflate(R.menu.group_action_menu, popup.menu)

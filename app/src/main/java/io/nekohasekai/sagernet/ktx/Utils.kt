@@ -10,6 +10,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Build
 import android.system.Os
 import android.system.OsConstants
@@ -184,6 +185,25 @@ fun Fragment.startFilesForResult(
     } catch (_: SecurityException) {
     }
     (requireActivity() as ThemedActivity).snackbar(getString(R.string.file_manager_missing)).show()
+}
+
+// Write an export to the document the user picked. Blank content means the state it
+// was built from died with the process: refuse instead of truncating the picked file
+// to 0 bytes and reporting success.
+suspend fun Fragment.writeToDocument(uri: Uri, content: String) {
+    if (content.isBlank()) {
+        onMainDispatcher { snackbar(getString(R.string.action_export_err)).show() }
+        return
+    }
+    try {
+        requireActivity().contentResolver.openOutputStream(uri)!!.use { stream ->
+            stream.bufferedWriter().use { it.write(content) }
+        }
+        onMainDispatcher { snackbar(getString(R.string.action_export_msg)).show() }
+    } catch (e: Exception) {
+        Logs.w(e)
+        onMainDispatcher { snackbar(e.readableMessage).show() }
+    }
 }
 
 fun Fragment.needReload() {

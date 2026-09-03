@@ -1,15 +1,13 @@
 package io.nekohasekai.sagernet.ui
 
-import android.os.Build
 import android.os.Bundle
 import android.view.View
-import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.android.material.tabs.TabLayoutMediator
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutToolsBinding
-import io.nekohasekai.sagernet.widget.ListListener
+import io.nekohasekai.sagernet.widget.padForSystemBars
 
 class ToolsFragment : ToolbarFragment(R.layout.layout_tools) {
 
@@ -23,9 +21,7 @@ class ToolsFragment : ToolbarFragment(R.layout.layout_tools) {
 
         val binding = LayoutToolsBinding.bind(view)
         // Pad the pager so the pages clear the gesture pill on API 35+
-        if (Build.VERSION.SDK_INT >= 35) {
-            ViewCompat.setOnApplyWindowInsetsListener(binding.toolsPager, ListListener)
-        }
+        binding.toolsPager.padForSystemBars()
         binding.toolsPager.adapter = ToolsAdapter(tools)
 
         TabLayoutMediator(binding.toolsTab, binding.toolsPager) { tab, position ->

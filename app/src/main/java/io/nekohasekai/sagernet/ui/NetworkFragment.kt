@@ -1,14 +1,12 @@
 package io.nekohasekai.sagernet.ui
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.view.View
-import androidx.core.view.ViewCompat
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutNetworkBinding
 import io.nekohasekai.sagernet.ktx.app
-import io.nekohasekai.sagernet.widget.ListListener
+import io.nekohasekai.sagernet.widget.padForSystemBars
 
 class NetworkFragment : NamedFragment(R.layout.layout_network) {
 
@@ -17,10 +15,7 @@ class NetworkFragment : NamedFragment(R.layout.layout_network) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Not a scrolling list: only pad against the gesture pill when edge-to-edge is enforced
-        if (Build.VERSION.SDK_INT >= 35) {
-            ViewCompat.setOnApplyWindowInsetsListener(view, ListListener)
-        }
+        view.padForSystemBars()
 
         val binding = LayoutNetworkBinding.bind(view)
         binding.stunTest.setOnClickListener {

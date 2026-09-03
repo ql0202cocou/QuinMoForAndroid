@@ -23,13 +23,7 @@ class TileService : BaseTileService(), SagerConnection.Callback {
         updateTile(state, profileName)
 
     override fun onServiceConnected(service: ISagerNetService) {
-        // The :bg binder may already be dying; treat a failed read as Stopped
-        // instead of crashing the main process.
-        updateTile(
-            runCatching { BaseService.State.values()[service.state] }
-                .getOrDefault(BaseService.State.Stopped),
-            runCatching { service.profileName }.getOrNull()
-        )
+        updateTile(service.stateOrStopped, runCatching { service.profileName }.getOrNull())
         if (tapPending) {
             tapPending = false
             onClick()
@@ -88,16 +82,14 @@ class TileService : BaseTileService(), SagerConnection.Callback {
     }
 
     private fun toggle() {
-        val service = connection.service
-        if (service == null) tapPending = true else {
-            // A tap racing binder death must not crash the main process;
-            // failing to read the state means the service is gone.
-            val state = runCatching { BaseService.State.values()[service.state] }
-                .getOrDefault(BaseService.State.Stopped)
-            when {
-                state.canStop -> SagerNet.stopService()
-                state == BaseService.State.Stopped -> SagerNet.startService()
-            }
+        val service = connection.service ?: run {
+            tapPending = true
+            return
+        }
+        val state = service.stateOrStopped
+        when {
+            state.canStop -> SagerNet.stopService()
+            state == BaseService.State.Stopped -> SagerNet.startService()
         }
     }
 }

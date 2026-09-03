@@ -26,7 +26,7 @@ import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
 import io.nekohasekai.sagernet.fmt.wireguard.buildSingBoxEndpointWireGuardBean
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.isIpAddress
-import io.nekohasekai.sagernet.ktx.isLocalNameserverAddress
+import io.nekohasekai.sagernet.ktx.usableNameservers
 import io.nekohasekai.sagernet.ktx.mkPort
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.utils.PackageCache
@@ -51,6 +51,10 @@ const val TAG_BYPASS = "bypass"
 const val TAG_BLOCK = "block"
 
 const val LOCALHOST = "127.0.0.1"
+
+// Shape of the tags buildConfig generates itself (g-<entryId>, c-<chainId>-…);
+// a user-chosen profile name matching it would collide with one.
+private val GENERATED_TAG_SHAPE = Regex("g-\\d+|c-\\d+.*")
 
 // sing-box 1.14 removed the legacy DNS server address format; map it to typed
 // servers the same way sing-box 1.13's internal upgrade did.
@@ -180,7 +184,7 @@ fun buildConfig(
         // a profile named like an auto-generated tag (g-<entryId>,
         // c-<chainId>-…) would collide with it; break the pattern up front —
         // appending "-N" alone keeps the "c-<digits>" prefix forever
-        val base = if (name_.matches(Regex("g-\\d+|c-\\d+.*"))) "p-$name_" else name_
+        val base = if (name_.matches(GENERATED_TAG_SHAPE)) "p-$name_" else name_
         var name = base
         var count = 0
         while (selectorNames.contains(name) || name in reservedSelectorTags) {
@@ -217,18 +221,7 @@ fun buildConfig(
     // per-group nameserver: resolve this group's node server domains with it,
     // multiple addresses (one per line) are used in order with fallback.
     // forTest honors it too: a fake node domain may only resolve through it.
-    // Loopback entries (stored by old versions or entered by hand) are dead on
-    // device — drop them here as well, not only at subscription parse time.
-    val groupNameservers = group?.proxyServerNameserver?.split("\n")
-        ?.mapNotNull { dns ->
-            // strip mihomo-style "#h3" suffixes like RawUpdater does at mirror
-            // time — a stored/hand-entered one would leak into the DoH path
-            dns.trim().substringBefore("#").trim().takeIf {
-                it.isNotBlank() && !it.isLocalNameserverAddress()
-            }
-        }
-        ?.distinct()
-        ?: listOf()
+    val groupNameservers = group?.proxyServerNameserver.usableNameservers()
     val groupNsDomains = LinkedHashSet<String>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST

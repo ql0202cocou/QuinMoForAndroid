@@ -176,7 +176,6 @@ class VpnService : BaseVpnService(),
         }
 
         updateUnderlyingNetwork(builder)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) builder.setMetered(metered)
 
         // app route
         val packageName = packageName

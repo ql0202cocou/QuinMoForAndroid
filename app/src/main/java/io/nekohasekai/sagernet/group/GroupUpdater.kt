@@ -21,6 +21,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.nio.channels.FileLock
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -162,20 +163,15 @@ abstract class GroupUpdater {
                     val channel = RandomAccessFile(
                         File(SagerNet.application.filesDir, "group_update_${proxyGroup.id}.lock"), "rw"
                     ).channel
+                    // tryLock can return null or throw (e.g. EMFILE); close the channel
+                    // unless we hand it out, or each failed attempt leaks an fd
+                    var lock: FileLock? = null
                     try {
-                        val lock = channel.tryLock()
-                        if (lock == null) {
-                            channel.close()
-                            null
-                        } else {
-                            channel to lock
-                        }
-                    } catch (e: Throwable) {
-                        // tryLock can throw too (e.g. EMFILE): close the channel
-                        // on that path as well, or each failed attempt leaks an fd
-                        runCatching { channel.close() }
-                        throw e
+                        lock = channel.tryLock()
+                    } finally {
+                        if (lock == null) channel.close()
                     }
+                    lock?.let { channel to it }
                 } catch (e: Throwable) {
                     Logs.w(e)
                     null

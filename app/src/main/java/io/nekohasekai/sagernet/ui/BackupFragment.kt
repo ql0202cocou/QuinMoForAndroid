@@ -40,32 +40,8 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
     private val exportSettings =
         registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { data ->
             if (data != null) {
-                runOnDefaultDispatcher {
-                    try {
-                        // Process death with the picker foreground loses
-                        // content; do not write a 0-byte file on top of the
-                        // user's chosen location and report success.
-                        if (content.isBlank()) {
-                            onMainDispatcher {
-                                snackbar(getString(R.string.action_export_err)).show()
-                            }
-                            return@runOnDefaultDispatcher
-                        }
-                        requireActivity().contentResolver.openOutputStream(
-                            data
-                        )!!.bufferedWriter().use {
-                            it.write(content)
-                        }
-                        onMainDispatcher {
-                            snackbar(getString(R.string.action_export_msg)).show()
-                        }
-                    } catch (e: Exception) {
-                        Logs.w(e)
-                        onMainDispatcher {
-                            snackbar(e.readableMessage).show()
-                        }
-                    }
-                }
+                // Process death with the picker foreground loses content
+                runOnDefaultDispatcher { writeToDocument(data, content) }
             }
         }
 
@@ -145,6 +121,20 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             parcel.recycle()
         }
     }
+
+    // Inverse of toBase64Str(): null when the record cannot be decoded, so a
+    // single corrupt entry is skipped instead of failing the whole import.
+    private inline fun <T> unmarshal(b64: String, create: (Parcel) -> T): T? = runCatching {
+        val data = Util.b64Decode(b64)
+        val parcel = Parcel.obtain()
+        try {
+            parcel.unmarshall(data, 0, data.size)
+            parcel.setDataPosition(0)
+            create(parcel)
+        } finally {
+            parcel.recycle()
+        }
+    }.getOrNull()
 
     fun doBackup(profile: Boolean, rule: Boolean, setting: Boolean): String {
         val out = JSONObject().apply {
@@ -300,22 +290,14 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             val profiles = mutableListOf<ProxyEntity>()
             val jsonProfiles = content.getJSONArray("profiles")
             for (i in 0 until jsonProfiles.length()) {
-                val entity = runCatching {
-                    val data = Util.b64Decode(jsonProfiles[i] as String)
-                    val parcel = Parcel.obtain()
-                    try {
-                        parcel.unmarshall(data, 0, data.size)
-                        parcel.setDataPosition(0)
-                        ProxyEntity.CREATOR.createFromParcel(parcel).also {
-                            // Unknown types leave every bean null (putByteArray
-                            // has no else); the configuration list would crash
-                            // in requireBean() when binding such a record.
-                            it.requireBean()
-                        }
-                    } finally {
-                        parcel.recycle()
+                val entity = unmarshal(jsonProfiles[i] as String) {
+                    ProxyEntity.CREATOR.createFromParcel(it).also { entity ->
+                        // Unknown types leave every bean null (putByteArray has no
+                        // else); the configuration list would crash in requireBean()
+                        // when binding such a record.
+                        entity.requireBean()
                     }
-                }.getOrNull()
+                }
                 if (entity == null) {
                     skippedRecords++
                     continue
@@ -326,17 +308,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             val groups = mutableListOf<ProxyGroup>()
             val jsonGroups = content.getJSONArray("groups")
             for (i in 0 until jsonGroups.length()) {
-                val group = runCatching {
-                    val data = Util.b64Decode(jsonGroups[i] as String)
-                    val parcel = Parcel.obtain()
-                    try {
-                        parcel.unmarshall(data, 0, data.size)
-                        parcel.setDataPosition(0)
-                        ProxyGroup.CREATOR.createFromParcel(parcel)
-                    } finally {
-                        parcel.recycle()
-                    }
-                }.getOrNull()
+                val group = unmarshal(jsonGroups[i] as String, ProxyGroup.CREATOR::createFromParcel)
                 if (group == null) {
                     skippedRecords++
                     continue
@@ -354,17 +326,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             val rules = mutableListOf<RuleEntity>()
             val jsonRules = content.getJSONArray("rules")
             for (i in 0 until jsonRules.length()) {
-                val ruleEntity = runCatching {
-                    val data = Util.b64Decode(jsonRules[i] as String)
-                    val parcel = Parcel.obtain()
-                    try {
-                        parcel.unmarshall(data, 0, data.size)
-                        parcel.setDataPosition(0)
-                        ParcelizeBridge.createRule(parcel)
-                    } finally {
-                        parcel.recycle()
-                    }
-                }.getOrNull()
+                val ruleEntity = unmarshal(jsonRules[i] as String, ParcelizeBridge::createRule)
                 if (ruleEntity == null) {
                     skippedRecords++
                     continue
@@ -380,17 +342,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             val settings = mutableListOf<KeyValuePair>()
             val jsonSettings = content.getJSONArray("settings")
             for (i in 0 until jsonSettings.length()) {
-                val kvPair = runCatching {
-                    val data = Util.b64Decode(jsonSettings[i] as String)
-                    val parcel = Parcel.obtain()
-                    try {
-                        parcel.unmarshall(data, 0, data.size)
-                        parcel.setDataPosition(0)
-                        KeyValuePair.CREATOR.createFromParcel(parcel)
-                    } finally {
-                        parcel.recycle()
-                    }
-                }.getOrNull()
+                val kvPair = unmarshal(jsonSettings[i] as String, KeyValuePair.CREATOR::createFromParcel)
                 if (kvPair == null) {
                     skippedRecords++
                     continue

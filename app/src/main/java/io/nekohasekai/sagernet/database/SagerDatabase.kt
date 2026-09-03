@@ -78,7 +78,9 @@ abstract class SagerDatabase : RoomDatabase() {
                 .setJournalMode(JournalMode.TRUNCATE)
                 .allowMainThreadQueries()
                 .enableMultiInstanceInvalidation()
-                .fallbackToDestructiveMigration()
+                // No destructive fallback: it silently drops every profile, group and
+                // rule whenever a migration is missing — which a downgrade to an older
+                // APK always is. Failing to open keeps the data recoverable.
                 // single thread keeps the submitted runnables in order, off the main thread
                 .setQueryExecutor(Executors.newSingleThreadExecutor())
                 .build()

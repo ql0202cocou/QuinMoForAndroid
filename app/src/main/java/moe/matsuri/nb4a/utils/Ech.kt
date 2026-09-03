@@ -20,15 +20,10 @@ private fun String.echPemBody(): String =
         .substringBefore(ECH_PEM_FOOTER)
         .substringBefore(ECH_PEM_HEADER)
 
+fun String.echAsBase64(): String =
+    (if (contains(ECH_PEM_HEADER)) echPemBody() else this).filterNot { it.isWhitespace() }
+
 // sing-box joins the Listable with "\n" before pem.Decode, and rejects any
 // trailing bytes, so emit exactly one block and nothing after it.
-fun String.echAsPem(): String {
-    val body = (if (contains(ECH_PEM_HEADER)) echPemBody() else this)
-        .filterNot { it.isWhitespace() }
-    return (listOf(ECH_PEM_HEADER) + body.chunked(64) + ECH_PEM_FOOTER).joinToString("\n")
-}
-
-fun String.echAsBase64(): String {
-    if (!contains(ECH_PEM_HEADER)) return filterNot { it.isWhitespace() }
-    return echPemBody().filterNot { it.isWhitespace() }
-}
+fun String.echAsPem(): String =
+    (listOf(ECH_PEM_HEADER) + echAsBase64().chunked(64) + ECH_PEM_FOOTER).joinToString("\n")

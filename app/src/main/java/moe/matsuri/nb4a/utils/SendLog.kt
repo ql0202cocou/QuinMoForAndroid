@@ -65,11 +65,14 @@ object SendLog {
                 "neko.log"
             )
             val len = file.length()
-            val stream = FileInputStream(file)
-            if (max in 1 until len) {
-                stream.skip(len - max) // TODO string?
+            FileInputStream(file).use { stream ->
+                // seek inside use(): a throwing seek used to leak the fd, and
+                // position() lands exactly where skip() may move less than asked
+                if (max in 1 until len) {
+                    stream.channel.position(len - max) // TODO string?
+                }
+                stream.readBytes()
             }
-            stream.use { it.readBytes() }
         } catch (e: Exception) {
             e.stackTraceToString().toByteArray()
         }

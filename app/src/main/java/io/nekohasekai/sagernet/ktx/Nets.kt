@@ -71,20 +71,23 @@ fun String.isLocalNameserverAddress(): Boolean {
     return ip.isLoopbackAddress || ip.isAnyLocalAddress
 }
 
+// One address per line. Strips mihomo-style "#h3" suffixes, the clash "system"/"local"
+// sentinels and loopback/unspecified entries, so every reader of a group's
+// proxyServerNameserver — the config builder, the resolver, the subscription mirror —
+// agrees on what counts as a usable address.
+fun String?.usableNameservers(): List<String> = this?.lineSequence()
+    ?.map { it.trim().substringBefore("#").trim() }
+    ?.filter {
+        it.isNotBlank() && it != "system" && it != "local" && !it.isLocalNameserverAddress()
+    }
+    ?.distinct()?.toList() ?: emptyList()
+
 // Resolve via the group's proxyServerNameserver (first usable address, e.g. DoH);
 // returns null on failure so callers can fall back to system DNS.
 // Note: Libcore.lookupHost does not cache, so callers on a per-profile path
 // should memoize — a dead nameserver costs the full timeout every call.
 fun lookupViaNameserver(nameserver: String?, domain: String): List<InetAddress>? {
-    val server = nameserver
-        // strip mihomo-style "#h3" suffixes like RawUpdater does at mirror
-        // time — a stored/hand-entered one would break the lookup address
-        ?.lineSequence()?.map { it.trim().substringBefore("#").trim() }
-        ?.firstOrNull {
-            it.isNotBlank() && it != "local" &&
-                    !it.isLocalNameserverAddress()
-        }
-        ?: return null
+    val server = nameserver.usableNameservers().firstOrNull() ?: return null
     return try {
         Libcore.lookupHost(server, domain).lineSequence()
             .mapNotNull { it.trim().parseNumericAddress() }

@@ -186,3 +186,9 @@ class SagerConnection(
         callback = null
     }
 }
+
+// The :bg binder may already be dying; a failed read must not crash the caller's
+// process, so treat it as Stopped.
+val ISagerNetService.stateOrStopped: BaseService.State
+    get() = runCatching { BaseService.State.values()[state] }
+        .getOrDefault(BaseService.State.Stopped)
