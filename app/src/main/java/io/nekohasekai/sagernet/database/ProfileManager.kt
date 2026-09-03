@@ -91,13 +91,6 @@ object ProfileManager {
         iterator { onUpdated(profile, false) }
     }
 
-    suspend fun updateProfile(profiles: List<ProxyEntity>) {
-        SagerDatabase.proxyDao.updateProxy(profiles)
-        profiles.forEach {
-            iterator { onUpdated(it, false) }
-        }
-    }
-
     // Snapshot-safe partial writes: the entity may have been read at VPN/test
     // start, so only the columns this caller owns go back to the DB.
 

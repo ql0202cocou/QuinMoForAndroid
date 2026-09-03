@@ -22,18 +22,13 @@ func LookupHost(server string, domain string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Try AAAA whenever A yielded nothing — including when A failed outright
-	// (REFUSED, timeout): an IPv6-only name behind a resolver that rejects the
-	// A query would otherwise never resolve.
+	// An empty answer covers NOERROR-empty, NXDOMAIN and REFUSED alike —
+	// lookupHostType does not inspect Rcode, so those all return (nil, nil) and
+	// still reach the AAAA leg. Only a transport-level failure short-circuits,
+	// and retrying that over the same server would just burn the timeout twice.
 	addresses, err := lookupHostType(ctx, server, domain, mDNS.TypeA)
-	if len(addresses) == 0 {
-		addresses6, err6 := lookupHostType(ctx, server, domain, mDNS.TypeAAAA)
-		if len(addresses6) > 0 {
-			return strings.Join(addresses6, "\n"), nil
-		}
-		if err == nil {
-			err = err6
-		}
+	if err == nil && len(addresses) == 0 {
+		addresses, err = lookupHostType(ctx, server, domain, mDNS.TypeAAAA)
 	}
 	if err != nil {
 		return "", err

@@ -100,16 +100,20 @@ class TrafficLooper
     // the mercy of anyone holding this public object's monitor.
     private val statsLock = Any()
 
-    // The UI cleared the tx/rx columns in the DB: drop the counters this loop
-    // carries too, or the next persistStats/stop writes the pre-clear totals
-    // straight back. Under statsLock like every other read-modify-write here.
-    fun clearStats() {
+    // The UI cleared the tx/rx columns of these profiles in the DB: drop the
+    // counters this loop carries for them too, or the next persistStats/stop
+    // writes the pre-clear totals straight back. Scoped to the ids the UI
+    // actually cleared — it clears one group, the loop spans every profile in
+    // the running config. Under statsLock like every other read-modify-write here.
+    fun clearStats(profileIds: LongArray) {
         synchronized(statsLock) {
-            idMap.values.forEach {
-                it.rx = 0
-                it.tx = 0
-                it.rxBase = 0
-                it.txBase = 0
+            for (id in profileIds) {
+                idMap[id]?.apply {
+                    rx = 0
+                    tx = 0
+                    rxBase = 0
+                    txBase = 0
+                }
             }
         }
     }

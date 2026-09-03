@@ -565,9 +565,6 @@ data class ProxyEntity(
         @Update
         fun updateProxy(proxy: ProxyEntity): Int
 
-        @Update
-        fun updateProxy(proxies: List<ProxyEntity>): Int
-
         // tx/rx only: callers hold a snapshot read at VPN/test start, and a
         // full-row @Update would roll back concurrent edits on the other columns
         @Query("UPDATE proxy_entities SET tx = :tx, rx = :rx WHERE id = :id")

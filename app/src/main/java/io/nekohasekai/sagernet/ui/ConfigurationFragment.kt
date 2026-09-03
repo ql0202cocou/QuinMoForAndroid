@@ -477,21 +477,24 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_clear_traffic_statistics -> {
                 runOnDefaultDispatcher {
-                    val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
-                    val toClear = profiles.filter { it.tx != 0L || it.rx != 0L }
+                    val toClear = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
+                        .filter { it.tx != 0L || it.rx != 0L }
                     if (toClear.isNotEmpty()) {
-                        // tx/rx only: a full-row update would roll back the
-                        // status/ping a concurrent URL test just wrote
-                        for (profile in toClear) {
-                            profile.tx = 0
-                            profile.rx = 0
-                            ProfileManager.updateTraffic(profile)
+                        // tx/rx only, and in one transaction like GroupManager.rearrange:
+                        // a full-row update would roll back the status/ping a concurrent
+                        // URL test just wrote, and a write per row would be N commits
+                        // against :bg's own traffic writer
+                        SagerDatabase.instance.runInTransaction {
+                            for (profile in toClear) {
+                                profile.tx = 0
+                                profile.rx = 0
+                                SagerDatabase.proxyDao.updateTraffic(profile.id, 0, 0)
+                            }
                         }
                         // :bg keeps its own counters; without this the running
                         // looper persists the pre-clear totals right back
-                        SagerNet.clearTrafficStatistics()
-                        // updateTraffic is a bare column write, so post the
-                        // refresh the list adapter needs ourselves
+                        SagerNet.clearTrafficStatistics(toClear.map { it.id }.toLongArray())
+                        // the bare column write posts nothing, so refresh the list here
                         for (profile in toClear) ProfileManager.postUpdate(profile)
                     }
                 }
@@ -499,18 +502,19 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_connection_test_clear_results -> {
                 runOnDefaultDispatcher {
-                    val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
-                    val toClear = profiles.filter { it.status != 0 }
-                    if (toClear.isNotEmpty()) {
-                        // status/ping/error only, same reason as above (tx/rx are
-                        // written by :bg while this runs)
+                    val toClear = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
+                        .filter { it.status != 0 }
+                    SagerDatabase.instance.runInTransaction {
                         for (profile in toClear) {
                             profile.status = 0
                             profile.ping = 0
                             profile.error = null
-                            ProfileManager.updateStatus(profile)
+                            SagerDatabase.proxyDao.updateStatus(profile.id, 0, 0, null)
                         }
                     }
+                    // updateStatus posts on its own, but not from inside the
+                    // transaction above (it is suspend)
+                    for (profile in toClear) ProfileManager.postUpdate(profile)
                 }
             }
 

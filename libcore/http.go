@@ -171,24 +171,18 @@ func (c *httpClient) NewRequest() HTTPRequest {
 		Method: "GET",
 		Header: http.Header{},
 	}
-	// The shared transport keeps pointing at c.tls. Pointing it at this
-	// request's clone instead would leak whatever the request does to its
-	// config (AllowInsecure) into every other request in flight on the same
-	// client; requests that need their own config get their own transport in
-	// Execute below.
 	return req
 }
 
-// perRequestTransport mirrors the shared transport, minus the connection pool,
-// for a request whose TLS config differs from the client's. Keep-alive is off
-// so the isolated pool cannot outlive the request.
+// perRequestTransport clones the shared transport for a request whose TLS config
+// differs from the client's — Clone carries every option the client set (dialer,
+// timeouts, ForceAttemptHTTP2), so this cannot drift out of sync with
+// NewHttpClient/TrySocks5/KeepAlive.
 func (r *httpRequest) perRequestTransport() *http.Transport {
-	return &http.Transport{
-		TLSClientConfig:       r.tls,
-		DialContext:           r.h1h2Transport.DialContext,
-		ResponseHeaderTimeout: r.h1h2Transport.ResponseHeaderTimeout,
-		DisableKeepAlives:     true,
-	}
+	t := r.h1h2Transport.Clone()
+	t.TLSClientConfig = r.tls
+	t.DisableKeepAlives = true // an isolated pool must not outlive the request
+	return t
 }
 
 func (c *httpClient) Close() {

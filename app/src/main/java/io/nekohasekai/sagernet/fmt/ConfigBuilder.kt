@@ -589,9 +589,11 @@ fun buildConfig(
                     // ...but it still needs a tagMap entry: profileTagMap drives
                     // selector switching, and without one, selecting this member
                     // while connected resolves to a blank tag and does nothing.
-                    // A member pulled in as the exit of another member's chain
-                    // has a global outbound; a mere middle hop has none and
-                    // genuinely cannot be selected on its own.
+                    // Only the first hop of another member's chain has a global
+                    // outbound of its own (globalOutbounds is filled at
+                    // profileList.lastIndex, which resolveChain reverses to the
+                    // hop dialed first); a middle hop has none and genuinely
+                    // cannot be selected on its own.
                     globalOutbounds[it.id]?.let { tag -> tagMap[it.id] = tag }
                     return@forEach
                 }
@@ -600,9 +602,9 @@ fun buildConfig(
             outbounds.add(0, Outbound_SelectorOptions().apply {
                 type = "selector"
                 tag = TAG_PROXY
-                // never null: sing-box would then fall back to whichever outbound
-                // happens to be listed first, which is not the selected profile
-                default_ = tagMap[proxy.id] ?: tagMap.values.firstOrNull()
+                // null only for the middle-hop case above; sing-box then selects
+                // outbounds[0], which is what any fallback here would pick too
+                default_ = tagMap[proxy.id]
                 // a chain whose exit node is also a group member maps to that
                 // member's tag via the globalOutbounds dedup — list it once
                 outbounds = tagMap.values.distinct()

@@ -72,14 +72,14 @@ object Util {
         val inflater = Inflater()
         val outputStream = ByteArrayOutputStream()
 
-        return outputStream.use {
-            val buffer = ByteArray(1024)
+        // end() in a finally: a corrupt link throws below, and the native
+        // buffer would otherwise leak until the finalizer runs
+        try {
+            return outputStream.use {
+                val buffer = ByteArray(1024)
 
-            inflater.setInput(input)
+                inflater.setInput(input)
 
-            // end() in a finally: a corrupt link throws below, and the native
-            // buffer would otherwise leak until the finalizer runs
-            try {
                 // 0 means no progress possible (truncated or corrupt input);
                 // don't silently return partial data
                 while (!inflater.finished()) {
@@ -87,11 +87,11 @@ object Util {
                     if (count == 0) throw DataFormatException("invalid or truncated zlib data")
                     outputStream.write(buffer, 0, count)
                 }
-            } finally {
-                inflater.end()
-            }
 
-            outputStream.toByteArray()
+                outputStream.toByteArray()
+            }
+        } finally {
+            inflater.end()
         }
     }
 

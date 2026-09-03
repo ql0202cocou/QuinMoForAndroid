@@ -191,26 +191,21 @@ fun Fragment.startFilesForResult(
 // was built from died with the process: refuse instead of truncating the picked file
 // to 0 bytes and reporting success.
 suspend fun Fragment.writeToDocument(uri: Uri, content: String) {
-    // Callers dispatch this on GlobalScope, so the fragment can already be
-    // detached — requireActivity()/getString() would throw out of a coroutine
-    // nobody catches. Resolve the activity once and report through it.
-    val activity = activity as? ThemedActivity ?: return
-    suspend fun report(text: CharSequence) = onMainDispatcher {
-        if (isAdded) activity.snackbar(text).show()
-    }
-    if (content.isBlank()) {
-        report(app.getString(R.string.action_export_err))
-        return
-    }
-    try {
-        activity.contentResolver.openOutputStream(uri)!!.use { stream ->
+    // Callers dispatch this on GlobalScope and the fragment can be detached by
+    // now. The SAF grant belongs to the package, so write through the app
+    // context regardless, and only report if there is still a UI to report to.
+    val message = if (content.isBlank()) {
+        app.getString(R.string.action_export_err)
+    } else try {
+        app.contentResolver.openOutputStream(uri)!!.use { stream ->
             stream.bufferedWriter().use { it.write(content) }
         }
-        report(app.getString(R.string.action_export_msg))
+        app.getString(R.string.action_export_msg)
     } catch (e: Exception) {
         Logs.w(e)
-        report(e.readableMessage)
+        e.readableMessage
     }
+    onMainDispatcher { if (isAdded) snackbar(message).show() }
 }
 
 fun Fragment.needReload() {

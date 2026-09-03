@@ -348,9 +348,9 @@ class AssetsActivity : ThemedActivity() {
                 if (!cacheFile.renameTo(file)) {
                     throw IOException("cannot replace ${file.absolutePath}")
                 }
-            } catch (e: Exception) {
+            } finally {
+                // no-op after a successful rename; drops a truncated download otherwise
                 cacheFile.delete()
-                throw e
             }
 
             versionFile.writeText(tagName)

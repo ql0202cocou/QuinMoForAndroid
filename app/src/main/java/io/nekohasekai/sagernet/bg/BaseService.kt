@@ -78,9 +78,15 @@ class BaseService {
                     }
                 }
 
-                // the UI already zeroed the tx/rx columns; drop the live
-                // counters so the looper does not write the old totals back
-                Action.CLEAR_TRAFFIC_STATISTICS -> proxy?.looper?.clearStats()
+                Action.CLEAR_TRAFFIC_STATISTICS -> {
+                    val ids = intent.getLongArrayExtra(Action.EXTRA_PROFILE_IDS)
+                    // off the receiver's main thread: clearStats contends with
+                    // the looper's stats sweep, which holds statsLock across
+                    // its JNI queryStats calls
+                    if (ids != null) runOnDefaultDispatcher {
+                        proxy?.looper?.clearStats(ids)
+                    }
+                }
 
                 Action.RESET_UPSTREAM_CONNECTIONS -> runOnDefaultDispatcher {
                     Libcore.resetAllConnections(true)
