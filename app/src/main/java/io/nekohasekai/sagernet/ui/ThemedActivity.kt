@@ -3,6 +3,8 @@ package io.nekohasekai.sagernet.ui
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.annotation.StringRes
@@ -10,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.fragment.app.DialogFragment
 import com.google.android.material.appbar.AppBarLayout
@@ -26,6 +29,9 @@ abstract class ThemedActivity : AppCompatActivity {
     var uiMode = 0
     open val isDialog = false
 
+    // Navigation bar bottom inset, tracked on API 35+ to lift snackbars above the gesture pill
+    private var navigationBarInset = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         if (!isDialog) {
             Theme.apply(this)
@@ -41,6 +47,7 @@ abstract class ThemedActivity : AppCompatActivity {
         if (Build.VERSION.SDK_INT >= 35) {
             ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { _, insets ->
                 val top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top
+                navigationBarInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
                 findViewById<AppBarLayout>(R.id.appbar)?.apply {
                     updatePadding(top = top)
 //                Logs.w("appbar $top")
@@ -72,6 +79,21 @@ abstract class ThemedActivity : AppCompatActivity {
     fun snackbar(text: CharSequence): Snackbar = snackbarInternal(text).apply {
         view.findViewById<TextView>(com.google.android.material.R.id.snackbar_text).apply {
             maxLines = 10
+        }
+        // Edge-to-edge on API 35+: lift the snackbar above the gesture pill.
+        // An anchored snackbar (MainActivity anchors to the FAB when shown)
+        // already clears it, so do not add the margin on top of the anchor.
+        if (navigationBarInset > 0 && anchorView == null) {
+            view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                        bottomMargin += navigationBarInset
+                    }
+                    v.removeOnAttachStateChangeListener(this)
+                }
+
+                override fun onViewDetachedFromWindow(v: View) {}
+            })
         }
     }
 

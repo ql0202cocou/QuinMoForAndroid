@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.ui
 
 import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.MenuItem
@@ -9,11 +10,13 @@ import android.view.ViewGroup
 import android.webkit.*
 import android.widget.EditText
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.ViewCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.databinding.LayoutWebviewBinding
+import io.nekohasekai.sagernet.widget.ListListener
 import moe.matsuri.nb4a.utils.WebViewUtil
 
 // Fragment必须有一个无参public的构造函数，否则在数据恢复的时候，会报crash
@@ -32,6 +35,11 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
         toolbar.setOnMenuItemClickListener(this)
 
         val binding = LayoutWebviewBinding.bind(view)
+
+        // Pad the root wrapper (not the WebView itself) against the gesture pill
+        if (Build.VERSION.SDK_INT >= 35) {
+            ViewCompat.setOnApplyWindowInsetsListener(view, ListListener)
+        }
 
         // webview
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)

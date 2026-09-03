@@ -14,6 +14,9 @@ import androidx.activity.addCallback
 import androidx.annotation.IdRes
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.preference.PreferenceDataStore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
@@ -73,6 +76,30 @@ class MainActivity : ThemedActivity(),
             binding.drawerLayout.removeView(binding.navView)
         }
         navigation.setNavigationItemSelectedListener(this)
+
+        if (Build.VERSION.SDK_INT >= 35) {
+            // Edge-to-edge: the gesture pill overlaps the bottom of the stats
+            // bar. Pad its inner layout so the text stays above the pill while
+            // the bar's background band extends under it. The FAB is anchored
+            // to the bar's top edge, which only moves up as the bar grows.
+            val statsBottomPadding = binding.statsContent.paddingBottom
+            ViewCompat.setOnApplyWindowInsetsListener(binding.statsContent) { v, insets ->
+                v.updatePadding(
+                    bottom = statsBottomPadding +
+                        insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                )
+                insets
+            }
+            // Drawer menus are full height: keep the first/last items clear
+            // of the status bar and the gesture pill.
+            ViewCompat.setOnApplyWindowInsetsListener(navigation) { v, insets ->
+                v.updatePadding(
+                    top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top,
+                    bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                )
+                insets
+            }
+        }
 
         if (savedInstanceState == null) {
             displayFragmentWithId(R.id.nav_configuration)

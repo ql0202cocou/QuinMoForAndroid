@@ -2,12 +2,14 @@ package io.nekohasekai.sagernet.ui
 
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutStunBinding
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.widget.ListListener
 import libcore.Libcore
 
 class StunActivity : ThemedActivity() {
@@ -28,6 +30,7 @@ class StunActivity : ThemedActivity() {
         binding.stunTest.setOnClickListener {
             doTest()
         }
+        ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout, ListListener)
     }
 
     fun doTest() {

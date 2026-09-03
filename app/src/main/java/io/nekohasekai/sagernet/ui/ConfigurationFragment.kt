@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.ui
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.OpenableColumns
@@ -24,9 +25,12 @@ import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.net.toUri
 import androidx.core.os.BundleCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.size
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.preference.PreferenceDataStore
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -1205,6 +1209,20 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             configurationListView = view.findViewById(R.id.configuration_list)
+            if (Build.VERSION.SDK_INT >= 35) {
+                // Edge-to-edge: the XML's fixed 48dp bottom padding predates
+                // edge-to-edge; never let the gesture pill cover list content.
+                val listBottomPadding = configurationListView.paddingBottom
+                ViewCompat.setOnApplyWindowInsetsListener(configurationListView) { v, insets ->
+                    v.updatePadding(
+                        bottom = maxOf(
+                            listBottomPadding,
+                            insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                        )
+                    )
+                    insets
+                }
+            }
             layoutManager = FixedLinearLayoutManager(configurationListView)
             configurationListView.layoutManager = layoutManager
             adapter = ConfigurationAdapter()
