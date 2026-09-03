@@ -44,6 +44,10 @@ jobs:
               "platforms;android-36" "build-tools;36.0.0" > /dev/null
           fi
       - name: Gradle Build
+        env:
+          # assets.sh resolves the latest geoip/geosite release via the GitHub API;
+          # unauthenticated calls from shared runner IPs hit the 60/h rate limit.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           # only point ndk.dir at NDK 25 when it is actually installed; the app has

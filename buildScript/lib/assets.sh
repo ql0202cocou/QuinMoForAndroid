@@ -11,9 +11,13 @@ trap 'rm -rf "$TMP"' EXIT
 cd $TMP
 
 get_latest_release() {
-  curl --silent "https://api.github.com/repos/$1/releases/latest" | # Get latest release from GitHub api
-    grep '"tag_name":' |                                            # Get tag line
-    sed -E 's/.*"([^"]+)".*/\1/'                                    # Pluck JSON value
+  # Unauthenticated API calls are rate-limited to 60/h per IP, which shared CI
+  # runner IPs exhaust constantly — pass GITHUB_TOKEN when the workflow provides it.
+  local auth=()
+  [ -n "$GITHUB_TOKEN" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  curl --silent "${auth[@]}" "https://api.github.com/repos/$1/releases/latest" | # Get latest release from GitHub api
+    grep '"tag_name":' |                                                          # Get tag line
+    sed -E 's/.*"([^"]+)".*/\1/'                                                  # Pluck JSON value
 }
 
 # Both repos publish a "<file>.sha256sum" next to the db. Without it a truncated
