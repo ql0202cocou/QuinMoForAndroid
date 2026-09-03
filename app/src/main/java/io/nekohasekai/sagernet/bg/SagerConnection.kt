@@ -13,6 +13,7 @@ import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback
 import io.nekohasekai.sagernet.aidl.SpeedDisplayData
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 
 class SagerConnection(
@@ -120,7 +121,9 @@ class SagerConnection(
         this.service = service
         try {
             if (listenForDeath) binder.linkToDeath(this, 0)
-            check(!callbackRegistered)
+            // a second onServiceConnected without a disconnect in between must not
+            // throw out of a system callback; re-registering is harmless
+            if (callbackRegistered) Logs.w("callback already registered, registering again")
             service.registerCallback(serviceCallback, connectionId)
             callbackRegistered = true
         } catch (e: RemoteException) {

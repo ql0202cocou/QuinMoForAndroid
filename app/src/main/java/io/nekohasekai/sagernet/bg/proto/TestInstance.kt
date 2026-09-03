@@ -8,7 +8,7 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.buildConfig
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.mkPort
-import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ktx.runOnIoDispatcher
 import io.nekohasekai.sagernet.ktx.tryResume
 import io.nekohasekai.sagernet.ktx.tryResumeWithException
 import kotlinx.coroutines.CancellationException
@@ -46,6 +46,13 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
 
     override fun mihomoTestController(): Pair<Int, String>? = mihomoController
 
+    companion object {
+        // One dispatcher and connection pool for every test: a fresh OkHttpClient per
+        // node keeps its own idle threads and pooled sockets alive for a minute.
+        // newBuilder() below shares both while overriding the timeouts.
+        private val sharedHttpClient by lazy { OkHttpClient() }
+    }
+
     suspend fun doTest(): Int {
         return suspendCancellableCoroutine { c ->
             // CancellableContinuation hides the ktx tryResume extensions behind
@@ -61,7 +68,10 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
                 // linger after the caller gave up. close() is idempotent.
                 runCatching { close() }
             }
-            runOnDefaultDispatcher {
+            // Dispatchers.IO, not Default: Libcore.urlTest and mihomoDelay block for
+            // seconds, and connectionTestConcurrent of them would saturate Default —
+            // where TrafficLooper and most of the app's background work also live.
+            runOnIoDispatcher {
                 try {
                     use {
                         try {
@@ -115,7 +125,7 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
     // mihomo -> sing-box mapping inbound -> real server.
     private fun mihomoDelay(controller: Pair<Int, String>): Int {
         val (port, secret) = controller
-        val client = OkHttpClient.Builder()
+        val client = sharedHttpClient.newBuilder()
             .connectTimeout(2, TimeUnit.SECONDS)
             .readTimeout(mihomoTimeout + 3000L, TimeUnit.MILLISECONDS)
             .build()

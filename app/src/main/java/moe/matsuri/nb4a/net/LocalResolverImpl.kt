@@ -37,18 +37,30 @@ object LocalResolverImpl : LocalDNSTransport {
         val signal = CancellationSignal()
         ctx.onCancel(signal::cancel)
 
+        // These run on the executor thread, outside the JNI call that gomobile turns
+        // into a Go error — an escaping exception here has nobody to catch it. Same
+        // guards as lookup() below.
         val callback = object : DnsResolver.Callback<ByteArray> {
             override fun onAnswer(answer: ByteArray, rcode: Int) {
-                ctx.rawSuccess(answer)
+                try {
+                    ctx.rawSuccess(answer)
+                } catch (e: Exception) {
+                    Logs.w(e)
+                    ctx.errnoCode(114514)
+                }
             }
 
             override fun onError(error: DnsResolver.DnsException) {
-                val cause = error.cause
-                if (cause is ErrnoException) {
-                    ctx.errnoCode(cause.errno)
-                } else {
-                    Logs.w(error)
-                    ctx.errnoCode(114514)
+                try {
+                    val cause = error.cause
+                    if (cause is ErrnoException) {
+                        ctx.errnoCode(cause.errno)
+                    } else {
+                        Logs.w(error)
+                        ctx.errnoCode(114514)
+                    }
+                } catch (e: Exception) {
+                    Logs.w(e)
                 }
             }
         }

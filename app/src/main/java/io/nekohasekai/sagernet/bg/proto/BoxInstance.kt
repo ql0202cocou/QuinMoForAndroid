@@ -38,7 +38,6 @@ abstract class BoxInstance(
 
     val pluginPath = hashMapOf<String, PluginManager.InitResult>()
     val pluginConfigs = hashMapOf<Int, Pair<Int, String>>()
-    val externalInstances = hashMapOf<Int, AbstractInstance>()
     open lateinit var processes: GuardedProcessPool
 
     // Written by init/launch on one thread while close() may purge it from
@@ -140,10 +139,6 @@ abstract class BoxInstance(
                 val (profileType, config) = pluginConfigs[port] ?: (0 to "")
 
                 when {
-                    externalInstances.containsKey(port) -> {
-                        externalInstances[port]!!.launch()
-                    }
-
                     bean is TrojanGoBean -> {
                         val configFile = writeCacheFile("trojan_go", "json", config)
 
@@ -252,12 +247,6 @@ abstract class BoxInstance(
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
-
-        for (instance in externalInstances.values) {
-            runCatching {
-                instance.close()
-            }
-        }
 
         // Stop the plugin processes before deleting their config files: the
         // Job returned by GuardedProcessPool.close completes once every guard

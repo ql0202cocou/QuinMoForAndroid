@@ -108,12 +108,16 @@ class BaseService {
         private val callbacks = object : RemoteCallbackList<ISagerNetServiceCallback>() {
             override fun onCallbackDied(callback: ISagerNetServiceCallback?, cookie: Any?) {
                 super.onCallbackDied(callback, cookie)
-                if (callback != null) callbackIdMap.remove(callback)
+                if (callback != null) callbackIdMap.remove(callback.asBinder())
             }
         }
 
+        // Keyed by the binder, not the interface: every registerCallback transaction
+        // deserializes a fresh Stub.Proxy and the generated proxy has no equals(), so
+        // an object-keyed map would never dedup and never remove — it would just grow
+        // one stale entry per foreground/background switch.
         // written on binder threads, read by TrafficLooper on Dispatchers.Default
-        val callbackIdMap = ConcurrentHashMap<ISagerNetServiceCallback, Int>()
+        val callbackIdMap = ConcurrentHashMap<IBinder, Int>()
 
         override val coroutineContext = Dispatchers.Main.immediate + Job()
 
@@ -125,10 +129,11 @@ class BaseService {
                 Runtime.getRuntime().exit(0)
                 return
             }
-            if (!callbackIdMap.containsKey(cb)) {
+            val key = cb.asBinder()
+            if (!callbackIdMap.containsKey(key)) {
                 callbacks.register(cb)
             }
-            callbackIdMap[cb] = id
+            callbackIdMap[key] = id
         }
 
         private val broadcastMutex = Mutex()
@@ -151,7 +156,7 @@ class BaseService {
         }
 
         override fun unregisterCallback(cb: ISagerNetServiceCallback) {
-            callbackIdMap.remove(cb)
+            callbackIdMap.remove(cb.asBinder())
             callbacks.unregister(cb)
         }
 
@@ -197,29 +202,37 @@ class BaseService {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
                 return
             }
-            try {
-                if (canReloadSelector()) {
-                    val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
-                    val tag = data.proxy!!.config.profileTagMap[ent?.id] ?: ""
-                    if (tag.isNotBlank() && ent != null) {
-                        // select from GUI
-                        data.proxy!!.box.selectOutbound(tag)
-                        // or select from webui
-                        // => selector_OnProxySelected
+            // canReloadSelector() builds a whole config, DB reads included, and
+            // reload() runs on :bg's main thread from onReceive — an ANR risk on a
+            // large group. data.proxy can be nulled by a concurrent stop now that
+            // this is off-thread, so read it defensively.
+            runOnDefaultDispatcher {
+                try {
+                    if (canReloadSelector()) {
+                        val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+                        val tag = data.proxy?.config?.profileTagMap?.get(ent?.id) ?: ""
+                        if (tag.isNotBlank() && ent != null) {
+                            // select from GUI
+                            data.proxy?.box?.selectOutbound(tag)
+                            // or select from webui
+                            // => selector_OnProxySelected
+                        }
+                        return@runOnDefaultDispatcher
                     }
-                    return
+                } catch (e: Throwable) {
+                    // bad profile data (e.g. a chain loop) or a JNI error must not
+                    // crash :bg from an uncaught coroutine exception;
+                    // fall back to a full restart below
+                    Logs.w(e)
                 }
-            } catch (e: Throwable) {
-                // bad profile data (e.g. a chain loop) or a JNI error must not
-                // crash :bg from an uncaught exception in onReceive;
-                // fall back to a full restart below
-                Logs.w(e)
-            }
-            val s = data.state
-            when {
-                s == State.Stopped -> startRunner()
-                s.canStop -> stopRunner(true)
-                else -> Logs.w("Illegal state $s when invoking use")
+                onMainDispatcher {
+                    val s = data.state
+                    when {
+                        s == State.Stopped -> startRunner()
+                        s.canStop -> stopRunner(true)
+                        else -> Logs.w("Illegal state $s when invoking use")
+                    }
+                }
             }
         }
 
