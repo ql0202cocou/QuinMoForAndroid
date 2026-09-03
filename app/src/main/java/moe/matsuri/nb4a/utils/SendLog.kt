@@ -30,11 +30,15 @@ object SendLog {
         logFile.writeText(report)
 
         try {
-            Runtime.getRuntime().exec(arrayOf("logcat", "-d")).inputStream.use(
-                FileOutputStream(
-                    logFile, true
-                )
-            )
+            // destroy() in a finally: "logcat -d" exits on its own, but the
+            // Process still holds its stderr/stdin fds until it is destroyed,
+            // and every log export used to leak one set
+            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d"))
+            try {
+                process.inputStream.use(FileOutputStream(logFile, true))
+            } finally {
+                process.destroy()
+            }
             logFile.appendText("\n")
         } catch (e: IOException) {
             Logs.w(e)

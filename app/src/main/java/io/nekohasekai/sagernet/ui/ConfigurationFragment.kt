@@ -478,16 +478,21 @@ class ConfigurationFragment @JvmOverloads constructor(
             R.id.action_clear_traffic_statistics -> {
                 runOnDefaultDispatcher {
                     val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
-                    val toClear = mutableListOf<ProxyEntity>()
-                    if (profiles.isNotEmpty()) for (profile in profiles) {
-                        if (profile.tx != 0L || profile.rx != 0L) {
+                    val toClear = profiles.filter { it.tx != 0L || it.rx != 0L }
+                    if (toClear.isNotEmpty()) {
+                        // tx/rx only: a full-row update would roll back the
+                        // status/ping a concurrent URL test just wrote
+                        for (profile in toClear) {
                             profile.tx = 0
                             profile.rx = 0
-                            toClear.add(profile)
+                            ProfileManager.updateTraffic(profile)
                         }
-                    }
-                    if (toClear.isNotEmpty()) {
-                        ProfileManager.updateProfile(toClear)
+                        // :bg keeps its own counters; without this the running
+                        // looper persists the pre-clear totals right back
+                        SagerNet.clearTrafficStatistics()
+                        // updateTraffic is a bare column write, so post the
+                        // refresh the list adapter needs ourselves
+                        for (profile in toClear) ProfileManager.postUpdate(profile)
                     }
                 }
             }
@@ -495,17 +500,16 @@ class ConfigurationFragment @JvmOverloads constructor(
             R.id.action_connection_test_clear_results -> {
                 runOnDefaultDispatcher {
                     val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
-                    val toClear = mutableListOf<ProxyEntity>()
-                    if (profiles.isNotEmpty()) for (profile in profiles) {
-                        if (profile.status != 0) {
+                    val toClear = profiles.filter { it.status != 0 }
+                    if (toClear.isNotEmpty()) {
+                        // status/ping/error only, same reason as above (tx/rx are
+                        // written by :bg while this runs)
+                        for (profile in toClear) {
                             profile.status = 0
                             profile.ping = 0
                             profile.error = null
-                            toClear.add(profile)
+                            ProfileManager.updateStatus(profile)
                         }
-                    }
-                    if (toClear.isNotEmpty()) {
-                        ProfileManager.updateProfile(toClear)
                     }
                 }
             }
@@ -1410,10 +1414,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (::undoManager.isInitialized) {
                         undoManager.flush()
                     }
+                    // read before the put below: noTraffic means this update
+                    // carries no live counters, so the previously displayed ones
+                    // have to be re-posted — reading after the put would just
+                    // hand back the incoming profile's stale DB values
+                    val oldProfile = configurationList[profile.id]
                     configurationList[profile.id] = profile
                     notifyItemChanged(index)
                     //
-                    val oldProfile = configurationList[profile.id]
                     if (noTraffic && oldProfile != null) {
                         runOnDefaultDispatcher {
                             onUpdated(
@@ -1658,6 +1666,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 removeButton.setOnClickListener {
                     adapter?.let {
                         val index = it.configurationIdList.indexOf(proxyEntity.id)
+                        // a stale holder can outlive its row: -1 would queue an
+                        // undo entry that inserts at index -1 on restore, while
+                        // still deleting the profile on commit
+                        if (index < 0) return@let
                         it.remove(index)
                         undoManager.remove(index to proxyEntity)
                     }

@@ -585,13 +585,24 @@ fun buildConfig(
                 // already built inside another member's chain: rebuilding
                 // would duplicate its outbound/inbound tags (same guard as
                 // the extraProxies loop below)
-                if (builtProfiles.contains(it.id)) return@forEach
+                if (builtProfiles.contains(it.id)) {
+                    // ...but it still needs a tagMap entry: profileTagMap drives
+                    // selector switching, and without one, selecting this member
+                    // while connected resolves to a blank tag and does nothing.
+                    // A member pulled in as the exit of another member's chain
+                    // has a global outbound; a mere middle hop has none and
+                    // genuinely cannot be selected on its own.
+                    globalOutbounds[it.id]?.let { tag -> tagMap[it.id] = tag }
+                    return@forEach
+                }
                 tagMap[it.id] = buildChain(it.id, it)
             }
             outbounds.add(0, Outbound_SelectorOptions().apply {
                 type = "selector"
                 tag = TAG_PROXY
-                default_ = tagMap[proxy.id]
+                // never null: sing-box would then fall back to whichever outbound
+                // happens to be listed first, which is not the selected profile
+                default_ = tagMap[proxy.id] ?: tagMap.values.firstOrNull()
                 // a chain whose exit node is also a group member maps to that
                 // member's tag via the globalOutbounds dedup — list it once
                 outbounds = tagMap.values.distinct()

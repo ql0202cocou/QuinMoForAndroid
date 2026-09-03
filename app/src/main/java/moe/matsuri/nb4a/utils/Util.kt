@@ -58,9 +58,14 @@ object Util {
             setInput(input)
             finish()
         }
-        val compressedDataLength: Int = compressor.deflate(output)
-        compressor.end()
-        return output.copyOfRange(0, compressedDataLength)
+        // end() in a finally: Deflater holds a native buffer that only the
+        // finalizer would reclaim if deflate() threw
+        try {
+            val compressedDataLength: Int = compressor.deflate(output)
+            return output.copyOfRange(0, compressedDataLength)
+        } finally {
+            compressor.end()
+        }
     }
 
     fun zlibDecompress(input: ByteArray): ByteArray {
@@ -72,15 +77,20 @@ object Util {
 
             inflater.setInput(input)
 
-            // 0 means no progress possible (truncated or corrupt input);
-            // don't silently return partial data
-            while (!inflater.finished()) {
-                val count = inflater.inflate(buffer)
-                if (count == 0) throw DataFormatException("invalid or truncated zlib data")
-                outputStream.write(buffer, 0, count)
+            // end() in a finally: a corrupt link throws below, and the native
+            // buffer would otherwise leak until the finalizer runs
+            try {
+                // 0 means no progress possible (truncated or corrupt input);
+                // don't silently return partial data
+                while (!inflater.finished()) {
+                    val count = inflater.inflate(buffer)
+                    if (count == 0) throw DataFormatException("invalid or truncated zlib data")
+                    outputStream.write(buffer, 0, count)
+                }
+            } finally {
+                inflater.end()
             }
 
-            inflater.end()
             outputStream.toByteArray()
         }
     }

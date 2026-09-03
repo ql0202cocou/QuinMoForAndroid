@@ -199,8 +199,11 @@ abstract class GroupUpdater {
 
                     if (byUser && (subscription.link?.startsWith("http://") == true || subscription.updateWhenConnectedOnly) && !connected) {
                         if (userInterface == null || !userInterface.confirm(app.getString(R.string.update_subscription_warning))) {
+                            // no cancel() here: cancelling this scope makes
+                            // coroutineScope throw on the way out, so the caller
+                            // never sees the value below. Nothing else is running
+                            // in the scope, so there is nothing to cancel.
                             finishUpdate(proxyGroup)
-                            cancel()
                             return@coroutineScope true
                         }
                     }

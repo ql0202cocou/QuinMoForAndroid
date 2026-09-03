@@ -78,6 +78,10 @@ class BaseService {
                     }
                 }
 
+                // the UI already zeroed the tx/rx columns; drop the live
+                // counters so the looper does not write the old totals back
+                Action.CLEAR_TRAFFIC_STATISTICS -> proxy?.looper?.clearStats()
+
                 Action.RESET_UPSTREAM_CONNECTIONS -> runOnDefaultDispatcher {
                     Libcore.resetAllConnections(true)
                     runOnMainDispatcher {
@@ -216,8 +220,12 @@ class BaseService {
                             data.proxy?.box?.selectOutbound(tag)
                             // or select from webui
                             // => selector_OnProxySelected
+                            return@runOnDefaultDispatcher
                         }
-                        return@runOnDefaultDispatcher
+                        // no outbound of its own (e.g. only a middle hop of another
+                        // member's chain): fall through to a full restart, which
+                        // rebuilds the config around it, instead of doing nothing
+                        Logs.w("No outbound tag for profile ${ent?.id}, restarting")
                     }
                 } catch (e: Throwable) {
                     // bad profile data (e.g. a chain loop) or a JNI error must not
@@ -392,6 +400,7 @@ class BaseService {
                         addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
                     }
                     addAction(Action.RESET_UPSTREAM_CONNECTIONS)
+                    addAction(Action.CLEAR_TRAFFIC_STATISTICS)
                 }
                 ContextCompat.registerReceiver(
                     this,

@@ -205,6 +205,12 @@ class SagerNet : Application(),
         fun stopService() =
             application.sendBroadcast(Intent(Action.CLOSE).setPackage(application.packageName))
 
+        // tell :bg to drop the counters it keeps in memory after the UI zeroed
+        // the tx/rx columns; a no-op when nothing is running
+        fun clearTrafficStatistics() = application.sendBroadcast(
+            Intent(Action.CLEAR_TRAFFIC_STATISTICS).setPackage(application.packageName)
+        )
+
         @Volatile
         var underlyingNetwork: Network? = null
 

@@ -185,4 +185,8 @@ object Action {
 
     // const val SWITCH_WAKE_LOCK = "io.nekohasekai.sagernet.SWITCH_WAKELOCK"
     const val RESET_UPSTREAM_CONNECTIONS = "moe.nb4a.RESET_UPSTREAM_CONNECTIONS"
+
+    // The UI clears the tx/rx columns; :bg has to drop its in-memory counters
+    // too, or the running TrafficLooper writes the old totals straight back.
+    const val CLEAR_TRAFFIC_STATISTICS = "moe.nb4a.CLEAR_TRAFFIC_STATISTICS"
 }

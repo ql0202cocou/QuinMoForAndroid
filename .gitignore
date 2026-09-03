@@ -23,6 +23,7 @@ jniLibs/
 # local agent guidance, not for the public repo
 /AGENTS.md
 /CLAUDE.md
+/.claude/worktrees/
 
 # submodules
 /external

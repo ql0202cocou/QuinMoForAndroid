@@ -143,7 +143,9 @@ class AssetsActivity : ThemedActivity() {
                     adapter.reloadAssets()
                 } catch (e: Exception) {
                     Logs.w(e)
-                    onMainDispatcher { alert(e.readableMessage).show() }
+                    // tryToShow, not show: this runs on GlobalScope and the
+                    // activity may be gone by now (BadTokenException)
+                    onMainDispatcher { alert(e.readableMessage).tryToShow() }
                 } finally {
                     // no-op after a successful rename; drops a half-copied db otherwise
                     tmpFile.delete()
@@ -297,10 +299,13 @@ class AssetsActivity : ThemedActivity() {
     )
 
     suspend fun updateAsset(file: File, versionFile: File, localVersion: String) {
-        var fileName = file.name
+        val fileName = file.name
 
-        val ruleProvider = rulesProviders[DataStore.rulesProvider]
+        // a settings backup from another build can carry an out-of-range index
+        val ruleProvider = rulesProviders.getOrNull(DataStore.rulesProvider)
+            ?: rulesProviders.first()
         val repo = ruleProvider.repoByFileName[fileName]
+            ?: error("No rules repository for $fileName")
 
         val client = Libcore.newHttpClient().apply {
             modernTLS()
@@ -332,27 +337,20 @@ class AssetsActivity : ThemedActivity() {
                 setURL(browserDownloadUrl)
             }.execute()
 
+            // download aside and rename: a truncated download must not leave a
+            // corrupted db behind (box may mmap it). The release assets are plain
+            // .db files, so there is nothing to decompress here.
             val cacheFile = File(file.parentFile, file.name + ".tmp")
             cacheFile.parentFile?.mkdirs()
 
-            response.writeTo(cacheFile.canonicalPath)
-
-            if (fileName.endsWith(".xz")) {
-                // decompress to a temp file and replace atomically: a truncated
-                // download must not leave a corrupted db behind (box may mmap it)
-                val unxzFile = File(file.parentFile, "$fileName.unxz.tmp")
-                try {
-                    Libcore.unxz(cacheFile.absolutePath, unxzFile.absolutePath)
-                    if (!unxzFile.renameTo(file)) {
-                        throw IOException("cannot replace ${file.absolutePath}")
-                    }
-                } catch (e: Exception) {
-                    unxzFile.delete()
-                    throw e
+            try {
+                response.writeTo(cacheFile.canonicalPath)
+                if (!cacheFile.renameTo(file)) {
+                    throw IOException("cannot replace ${file.absolutePath}")
                 }
+            } catch (e: Exception) {
                 cacheFile.delete()
-            } else {
-                cacheFile.renameTo(file)
+                throw e
             }
 
             versionFile.writeText(tagName)

@@ -171,8 +171,24 @@ func (c *httpClient) NewRequest() HTTPRequest {
 		Method: "GET",
 		Header: http.Header{},
 	}
-	c.h1h2Transport.TLSClientConfig = req.tls
+	// The shared transport keeps pointing at c.tls. Pointing it at this
+	// request's clone instead would leak whatever the request does to its
+	// config (AllowInsecure) into every other request in flight on the same
+	// client; requests that need their own config get their own transport in
+	// Execute below.
 	return req
+}
+
+// perRequestTransport mirrors the shared transport, minus the connection pool,
+// for a request whose TLS config differs from the client's. Keep-alive is off
+// so the isolated pool cannot outlive the request.
+func (r *httpRequest) perRequestTransport() *http.Transport {
+	return &http.Transport{
+		TLSClientConfig:       r.tls,
+		DialContext:           r.h1h2Transport.DialContext,
+		ResponseHeaderTimeout: r.h1h2Transport.ResponseHeaderTimeout,
+		DisableKeepAlives:     true,
+	}
 }
 
 func (c *httpClient) Close() {
@@ -181,15 +197,20 @@ func (c *httpClient) Close() {
 
 type httpRequest struct {
 	*httpClient
-	// tls shadows the client's config with a per-request clone: the h1h2
-	// transport aliases httpClient.tls, so AllowInsecure writing it would
-	// permanently disable verification for every later request on the client.
-	tls     *tls.Config
+	// tls shadows the client's config with a per-request clone, so a request
+	// changing it (AllowInsecure) cannot disable verification for every later
+	// request on the same client. The shared transport keeps using the client's
+	// own config; see perRequestTransport.
+	tls *tls.Config
+	// set once the clone diverges from the client's config, so Execute knows
+	// it cannot use the shared transport
+	ownTLS  bool
 	request http.Request
 }
 
 func (r *httpRequest) AllowInsecure() {
 	r.tls.InsecureSkipVerify = true
+	r.ownTLS = true
 }
 
 func (r *httpRequest) SetURL(link string) (err error) {
@@ -234,7 +255,16 @@ func (r *httpRequest) Execute() (resp HTTPResponse, err error) {
 	if r.tryH3Direct && !r.trySocks5 {
 		return r.doH3Direct()
 	}
-	response, err := r.h1h2Client.Do(&r.request)
+	client := &r.h1h2Client
+	if r.ownTLS {
+		// this request's TLS config differs from the client's; give it an
+		// isolated transport instead of rewriting the shared one
+		client = &http.Client{
+			Transport: r.perRequestTransport(),
+			Timeout:   r.h1h2Client.Timeout,
+		}
+	}
+	response, err := client.Do(&r.request)
 	if err != nil {
 		// trySocks5 && tryH3Direct
 		if r.tryH3Direct && errors.Is(err, errFailConnectSocks5) {

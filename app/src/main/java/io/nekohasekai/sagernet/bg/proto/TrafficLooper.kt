@@ -100,6 +100,20 @@ class TrafficLooper
     // the mercy of anyone holding this public object's monitor.
     private val statsLock = Any()
 
+    // The UI cleared the tx/rx columns in the DB: drop the counters this loop
+    // carries too, or the next persistStats/stop writes the pre-clear totals
+    // straight back. Under statsLock like every other read-modify-write here.
+    fun clearStats() {
+        synchronized(statsLock) {
+            idMap.values.forEach {
+                it.rx = 0
+                it.tx = 0
+                it.rxBase = 0
+                it.txBase = 0
+            }
+        }
+    }
+
     // NativeInterface.selector_OnProxySelected serializes the selector events,
     // but this read-modify-write still races the loop's stats sweep
     fun selectMain(id: Long) {

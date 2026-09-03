@@ -191,18 +191,25 @@ fun Fragment.startFilesForResult(
 // was built from died with the process: refuse instead of truncating the picked file
 // to 0 bytes and reporting success.
 suspend fun Fragment.writeToDocument(uri: Uri, content: String) {
+    // Callers dispatch this on GlobalScope, so the fragment can already be
+    // detached — requireActivity()/getString() would throw out of a coroutine
+    // nobody catches. Resolve the activity once and report through it.
+    val activity = activity as? ThemedActivity ?: return
+    suspend fun report(text: CharSequence) = onMainDispatcher {
+        if (isAdded) activity.snackbar(text).show()
+    }
     if (content.isBlank()) {
-        onMainDispatcher { snackbar(getString(R.string.action_export_err)).show() }
+        report(app.getString(R.string.action_export_err))
         return
     }
     try {
-        requireActivity().contentResolver.openOutputStream(uri)!!.use { stream ->
+        activity.contentResolver.openOutputStream(uri)!!.use { stream ->
             stream.bufferedWriter().use { it.write(content) }
         }
-        onMainDispatcher { snackbar(getString(R.string.action_export_msg)).show() }
+        report(app.getString(R.string.action_export_msg))
     } catch (e: Exception) {
         Logs.w(e)
-        onMainDispatcher { snackbar(e.readableMessage).show() }
+        report(e.readableMessage)
     }
 }
 
