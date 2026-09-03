@@ -75,9 +75,11 @@ jobs:
           tar -xvf ghr.tar.gz
           mv ghr*linux_amd64/ghr .
           mkdir apks
-          find artifacts -name "*.apk" -exec cp {} apks \;
+          # publish policy: universal APK only; the ABI splits are built and
+          # verified in the build job but never shipped as release assets
+          find artifacts -name "*-universal.apk" -exec cp {} apks \;
           if [ -z "$(ls -A apks)" ]; then
-            echo "::error::no APKs to publish; aborting before ghr -delete removes the existing release and tag"
+            echo "::error::no universal APK to publish; aborting before ghr -delete removes the existing release and tag"
             exit 1
           fi
           # -delete drops the existing release AND its git tag, then recreates the
