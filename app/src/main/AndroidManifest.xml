@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -275,26 +276,53 @@
             android:launchMode="singleInstance"
             android:theme="@style/Theme.SagerNet.Dialog" />
 
+        <!--
+            Proxy mode holds no VPN app-op, so systemExempted is refused on Android 14+
+            (ForegroundServiceTypePolicy requires OP_ACTIVATE_VPN or an exact-alarm
+            permission for it) and startForeground throws.
+        -->
         <service
             android:name="io.nekohasekai.sagernet.bg.ProxyService"
             android:exported="false"
-            android:foregroundServiceType="systemExempted"
+            android:foregroundServiceType="specialUse"
             android:process=":bg"
-            tools:ignore="ForegroundServicePermission" />
+            tools:ignore="ForegroundServicePermission">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Runs the user-configured local proxy for as long as the user keeps it on" />
+        </service>
 
+        <!--
+            systemExempted covers the running VPN (the VPN app-op grants it). specialUse
+            is declared too: when the VPN authorization has been revoked the service is
+            still started, and must call startForeground with a type it can hold.
+        -->
         <service
             android:name="io.nekohasekai.sagernet.bg.VpnService"
             android:exported="false"
-            android:foregroundServiceType="systemExempted"
+            android:foregroundServiceType="systemExempted|specialUse"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:process=":bg"
             tools:ignore="ForegroundServicePermission">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Tells the user the VPN authorization was revoked and has to be granted again" />
 
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>
         </service>
+
+        <!--
+            WorkManager's own components all live in the main process, so a plain worker
+            runs there and reads a DataStore.serviceState that only :bg keeps current.
+            RemoteWorkerService hosts the subscription worker in :bg instead.
+        -->
+        <service
+            android:name="androidx.work.multiprocess.RemoteWorkerService"
+            android:exported="false"
+            android:process=":bg" />
 
         <service
             android:name="io.nekohasekai.sagernet.bg.TileService"

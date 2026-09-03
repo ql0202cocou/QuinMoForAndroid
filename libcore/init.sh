@@ -5,8 +5,14 @@ set -e
 chmod -R 777 .build 2>/dev/null || true
 rm -rf .build 2>/dev/null || true
 
-if [ -z "$GOPATH" ]; then
-    GOPATH=$(go env GOPATH)
+# go install honours GOBIN over GOPATH/bin; without this the mv below fails with
+# a bare "No such file or directory" on any machine that sets GOBIN.
+GOBIN_DIR=$(go env GOBIN)
+if [ -z "$GOBIN_DIR" ]; then
+    if [ -z "$GOPATH" ]; then
+        GOPATH=$(go env GOPATH)
+    fi
+    GOBIN_DIR="$GOPATH/bin"
 fi
 
 # Install gomobile (vendored in ./gomobile, MatsuriDayo/gomobile @ master2).
@@ -22,7 +28,7 @@ go install -v
 popd
 popd
 popd
-mv -f "$GOPATH/bin/gomobile" "$GOPATH/bin/gomobile-matsuri"
-mv -f "$GOPATH/bin/gobind" "$GOPATH/bin/gobind-matsuri"
+mv -f "$GOBIN_DIR/gomobile" "$GOBIN_DIR/gomobile-matsuri"
+mv -f "$GOBIN_DIR/gobind" "$GOBIN_DIR/gobind-matsuri"
 
-GOBIND=gobind-matsuri "$GOPATH/bin/gomobile-matsuri" init
+GOBIND=gobind-matsuri "$GOBIN_DIR/gomobile-matsuri" init

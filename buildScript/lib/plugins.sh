@@ -7,7 +7,7 @@
 set -e
 
 XRAY_VERSION="v26.3.27"
-MIHOMO_VERSION="v1.19.29"
+MIHOMO_VERSION="v1.19.30"
 
 ABIS="arm64-v8a x86_64"
 DIR=app/executableSo

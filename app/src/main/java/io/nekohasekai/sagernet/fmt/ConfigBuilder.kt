@@ -61,6 +61,9 @@ private fun makeDnsServer(address: String, tag: String): DNSServerOptions {
         var port: Int? = null
         if (authority.startsWith("[")) {
             val end = authority.indexOf(']')
+            // "[" without "]" is unparseable — fail like the unknown-scheme
+            // branch instead of crashing on substring(1, -1)
+            if (end < 0) throw Exception("unsupported DNS server address: $address")
             host = authority.substring(1, end)
             port = authority.substringAfter("]:", "").toIntOrNull()
         } else if (authority.indexOf(':') >= 0 && authority.indexOf(':') == authority.lastIndexOf(':')) {
@@ -174,11 +177,15 @@ fun buildConfig(
     }
 
     fun selectorName(name_: String): String {
-        var name = name_
+        // a profile named like an auto-generated tag (g-<entryId>,
+        // c-<chainId>-…) would collide with it; break the pattern up front —
+        // appending "-N" alone keeps the "c-<digits>" prefix forever
+        val base = if (name_.matches(Regex("g-\\d+|c-\\d+.*"))) "p-$name_" else name_
+        var name = base
         var count = 0
         while (selectorNames.contains(name) || name in reservedSelectorTags) {
             count++
-            name = "$name_-$count"
+            name = "$base-$count"
         }
         selectorNames.add(name)
         return name
@@ -214,8 +221,10 @@ fun buildConfig(
     // device — drop them here as well, not only at subscription parse time.
     val groupNameservers = group?.proxyServerNameserver?.split("\n")
         ?.mapNotNull { dns ->
-            dns.trim().takeIf {
-                it.isNotBlank() && !it.startsWith("#") && !it.isLocalNameserverAddress()
+            // strip mihomo-style "#h3" suffixes like RawUpdater does at mirror
+            // time — a stored/hand-entered one would leak into the DoH path
+            dns.trim().substringBefore("#").trim().takeIf {
+                it.isNotBlank() && !it.isLocalNameserverAddress()
             }
         }
         ?.distinct()
@@ -412,13 +421,10 @@ fun buildConfig(
                             outbound = tagOut
                         })
                     } else {
-                        // wireguard is an endpoint since sing-box 1.13 and endpoints
-                        // have no detour: the key would be silently dropped and the
-                        // hop would dial directly, bypassing the rest of the chain.
-                        // Fail loudly like the loop/empty-chain guards.
-                        if (pastOutbound is SingBoxOptions.Endpoint) {
-                            error("wireguard profile ${pastEntity!!.id} (${pastEntity!!.requireBean().displayName()}) must be the first hop of a chain: endpoints do not support detour")
-                        }
+                        // wireguard is an endpoint since sing-box 1.13, but the
+                        // endpoint options embed DialerOptions, so detour works
+                        // the same as for outbounds (the builder never sets
+                        // listen_port, which sing-box would reject with detour)
                         pastOutbound._hack_config_map["detour"] = tagOut
                     }
                 } else {
@@ -583,13 +589,19 @@ fun buildConfig(
         if (buildSelector) {
             val list = group.id.let { SagerDatabase.proxyDao.getByGroup(it) }
             list.forEach {
+                // already built inside another member's chain: rebuilding
+                // would duplicate its outbound/inbound tags (same guard as
+                // the extraProxies loop below)
+                if (builtProfiles.contains(it.id)) return@forEach
                 tagMap[it.id] = buildChain(it.id, it)
             }
             outbounds.add(0, Outbound_SelectorOptions().apply {
                 type = "selector"
                 tag = TAG_PROXY
                 default_ = tagMap[proxy.id]
-                outbounds = tagMap.values.toList()
+                // a chain whose exit node is also a group member maps to that
+                // member's tag via the globalOutbounds dedup — list it once
+                outbounds = tagMap.values.distinct()
             })
         } else {
             buildChain(0, proxy)

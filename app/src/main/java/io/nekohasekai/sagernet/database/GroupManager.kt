@@ -59,6 +59,7 @@ object GroupManager {
             DataStore.selectedProxy = 0L
         }
         SagerDatabase.proxyDao.deleteAll(groupId)
+        resetDanglingGroupProxies()
         iterator { groupUpdated(groupId) }
     }
 

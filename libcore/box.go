@@ -249,11 +249,16 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 	// test i
 	if i != nil {
 		i.access.Lock()
+		if i.state == 2 {
+			i.access.Unlock()
+			return 0, errors.New("instance is closed")
+		}
 		if i.v2api != nil {
 			connectionTracker = i.v2api.StatsService()
 		}
+		httpClient := boxapi.CreateProxyHttpClient(i.Box, connectionTracker)
 		i.access.Unlock()
-		return speedtest.UrlTest(boxapi.CreateProxyHttpClient(i.Box, connectionTracker), link, timeout, speedtest.UrlTestStandard_RTT)
+		return speedtest.UrlTest(httpClient, link, timeout, speedtest.UrlTestStandard_RTT)
 	}
 	// test direct
 	main := getMainInstance()
@@ -264,11 +269,19 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 	// so taking main.access here cannot deadlock against Close's b.access ->
 	// mainInstanceAccess order)
 	main.access.Lock()
+	if main.state == 2 {
+		main.access.Unlock()
+		return 0, errors.New("instance is closed")
+	}
 	if main.v2api != nil {
 		connectionTracker = main.v2api.StatsService()
 	}
+	// build the client while still holding access: a concurrent Close could
+	// otherwise tear down the box between the state check and here, panicking
+	// inside CreateProxyHttpClient
+	httpClient := boxapi.CreateProxyHttpClient(main.Box, connectionTracker)
 	main.access.Unlock()
-	return speedtest.UrlTest(boxapi.CreateProxyHttpClient(main.Box, connectionTracker), link, timeout, speedtest.UrlTestStandard_RTT)
+	return speedtest.UrlTest(httpClient, link, timeout, speedtest.UrlTestStandard_RTT)
 }
 
 var protectCloser io.Closer

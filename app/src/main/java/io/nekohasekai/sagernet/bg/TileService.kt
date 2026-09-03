@@ -23,7 +23,13 @@ class TileService : BaseTileService(), SagerConnection.Callback {
         updateTile(state, profileName)
 
     override fun onServiceConnected(service: ISagerNetService) {
-        updateTile(BaseService.State.values()[service.state], service.profileName)
+        // The :bg binder may already be dying; treat a failed read as Stopped
+        // instead of crashing the main process.
+        updateTile(
+            runCatching { BaseService.State.values()[service.state] }
+                .getOrDefault(BaseService.State.Stopped),
+            runCatching { service.profileName }.getOrNull()
+        )
         if (tapPending) {
             tapPending = false
             onClick()
@@ -53,7 +59,13 @@ class TileService : BaseTileService(), SagerConnection.Callback {
         qsTile?.apply {
             label = null
             when (serviceState) {
-                BaseService.State.Idle -> error("serviceState")
+                // Idle means the :bg binder is up but its data was already
+                // nulled (service dying); show it as Stopped.
+                BaseService.State.Idle, BaseService.State.Stopped -> {
+                    icon = iconIdle
+                    state = Tile.STATE_INACTIVE
+                }
+
                 BaseService.State.Connecting -> {
                     icon = iconBusy
                     state = Tile.STATE_ACTIVE
@@ -69,11 +81,6 @@ class TileService : BaseTileService(), SagerConnection.Callback {
                     icon = iconBusy
                     state = Tile.STATE_UNAVAILABLE
                 }
-
-                BaseService.State.Stopped -> {
-                    icon = iconIdle
-                    state = Tile.STATE_INACTIVE
-                }
             }
             label = label ?: getString(R.string.app_name)
             updateTile()
@@ -82,8 +89,11 @@ class TileService : BaseTileService(), SagerConnection.Callback {
 
     private fun toggle() {
         val service = connection.service
-        if (service == null) tapPending =
-            true else BaseService.State.values()[service.state].let { state ->
+        if (service == null) tapPending = true else {
+            // A tap racing binder death must not crash the main process;
+            // failing to read the state means the service is gone.
+            val state = runCatching { BaseService.State.values()[service.state] }
+                .getOrDefault(BaseService.State.Stopped)
             when {
                 state.canStop -> SagerNet.stopService()
                 state == BaseService.State.Stopped -> SagerNet.startService()

@@ -6,12 +6,14 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.net.ProxyInfo
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.ServiceCompat
 import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.fmt.LOCALHOST
@@ -94,23 +96,41 @@ class VpnService : BaseVpnService(),
                 // VPN permission was revoked; starting an activity from the
                 // background is silently blocked since Android 10, so ask
                 // via a notification instead.
-                NotificationManagerCompat.from(this).notify(
-                    NOTIFICATION_ID_VPN_REQUEST,
-                    NotificationCompat.Builder(this, "service-vpn-request")
-                        .setContentTitle(getString(R.string.service_vpn))
-                        .setContentText(getString(R.string.vpn_permission_required))
-                        .setContentIntent(
-                            PendingIntent.getActivity(
-                                this,
-                                0,
-                                Intent(this, VpnRequestActivity::class.java),
-                                ServiceNotification.flags
-                            )
+                val request = NotificationCompat.Builder(this, "service-vpn-request")
+                    .setContentTitle(getString(R.string.service_vpn))
+                    .setContentText(getString(R.string.vpn_permission_required))
+                    .setContentIntent(
+                        PendingIntent.getActivity(
+                            this,
+                            0,
+                            Intent(this, VpnRequestActivity::class.java),
+                            ServiceNotification.flags
                         )
-                        .setSmallIcon(R.drawable.ic_service_active)
-                        .setAutoCancel(true)
-                        .build()
-                )
+                    )
+                    .setSmallIcon(R.drawable.ic_service_active)
+                    .setAutoCancel(true)
+                    .build()
+                // Started via startForegroundService(): not calling startForeground()
+                // gets :bg ANR-killed, and the stopRunner() below does not clear that
+                // while an activity still holds a binding. Post the request as the
+                // foreground notification, then detach it so it outlives us.
+                try {
+                    if (Build.VERSION.SDK_INT >= 34) {
+                        startForeground(
+                            NOTIFICATION_ID_VPN_REQUEST,
+                            request,
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+                        )
+                    } else {
+                        startForeground(NOTIFICATION_ID_VPN_REQUEST, request)
+                    }
+                    ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+                } catch (e: Exception) {
+                    Logs.w(e)
+                    NotificationManagerCompat.from(this).notify(
+                        NOTIFICATION_ID_VPN_REQUEST, request
+                    )
+                }
             } else return super<BaseService.Interface>.onStartCommand(intent, flags, startId)
         }
         stopRunner()

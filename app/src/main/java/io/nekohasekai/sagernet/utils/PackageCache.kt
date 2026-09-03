@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.listenForPackageChanges
 import kotlinx.coroutines.runBlocking
@@ -27,12 +28,24 @@ object PackageCache {
     // called from init (suspend)
     fun register() {
         if (registerd.getAndSet(true)) return
-        reload()
-        app.listenForPackageChanges(false) {
+        try {
             reload()
-            labelMap.clear()
+            app.listenForPackageChanges(false) {
+                reload()
+                labelMap.clear()
+            }
+        } catch (e: Throwable) {
+            // allow a later awaitLoadSync() to retry instead of leaving
+            // registerd=true with the maps uninitialized
+            registerd.set(false)
+            Logs.w(e)
+        } finally {
+            // awaitLoadSync() blocks on this mutex (including the gomobile
+            // callback path), so unlock even when reload() throws — a stuck
+            // lock hangs the VPN mid-start with no error. A retry after a
+            // failed attempt finds it already unlocked.
+            if (loaded.isLocked) loaded.unlock()
         }
-        loaded.unlock()
     }
 
     @Synchronized // register() and the package-change receiver may race

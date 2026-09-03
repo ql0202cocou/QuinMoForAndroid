@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.ktx.linkBuilder
 import io.nekohasekai.sagernet.ktx.toLink
 import io.nekohasekai.sagernet.ktx.urlSafe
 import moe.matsuri.nb4a.SingBoxOptions
+import moe.matsuri.nb4a.utils.echAsPem
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
@@ -34,7 +35,9 @@ fun buildSingBoxOutboundAnyTLSBean(bean: AnyTLSBean): SingBoxOptions.Outbound_An
                 // In new version, some complex options will be deprecated, so we just do this.
                 ech = SingBoxOptions.OutboundECHOptions().apply {
                     enabled = true
-                    config = listOf(it)
+                    // sing-box only accepts an "ECH CONFIGS" PEM block; a mihomo
+                    // subscription hands us bare base64
+                    config = it.echAsPem().lines()
                 }
             }
         }
@@ -100,7 +103,9 @@ fun parseAnytls(url: String): AnyTLSBean {
             certificateFingerprint = it
         }
         (link.queryParameter("ech") ?: link.queryParameter("echConfig"))?.let {
-            echConfig = it
+            // "1" marks enable-only; there is no enableECH flag to carry it,
+            // and storing it as a config makes both cores reject the profile
+            if (it != "1") echConfig = it
         }
     }
 }

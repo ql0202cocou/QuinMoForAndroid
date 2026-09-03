@@ -16,12 +16,26 @@ get_latest_release() {
     sed -E 's/.*"([^"]+)".*/\1/'                                    # Pluck JSON value
 }
 
+# Both repos publish a "<file>.sha256sum" next to the db. Without it a truncated
+# or tampered download is xz-compressed straight into the APK and only surfaces
+# at runtime as a sing-box asset-load failure.
+download_verified() {
+  local repo="$1" version="$2" file="$3"
+  local base="https://github.com/$repo/releases/download/$version"
+  curl -fLSs -o "$file" "$base/$file"
+  # shasum, not sha256sum: the dev machines are macOS (same as plugins.sh)
+  local expect=$(curl -fLSs "$base/$file.sha256sum" | awk '{print $1}')
+  [ -n "$expect" ] || { echo "no sha256sum published for $file"; exit 1; }
+  local actual=$(shasum -a 256 "$file" | awk '{print $1}')
+  [ "$actual" = "$expect" ] || { echo "sha256 mismatch for $file: $actual != $expect"; exit 1; }
+}
+
 ####
 VERSION_GEOIP=`get_latest_release "SagerNet/sing-geoip"`
 [ -n "$VERSION_GEOIP" ] || { echo "failed to resolve latest sing-geoip release"; exit 1; }
 echo VERSION_GEOIP=$VERSION_GEOIP
 echo -n $VERSION_GEOIP > geoip.version.txt
-curl -fLSsO https://github.com/SagerNet/sing-geoip/releases/download/$VERSION_GEOIP/geoip.db
+download_verified "SagerNet/sing-geoip" "$VERSION_GEOIP" geoip.db
 xz -9 geoip.db
 
 ####
@@ -29,7 +43,7 @@ VERSION_GEOSITE=`get_latest_release "SagerNet/sing-geosite"`
 [ -n "$VERSION_GEOSITE" ] || { echo "failed to resolve latest sing-geosite release"; exit 1; }
 echo VERSION_GEOSITE=$VERSION_GEOSITE
 echo -n $VERSION_GEOSITE > geosite.version.txt
-curl -fLSsO https://github.com/SagerNet/sing-geosite/releases/download/$VERSION_GEOSITE/geosite.db
+download_verified "SagerNet/sing-geosite" "$VERSION_GEOSITE" geosite.db
 xz -9 geosite.db
 
 ####

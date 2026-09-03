@@ -110,11 +110,15 @@ object ProfileManager {
         iterator { onUpdated(profile, false) }
     }
 
+    // Bulk-delete path: listeners fire per profile, but the expensive fixups
+    // (dangling front/landing proxies, rearrange) are left to the caller to
+    // run once per batch instead of per profile.
     suspend fun deleteProfile2(groupId: Long, profileId: Long) {
         if (SagerDatabase.proxyDao.deleteById(profileId) == 0) return
         if (DataStore.selectedProxy == profileId) {
             DataStore.selectedProxy = 0L
         }
+        iterator { onRemoved(groupId, profileId) }
     }
 
     suspend fun deleteProfile(groupId: Long, profileId: Long) {

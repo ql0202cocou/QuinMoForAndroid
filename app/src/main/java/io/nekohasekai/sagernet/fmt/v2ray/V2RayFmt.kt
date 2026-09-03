@@ -9,6 +9,7 @@ import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import io.nekohasekai.sagernet.ktx.*
 import moe.matsuri.nb4a.SingBoxOptions.*
 import moe.matsuri.nb4a.utils.NGUtil
+import moe.matsuri.nb4a.utils.echAsPem
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -362,6 +363,9 @@ fun parseV2RayN(link: String): VMessBean {
                 bean.type = "http"
             }
         }
+
+        // v2rayN spells the h2 transport "h2"; the bean keeps "http"
+        "h2" -> bean.type = "http"
     }
     when (vmessQRCode.tls) {
         "tls", "reality" -> {
@@ -451,7 +455,11 @@ fun VMessBean.toV2rayN(): String {
 
         when (net) {
             "http" -> {
-                if (!isTLS()) {
+                if (isTLS()) {
+                    // v2rayN spells the h2 transport "h2"; "http" means the
+                    // tcp fake-http header
+                    net = "h2"
+                } else {
                     type = "http"
                     net = "tcp"
                 }
@@ -651,7 +659,8 @@ fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportO
                 type = "http"
                 if (!bean.isTLS()) method = "GET" // v2ray tcp header
                 if (bean.host.isNotBlank()) {
-                    host = bean.host.split(",")
+                    // clash h2-opts/http-opts hosts arrive newline-joined
+                    host = bean.host.listByLineOrComma()
                 }
                 path = bean.path.takeIf { it.isNotBlank() } ?: "/"
             }
@@ -708,7 +717,8 @@ fun buildSingBoxOutboundTLS(bean: StandardV2RayBean): OutboundTLSOptions? {
             ech = OutboundECHOptions().apply {
                 enabled = true
                 if (bean.echConfig.isNotBlank()) {
-                    config = bean.echConfig.lines()
+                    // sing-box only accepts an "ECH CONFIGS" PEM block
+                    config = bean.echConfig.echAsPem().lines()
                 }
             }
         }

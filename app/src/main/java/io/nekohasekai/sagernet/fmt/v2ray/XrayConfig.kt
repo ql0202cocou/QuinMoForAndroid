@@ -2,13 +2,24 @@ package io.nekohasekai.sagernet.fmt.v2ray
 
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.toStringPretty
+import moe.matsuri.nb4a.utils.echAsBase64
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import org.json.JSONArray
 import org.json.JSONObject
 
+// Xray-core dropped the standalone h2 ("http" over TLS) and quic transports; the
+// shipped binary registers neither, so it answers such a config with "unknown
+// transport protocol". sing-box still implements both, so these profiles have to
+// run there — resolvedCore() routes them away from the Xray plugin.
+fun VMessBean.xrayLacksTransport(): Boolean =
+    type == "quic" || (type == "http" && isTLS())
+
 // Builds an Xray-core client config for a VMess/VLESS profile:
 // a local socks inbound chained from sing-box, and the profile as outbound.
 fun buildXrayConfig(bean: VMessBean, port: Int): String {
+    if (bean.xrayLacksTransport()) {
+        error("xray-core no longer supports the ${bean.type} transport, use the sing-box core for this profile")
+    }
     val user = JSONObject().apply {
         put("id", bean.uuid)
         if (bean.isVLESS) {
@@ -78,8 +89,12 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
                     // Xray only reads early data from "?ed=N" in the path; the
                     // maxEarlyData/earlyDataHeaderName keys are silently ignored.
                     var path = bean.path.takeIf { it.isNotBlank() } ?: "/"
-                    if (!path.contains("?ed=") && bean.wsMaxEarlyData > 0) {
-                        path += "?ed=${bean.wsMaxEarlyData}"
+                    if (bean.wsMaxEarlyData > 0 &&
+                        !path.contains("?ed=") && !path.contains("&ed=")
+                    ) {
+                        // the path may already carry a query, so "?" is not always right
+                        path += (if (path.contains("?")) "&" else "?") +
+                            "ed=${bean.wsMaxEarlyData}"
                     }
                     put("path", path)
                     if (bean.host.isNotBlank()) {
@@ -88,16 +103,9 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
                 })
             }
 
-            "http" -> if (bean.isTLS()) {
-                put("network", "http")
-                put("httpSettings", JSONObject().apply {
-                    if (bean.host.isNotBlank()) {
-                        put("host", JSONArray(bean.host.split(",")))
-                    }
-                    put("path", bean.path.takeIf { it.isNotBlank() } ?: "/")
-                })
-            } else {
-                // v2ray style tcp fake http
+            // h2 is rejected by xrayLacksTransport(); only the v2ray-style
+            // tcp fake-http header form reaches here
+            "http" -> {
                 put("network", "tcp")
                 put("tcpSettings", JSONObject().apply {
                     put("header", JSONObject().apply {
@@ -108,18 +116,11 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
                             })
                             if (bean.host.isNotBlank()) {
                                 put("headers", JSONObject().apply {
-                                    put("Host", JSONArray(bean.host.split(",")))
+                                    put("Host", JSONArray(bean.host.listByLineOrComma()))
                                 })
                             }
                         })
                     })
-                })
-            }
-
-            "quic" -> {
-                put("network", "quic")
-                put("quicSettings", JSONObject().apply {
-                    put("header", JSONObject().apply { put("type", "none") })
                 })
             }
 
@@ -132,7 +133,9 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
 
             "httpupgrade" -> {
                 put("network", "httpupgrade")
-                put("httpUpgradeSettings", JSONObject().apply {
+                // xray's json tag is all-lowercase; httpUpgradeSettings is
+                // silently ignored, dropping path and Host
+                put("httpupgradeSettings", JSONObject().apply {
                     if (bean.host.isNotBlank()) put("host", bean.host)
                     put("path", bean.path.takeIf { it.isNotBlank() } ?: "/")
                 })
@@ -176,7 +179,7 @@ private fun buildXrayStreamSettings(bean: VMessBean): JSONObject {
                 }
                 // presence of echConfigList enables ECH; blank means "query DNS", leave that to sing-box
                 if (bean.enableECH && bean.echConfig.isNotBlank()) {
-                    put("echConfigList", bean.echConfig)
+                    put("echConfigList", bean.echConfig.echAsBase64())
                 }
             })
         }

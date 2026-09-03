@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED
 import android.os.Build
 import android.text.format.Formatter
@@ -21,6 +22,7 @@ import io.nekohasekai.sagernet.aidl.SpeedDisplayData
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
@@ -192,17 +194,22 @@ class ServiceNotification(
 
     private suspend fun show() =
         useBuilder {
+            val notification = it.build()
             try {
                 if (Build.VERSION.SDK_INT >= 34) {
-                    (service as Service).startForeground(
-                        notificationId,
-                        it.build(),
-                        FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED
-                    )
+                    // systemExempted is only granted to a VPN app through the OP_ACTIVATE_VPN
+                    // app-op, which ProxyService never holds: the platform would answer it with
+                    // a SecurityException and the service would silently degrade to a background one
+                    val type = if (service is VpnService) FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED
+                    else FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                    (service as Service).startForeground(notificationId, notification, type)
                 } else {
-                    (service as Service).startForeground(notificationId, it.build())
+                    (service as Service).startForeground(notificationId, notification)
                 }
             } catch (e: Exception) {
+                // the service cannot survive in the background without this;
+                // keep it out of the log-less Toast-only path
+                Logs.w(e)
                 Toast.makeText(
                     SagerNet.application,
                     "startForeground: $e",

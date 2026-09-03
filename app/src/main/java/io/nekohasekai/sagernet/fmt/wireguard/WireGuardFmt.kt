@@ -29,6 +29,10 @@ fun buildSingBoxEndpointWireGuardBean(bean: WireGuardBean): SingBoxOptions.Endpo
             port = bean.serverPort
             public_key = bean.peerPublicKey
             pre_shared_key = bean.peerPreSharedKey
+            // Required since the move from the wireguard outbound to the endpoint:
+            // sing-box rejects a peer with an empty allowed_ips ("missing allowed ips
+            // for peer"). The single-peer outbound used to imply a default route.
+            allowed_ips = listOf("0.0.0.0/0", "::/0")
             if (bean.reserved.isNotBlank()) reserved = genReservedList(bean.reserved)
         })
     }

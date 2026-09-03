@@ -162,12 +162,19 @@ abstract class GroupUpdater {
                     val channel = RandomAccessFile(
                         File(SagerNet.application.filesDir, "group_update_${proxyGroup.id}.lock"), "rw"
                     ).channel
-                    val lock = channel.tryLock()
-                    if (lock == null) {
-                        channel.close()
-                        null
-                    } else {
-                        channel to lock
+                    try {
+                        val lock = channel.tryLock()
+                        if (lock == null) {
+                            channel.close()
+                            null
+                        } else {
+                            channel to lock
+                        }
+                    } catch (e: Throwable) {
+                        // tryLock can throw too (e.g. EMFILE): close the channel
+                        // on that path as well, or each failed attempt leaks an fd
+                        runCatching { channel.close() }
+                        throw e
                     }
                 } catch (e: Throwable) {
                     Logs.w(e)

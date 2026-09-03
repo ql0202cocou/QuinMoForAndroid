@@ -331,7 +331,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         snackbar(getString(R.string.no_proxies_found_in_file)).show()
                     } else import(proxies)
                 } catch (e: SubscriptionFoundException) {
-                    (requireActivity() as MainActivity).importSubscription(e.link.toUri())
+                    (activity as? MainActivity)?.importSubscription(e.link.toUri())
                 } catch (e: Exception) {
                     Logs.w(e)
                     onMainDispatcher {
@@ -374,7 +374,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                             snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
                         } else import(proxies)
                     } catch (e: SubscriptionFoundException) {
-                        (requireActivity() as MainActivity).importSubscription(e.link.toUri())
+                        (activity as? MainActivity)?.importSubscription(e.link.toUri())
                     } catch (e: Exception) {
                         Logs.w(e)
 
@@ -516,25 +516,21 @@ class ConfigurationFragment @JvmOverloads constructor(
                         }
                     }
                     if (toClear.isNotEmpty()) {
+                        val groupId = toClear.first().groupId
                         onMainDispatcher {
                             MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                                 .setMessage(R.string.delete_confirm_prompt)
                                 .setPositiveButton(R.string.yes) { _, _ ->
-                                    for (profile in toClear) {
-                                        adapter.groupFragments[DataStore.selectedGroup]?.adapter?.apply {
-                                            val index = configurationIdList.indexOf(profile.id)
-                                            if (index >= 0) {
-                                                configurationIdList.removeAt(index)
-                                                configurationList.remove(profile.id)
-                                                notifyItemRemoved(index)
-                                            }
-                                        }
-                                    }
                                     runOnDefaultDispatcher {
                                         for (profile in toClear) {
                                             ProfileManager.deleteProfile2(
                                                 profile.groupId, profile.id
                                             )
+                                        }
+                                        // deleteProfile2 skips these; pay for them once per bulk delete
+                                        GroupManager.resetDanglingGroupProxies()
+                                        if (SagerDatabase.proxyDao.countByGroup(groupId) > 1) {
+                                            GroupManager.rearrange(groupId)
                                         }
                                     }
                                 }
@@ -557,6 +553,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         }
                     }
                     if (toClear.isNotEmpty()) {
+                        val groupId = toClear.first().groupId
                         onMainDispatcher {
                             MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                                 .setMessage(
@@ -572,21 +569,16 @@ class ConfigurationFragment @JvmOverloads constructor(
                                             }.joinToString("\n")
                                 )
                                 .setPositiveButton(R.string.yes) { _, _ ->
-                                    for (profile in toClear) {
-                                        adapter.groupFragments[DataStore.selectedGroup]?.adapter?.apply {
-                                            val index = configurationIdList.indexOf(profile.id)
-                                            if (index >= 0) {
-                                                configurationIdList.removeAt(index)
-                                                configurationList.remove(profile.id)
-                                                notifyItemRemoved(index)
-                                            }
-                                        }
-                                    }
                                     runOnDefaultDispatcher {
                                         for (profile in toClear) {
                                             ProfileManager.deleteProfile2(
                                                 profile.groupId, profile.id
                                             )
+                                        }
+                                        // deleteProfile2 skips these; pay for them once per bulk delete
+                                        GroupManager.resetDanglingGroupProxies()
+                                        if (SagerDatabase.proxyDao.countByGroup(groupId) > 1) {
+                                            GroupManager.rearrange(groupId)
                                         }
                                     }
                                 }
@@ -1378,7 +1370,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val updated = HashSet(updated)
                 this.updated.clear()
                 runOnDefaultDispatcher {
-                    updated.forEach { SagerDatabase.proxyDao.updateProxy(it) }
+                    updated.forEach { SagerDatabase.proxyDao.updateOrder(it.id, it.userOrder) }
                 }
             }
 
@@ -1792,10 +1784,19 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (data != null) {
                 runOnDefaultDispatcher {
                     try {
+                        val content = DataStore.serverConfig
+                        if (content.isBlank()) {
+                            // profileCacheStore died with the process; writing now
+                            // would truncate the picked document to 0 bytes
+                            onMainDispatcher {
+                                snackbar(getString(R.string.action_export_err)).show()
+                            }
+                            return@runOnDefaultDispatcher
+                        }
                         (requireActivity() as MainActivity).contentResolver.openOutputStream(data)!!
                             .bufferedWriter()
                             .use {
-                                it.write(DataStore.serverConfig)
+                                it.write(content)
                             }
                         onMainDispatcher {
                             snackbar(getString(R.string.action_export_msg)).show()

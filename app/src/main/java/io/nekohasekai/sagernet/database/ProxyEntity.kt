@@ -337,7 +337,10 @@ data class ProxyEntity(
     fun resolvedCore(): Int {
         if (core != CORE_AUTO) return core
         return when (type) {
-            TYPE_VMESS -> if (vmessBean!!.isVLESS) CORE_XRAY else CORE_SING_BOX
+            // xray dropped the h2/quic transports; those profiles only run on sing-box
+            TYPE_VMESS ->
+                if (vmessBean!!.isVLESS && !vmessBean!!.xrayLacksTransport()) CORE_XRAY else CORE_SING_BOX
+
             TYPE_ANYTLS -> CORE_MIHOMO
             else -> CORE_SING_BOX
         }
@@ -572,6 +575,11 @@ data class ProxyEntity(
 
         @Query("UPDATE proxy_entities SET status = :status, ping = :ping, error = :error WHERE id = :id")
         fun updateStatus(id: Long, status: Int, ping: Int, error: String?)
+
+        // userOrder only: drag-sort holds a stale snapshot, and a full-row
+        // @Update would roll back tx/rx persisted meanwhile by TrafficLooper
+        @Query("UPDATE proxy_entities SET userOrder = :order WHERE id = :id")
+        fun updateOrder(id: Long, order: Long)
 
         @Insert
         fun addProxy(proxy: ProxyEntity): Long

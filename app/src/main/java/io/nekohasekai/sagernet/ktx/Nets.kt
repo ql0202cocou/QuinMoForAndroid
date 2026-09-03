@@ -77,9 +77,11 @@ fun String.isLocalNameserverAddress(): Boolean {
 // should memoize — a dead nameserver costs the full timeout every call.
 fun lookupViaNameserver(nameserver: String?, domain: String): List<InetAddress>? {
     val server = nameserver
-        ?.lineSequence()?.map { it.trim() }
+        // strip mihomo-style "#h3" suffixes like RawUpdater does at mirror
+        // time — a stored/hand-entered one would break the lookup address
+        ?.lineSequence()?.map { it.trim().substringBefore("#").trim() }
         ?.firstOrNull {
-            it.isNotBlank() && !it.startsWith("#") && it != "local" &&
+            it.isNotBlank() && it != "local" &&
                     !it.isLocalNameserverAddress()
         }
         ?: return null
@@ -88,7 +90,12 @@ fun lookupViaNameserver(nameserver: String?, domain: String): List<InetAddress>?
             .mapNotNull { it.trim().parseNumericAddress() }
             .toList().takeIf { it.isNotEmpty() }
     } catch (e: Exception) {
-        Logs.d("Lookup $domain via $server failed: ${e.readableMessage}")
+        // scheme + authority only: a DoH path can embed tokens
+        Logs.d(
+            "Lookup $domain via " +
+                    server.substringAfter("://").substringBefore("/") +
+                    " failed: ${e.readableMessage}"
+        )
         null
     }
 }

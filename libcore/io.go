@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -47,6 +48,9 @@ func Unzip(archive string, path string) error {
 
 	for _, file := range r.File {
 		filePath := filepath.Join(path, file.Name)
+		if !strings.HasPrefix(filePath, filepath.Clean(path)+string(os.PathSeparator)) {
+			return E.New("zip entry ", file.Name, " escapes destination ", path)
+		}
 
 		if file.FileInfo().IsDir() {
 			err = os.MkdirAll(filePath, os.ModePerm)

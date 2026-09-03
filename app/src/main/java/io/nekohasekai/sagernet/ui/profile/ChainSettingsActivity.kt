@@ -139,6 +139,15 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
             // appending; mutate it on the main thread where the RecyclerView
             // reads it.
             onMainDispatcher {
+                // A select-profile callback may have written the cache while
+                // the profiles were loading; retry instead of rebuilding the
+                // list from stale ids and wiping that selection.
+                val currentIds = DataStore.serverProtocol.split(",")
+                    .mapNotNull { it.takeIf { it.isNotBlank() }?.toLong() }
+                if (currentIds != idList) {
+                    runOnDefaultDispatcher { reload() }
+                    return@onMainDispatcher
+                }
                 proxyList.clear()
                 for (id in idList) {
                     profiles[id]?.let { proxyList.add(it) }
@@ -264,14 +273,22 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
                     }
                 } else {
                     configurationList.post {
-                        if (replacing != 0) {
-                            proxyList[replacing - 1] = profile
-                            configurationAdapter.notifyItemChanged(replacing)
+                        // reload() rebuilds proxyList from DataStore.serverProtocol
+                        // asynchronously, so after a process-death restore the
+                        // list may still be empty here. Write the selection
+                        // through the same cache instead of indexing proxyList
+                        // (replacing can also be out of range then); a pending
+                        // reload picks the change up via its stale-cache retry.
+                        val ids = DataStore.serverProtocol.split(",")
+                            .mapNotNull { it.takeIf { it.isNotBlank() }?.toLong() }
+                            .toMutableList()
+                        if (replacing in 1..ids.size) {
+                            ids[replacing - 1] = profile.id
                         } else {
-                            proxyList.add(profile)
-                            configurationAdapter.notifyItemInserted(proxyList.size)
+                            ids.add(profile.id)
                         }
-                        updateProxiesCache()
+                        DataStore.serverProtocol = ids.joinToString(",")
+                        runOnDefaultDispatcher { configurationAdapter.reload() }
                     }
                 }
             }

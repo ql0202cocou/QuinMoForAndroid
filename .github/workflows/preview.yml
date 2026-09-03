@@ -1,6 +1,10 @@
 name: Preview Build
 on:
   workflow_dispatch:
+# Least privilege for every job; reusable workflows cannot exceed this.
+permissions:
+  contents: read
+  actions: read
 jobs:
   libcore:
     uses: ./.github/workflows/libcore.yml

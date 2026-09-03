@@ -166,11 +166,12 @@ func (c *httpClient) KeepAlive() {
 }
 
 func (c *httpClient) NewRequest() HTTPRequest {
-	req := &httpRequest{httpClient: c}
+	req := &httpRequest{httpClient: c, tls: c.tls.Clone()}
 	req.request = http.Request{
 		Method: "GET",
 		Header: http.Header{},
 	}
+	c.h1h2Transport.TLSClientConfig = req.tls
 	return req
 }
 
@@ -180,6 +181,10 @@ func (c *httpClient) Close() {
 
 type httpRequest struct {
 	*httpClient
+	// tls shadows the client's config with a per-request clone: the h1h2
+	// transport aliases httpClient.tls, so AllowInsecure writing it would
+	// permanently disable verification for every later request on the client.
+	tls     *tls.Config
 	request http.Request
 }
 
@@ -314,7 +319,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 						if host, _, _ := net.SplitHostPort(addr); host != "" {
 							domain = host
 						}
-						echTls := ech.NewECHClientConfig(domain, &r.tls, gLocalDNSTransport)
+						echTls := ech.NewECHClientConfig(domain, r.tls, gLocalDNSTransport)
 						return echTls.Client(ctx, c)
 					},
 					DisableKeepAlives: true,

@@ -3,6 +3,7 @@ package moe.matsuri.nb4a.proxy.anytls
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.Logs
 import moe.matsuri.nb4a.utils.JavaUtil
+import moe.matsuri.nb4a.utils.echAsBase64
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import org.yaml.snakeyaml.Yaml
 import java.security.MessageDigest
@@ -47,7 +48,8 @@ fun buildMihomoConfig(
     if (bean.echConfig.isNotBlank()) {
         proxy["ech-opts"] = linkedMapOf<String, Any?>(
             "enable" to true,
-            "config" to bean.echConfig,
+            // mihomo base64-decodes this string; a sing-box style PEM fails
+            "config" to bean.echConfig.echAsBase64(),
         )
     }
 

@@ -193,6 +193,9 @@ object RawUpdater : GroupUpdater() {
         // 分组删除的检查移入下面的事务里，与写入保持原子
         val toInsert = ArrayList<ProxyEntity>()
         val toUpdate = ArrayList<ProxyEntity>()
+        // reorder-only rows: applied as a userOrder column update below, so
+        // status/ping/error/tx/rx written during the download are not rolled back
+        val toReorder = ArrayList<ProxyEntity>()
         val added = mutableListOf<String>()
         val updated = mutableMapOf<String, String>()
         val deleted = toDelete.map { it.displayName() }
@@ -225,8 +228,7 @@ object RawUpdater : GroupUpdater() {
                     reordered -> {
                         // 纯重排也是变化，否则 changed==0 时误报“没有差异”
                         changed++
-                        entity.putBean(bean)
-                        toUpdate.add(entity)
+                        toReorder.add(entity)
 
                         Logs.d("Reordered profile: $name")
                     }
@@ -258,8 +260,22 @@ object RawUpdater : GroupUpdater() {
 
             SagerDatabase.proxyDao.insert(toInsert)
 
-            SagerDatabase.proxyDao.updateProxy(toUpdate).also {
-                Logs.d("Updated profiles: $it")
+            // toUpdate holds snapshots read before the download/resolve; a
+            // full-row write would roll back status/ping/error/tx/rx updates
+            // (URL tests, traffic persist) that landed meanwhile. Re-read each
+            // row inside the transaction and merge only updater-owned fields
+            // (userOrder and the bean content).
+            var updatedCount = 0
+            for (entity in toUpdate) {
+                val current = SagerDatabase.proxyDao.getById(entity.id) ?: continue
+                current.userOrder = entity.userOrder
+                current.putBean(entity.requireBean())
+                updatedCount += SagerDatabase.proxyDao.updateProxy(current)
+            }
+            Logs.d("Updated profiles: $updatedCount")
+
+            for (entity in toReorder) {
+                SagerDatabase.proxyDao.updateOrder(entity.id, entity.userOrder)
             }
 
             SagerDatabase.proxyDao.deleteProxy(toDelete).also {
@@ -366,9 +382,12 @@ object RawUpdater : GroupUpdater() {
 
                             "ss" -> {
                                 val ssPlugin = mutableListOf<String>()
-                                if (proxy.contains("plugin")) {
-                                    val opts = proxy["plugin-opts"] as Map<String, Any?>
-                                    when (proxy["plugin"]) {
+                                val ssPluginName = proxy["plugin"]?.toString().blankAsNull()
+                                if (ssPluginName != null) {
+                                    // plugin-opts is optional in clash; without it the
+                                    // plugin still applies with its default options
+                                    val opts = proxy["plugin-opts"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+                                    when (ssPluginName) {
                                         "obfs" -> {
                                             ssPlugin.apply {
                                                 add("obfs-local")
@@ -387,6 +406,12 @@ object RawUpdater : GroupUpdater() {
                                                 if (opts["mux"]?.toString() == "true") add("mux=8")
                                             }
                                         }
+
+                                        // shadow-tls/restls are configured through their own
+                                        // *-opts keys and have no sip003 plugin here; importing
+                                        // the node without them yields something that looks fine
+                                        // and can never connect, so drop it loudly instead
+                                        else -> error("unsupported shadowsocks plugin: $ssPluginName")
                                     }
                                 }
                                 proxies.add(ShadowsocksBean().apply {
@@ -538,8 +563,11 @@ object RawUpdater : GroupUpdater() {
                                         "http-opts" -> (opt.value as? Map<String, Any?>)?.also {
                                             for (httpOpt in it) {
                                                 when (httpOpt.key) {
+                                                    // a list mihomo picks from at random;
+                                                    // the builders carry a single path
                                                     "path" -> bean.path =
-                                                        (httpOpt.value as? List<Any>)?.joinToString("\n")
+                                                        (httpOpt.value as? List<*>)?.firstOrNull()
+                                                            ?.toString()
 
                                                     "headers" -> {
                                                         (httpOpt.value as? Map<Any, List<Any>>)?.forEach { (key, value) ->
@@ -610,7 +638,14 @@ object RawUpdater : GroupUpdater() {
                                         "skip-cert-verify" -> bean.allowInsecure =
                                             opt.value.toString() == "true"
 
-                                        "certificate" -> bean.certificates = opt.value.toString()
+                                        // mihomo's "certificate"/"private-key" are the mTLS
+                                        // CLIENT cert (ca.GetTLSConfig -> GetClientCertificate),
+                                        // not a custom CA — mapping them to bean.certificates
+                                        // would become a server-cert pin that can never match.
+                                        "certificate", "private-key" -> Logs.w(
+                                            "clash anytls mTLS client cert is unsupported, dropped"
+                                        )
+
                                         "fingerprint" -> bean.certificateFingerprint =
                                             opt.value.toString()
 
@@ -692,6 +727,9 @@ object RawUpdater : GroupUpdater() {
                                         "disable-mtu-discovery" -> bean.disableMtuDiscovery =
                                             opt.value.toString() == "true" || opt.value.toString() == "1"
 
+                                        "hop-interval" -> bean.hopInterval =
+                                            opt.value.toString().toIntOrNull() ?: bean.hopInterval
+
                                         "alpn" -> {
                                             val alpn = (opt.value as? (List<String>))
                                             bean.alpn = alpn?.joinToString("\n") ?: "h3"
@@ -730,6 +768,14 @@ object RawUpdater : GroupUpdater() {
 
                                         "down" -> bean.downloadMbps =
                                             opt.value.toString().substringBefore(" ").toIntOrNull() ?: 0
+
+                                        "ca-str" -> bean.caText = opt.value.toString()
+
+                                        "hop-interval" -> bean.hopInterval =
+                                            opt.value.toString().toIntOrNull() ?: bean.hopInterval
+
+                                        // no "alpn" here: hysteria2 mandates h3 and the
+                                        // sing-box builder hardcodes it
                                     }
                                 }
                                 if (hopPorts.isNotBlank()) {
@@ -858,25 +904,29 @@ object RawUpdater : GroupUpdater() {
     // 每行一个；缺省时按 mihomo 语义回退 dns.nameserver（节点域名用它解析）。
     // mihomo 特有的 system 值对 sing-box 无意义，直接丢弃；回环/未指定地址
     // （如指向 mihomo 自身 dns.listen 的 127.0.0.1:7874）出了原核心就是死地址，同样丢弃；
-    // #h3 之类 mihomo 私有后缀也一并剥掉，否则会漏进 sing-box 的 DoH path
+    // #h3 之类 mihomo 私有后缀也一并剥掉，否则会漏进 sing-box 的 DoH path。
+    // 候选键按优先级逐个尝试：proxy-server-nameserver 存在但过滤后为空时
+    // 同样回退 nameserver —— mihomo 语义里前者的上游就是后者
     fun parseProxyServerNameserver(text: String): String? {
         if (!text.contains("proxies:")) return null
         return try {
             val yaml = Yaml(SafeConstructor()).load(text) as Map<*, *>
             val dns = yaml["dns"] as? Map<*, *>
-            val value = dns?.get("proxy-server-nameserver")
-                ?: yaml["proxy-server-nameserver"]
-                ?: dns?.get("nameserver")
-            val addresses = when (value) {
-                is List<*> -> value.mapNotNull { it?.toString() }
-                is String -> listOf(value)
-                else -> return null
+            listOfNotNull(
+                dns?.get("proxy-server-nameserver"),
+                yaml["proxy-server-nameserver"],
+                dns?.get("nameserver")
+            ).firstNotNullOfOrNull { candidate ->
+                when (candidate) {
+                    is List<*> -> candidate.mapNotNull { it?.toString() }
+                    is String -> listOf(candidate)
+                    else -> emptyList()
+                }.map { it.trim().substringBefore("#") }
+                    .filter { it.isNotBlank() && it != "system" && !it.isLocalNameserverAddress() }
+                    .distinct()
+                    .joinToString("\n")
+                    .takeIf { it.isNotBlank() }
             }
-            addresses.map { it.trim().substringBefore("#") }
-                .filter { it.isNotBlank() && it != "system" && !it.isLocalNameserverAddress() }
-                .distinct()
-                .joinToString("\n")
-                .takeIf { it.isNotBlank() }
         } catch (e: Exception) {
             Logs.w(e)
             null

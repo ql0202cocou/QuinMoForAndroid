@@ -155,7 +155,12 @@ class RouteSettingsActivity(
     val selectAppList = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { (_, _) ->
-        apps.postUpdate()
+        // The fragment may not be committed yet on a process-death restore;
+        // AppListActivity already wrote DataStore.routePackages, so skipping
+        // the refresh loses nothing.
+        if (::apps.isInitialized) {
+            apps.postUpdate()
+        }
     }
 
     lateinit var outbound: OutboundPreference

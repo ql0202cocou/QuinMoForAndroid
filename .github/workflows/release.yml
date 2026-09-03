@@ -8,6 +8,11 @@ on:
       publish:
         description: "Publish: If want ignore"
         required: false
+# Least privilege for every job; the publish job widens contents to write.
+# Reusable workflows cannot exceed what is granted here.
+permissions:
+  contents: read
+  actions: read
 jobs:
   validate:
     name: Validate tag
@@ -21,10 +26,13 @@ jobs:
         # The tag must equal VERSION_NAME at the tagged commit, or ghr would publish a
         # release whose name doesn't match the APK version. Alpha tags (e.g. 1.7.2-a1)
         # follow the same rule — their nb4a.properties carries the alpha VERSION_NAME.
+        # The tag goes through env, never interpolated into the script body.
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           VERSION=$(grep '^VERSION_NAME=' nb4a.properties | cut -d= -f2 | tr -d '[:space:]')
-          if [ "$VERSION" != "${{ inputs.tag }}" ]; then
-            echo "::error::inputs.tag (${{ inputs.tag }}) does not match VERSION_NAME ($VERSION) in nb4a.properties"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "::error::inputs.tag ($TAG) does not match VERSION_NAME ($VERSION) in nb4a.properties"
             exit 1
           fi
   libcore:
@@ -45,6 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     needs: build
     steps:
       - name: Checkout
@@ -52,11 +61,14 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
       - name: Donwload Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: APKs
           path: artifacts
       - name: Release
+        env:
+          TAG: ${{ inputs.tag }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           wget -O ghr.tar.gz https://github.com/tcnksm/ghr/releases/download/v0.13.0/ghr_v0.13.0_linux_amd64.tar.gz
           echo "c428627270ae26e206cb526cb8c7bdfba475dd278f6691ddaf863355adadfa13  ghr.tar.gz" | sha256sum -c -
@@ -64,4 +76,12 @@ jobs:
           mv ghr*linux_amd64/ghr .
           mkdir apks
           find artifacts -name "*.apk" -exec cp {} apks \;
-          ./ghr -delete -t "${{ github.token }}" -n "${{ github.event.inputs.tag }}" "${{ github.event.inputs.tag }}" apks
+          if [ -z "$(ls -A apks)" ]; then
+            echo "::error::no APKs to publish; aborting before ghr -delete removes the existing release and tag"
+            exit 1
+          fi
+          # -delete drops the existing release AND its git tag, then recreates the
+          # tag at the target commitish; without -c that is the default branch head,
+          # so re-running a release for an older tag would silently move it off the
+          # commit these APKs were built from. HEAD here is the checked-out tag.
+          ./ghr -delete -c "$(git rev-parse HEAD)" -t "$GITHUB_TOKEN" -n "$TAG" "$TAG" apks

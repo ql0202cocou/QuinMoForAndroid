@@ -101,10 +101,19 @@ class AssetsActivity : ThemedActivity() {
             // DISPLAY_NAME comes from an external document provider and may
             // contain path separators; keep only the last segment like the
             // fallback does, so File(filesDir, fileName) cannot escape.
-            val fileName = (contentResolver.query(file, null, null, null, null)?.use { cursor ->
-                cursor.moveToFirst()
-                cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
-            }?.takeIf { it.isNotBlank() } ?: file.pathSegments.last()
+            // GetContent("*/*") allows arbitrary document providers; a broken
+            // one may return an empty cursor or lack the DISPLAY_NAME column.
+            val displayName = try {
+                contentResolver.query(file, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
+                    } else null
+                }
+            } catch (e: Exception) {
+                Logs.w(e)
+                null
+            }
+            val fileName = (displayName?.takeIf { it.isNotBlank() } ?: file.pathSegments.last()
                 .substringAfterLast('/')
                 .substringAfter(':'))
                 .substringAfterLast('/')

@@ -4,11 +4,15 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy.UPDATE
 import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkerParameters
+import androidx.work.multiprocess.RemoteCoroutineWorker
+import androidx.work.multiprocess.RemoteListenableWorker.ARGUMENT_CLASS_NAME
+import androidx.work.multiprocess.RemoteListenableWorker.ARGUMENT_PACKAGE_NAME
 import androidx.work.multiprocess.RemoteWorkManager
+import androidx.work.multiprocess.RemoteWorkerService
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
@@ -22,7 +26,8 @@ object SubscriptionUpdater {
     private const val WORK_NAME = "SubscriptionUpdater"
 
     suspend fun reconfigureUpdater() {
-        RemoteWorkManager.getInstance(app).cancelUniqueWork(WORK_NAME)
+        val workManager = RemoteWorkManager.getInstance(app)
+        workManager.cancelUniqueWork(WORK_NAME)
 
         val subscriptions = SagerDatabase.groupDao.subscriptions()
             .filter { it.subscription?.autoUpdate == true }
@@ -39,11 +44,20 @@ object SubscriptionUpdater {
             subscriptions.minOf { it.subscription!!.lastUpdated + it.subscription!!.autoUpdateDelay * 60L - now }
         if (minDelay < 15) minDelay = 15
 
-        // main process
-        RemoteWorkManager.getInstance(app).enqueueUniquePeriodicWork(
+        // Scheduling stays in the main process, but UpdateTask has to run in :bg —
+        // the only process whose DataStore.serviceState tracks the service. These two
+        // arguments make WorkManager delegate the request to RemoteWorkerService
+        // (manifest-pinned to :bg); without them the work would never do anything.
+        val remoteArgs = Data.Builder()
+            .putString(ARGUMENT_PACKAGE_NAME, app.packageName)
+            .putString(ARGUMENT_CLASS_NAME, RemoteWorkerService::class.java.name)
+            .build()
+
+        workManager.enqueueUniquePeriodicWork(
             WORK_NAME,
             UPDATE,
             PeriodicWorkRequest.Builder(UpdateTask::class.java, minDelay, TimeUnit.MINUTES)
+                .setInputData(remoteArgs)
                 .apply {
                     if (minInitDelay > 0) setInitialDelay(minInitDelay, TimeUnit.SECONDS)
                 }
@@ -53,7 +67,7 @@ object SubscriptionUpdater {
 
     class UpdateTask(
         appContext: Context, params: WorkerParameters
-    ) : CoroutineWorker(appContext, params) {
+    ) : RemoteCoroutineWorker(appContext, params) {
 
         val nm = NotificationManagerCompat.from(applicationContext)
 
@@ -67,7 +81,7 @@ object SubscriptionUpdater {
         // POST_NOTIFICATIONS is requested in MainActivity; when denied, notify()
         // is silently dropped by the system — no SecurityException to handle
         @SuppressLint("MissingPermission")
-        override suspend fun doWork(): Result {
+        override suspend fun doRemoteWork(): Result {
             try {
                 var subscriptions =
                     SagerDatabase.groupDao.subscriptions().filter { it.subscription?.autoUpdate == true }

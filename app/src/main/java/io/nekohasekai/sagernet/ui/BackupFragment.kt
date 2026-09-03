@@ -42,6 +42,15 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             if (data != null) {
                 runOnDefaultDispatcher {
                     try {
+                        // Process death with the picker foreground loses
+                        // content; do not write a 0-byte file on top of the
+                        // user's chosen location and report success.
+                        if (content.isBlank()) {
+                            onMainDispatcher {
+                                snackbar(getString(R.string.action_export_err)).show()
+                            }
+                            return@runOnDefaultDispatcher
+                        }
                         requireActivity().contentResolver.openOutputStream(
                             data
                         )!!.bufferedWriter().use {
@@ -257,7 +266,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                                 import.backupSettings.isChecked
                             )
                             if (skipped > 0) {
-                                Logs.w("Backup import skipped $skipped invalid profile record(s)")
+                                Logs.w("Backup import skipped $skipped invalid record(s)")
                                 onMainDispatcher {
                                     if (!isAdded) return@onMainDispatcher
                                     snackbar(
@@ -286,7 +295,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
     fun finishImport(
         content: JSONObject, profile: Boolean, rule: Boolean, setting: Boolean
     ): Int {
-        var skippedProfiles = 0
+        var skippedRecords = 0
         if (profile && content.has("profiles")) {
             val profiles = mutableListOf<ProxyEntity>()
             val jsonProfiles = content.getJSONArray("profiles")
@@ -308,7 +317,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                     }
                 }.getOrNull()
                 if (entity == null) {
-                    skippedProfiles++
+                    skippedRecords++
                     continue
                 }
                 profiles.add(entity)
@@ -317,12 +326,22 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             val groups = mutableListOf<ProxyGroup>()
             val jsonGroups = content.getJSONArray("groups")
             for (i in 0 until jsonGroups.length()) {
-                val data = Util.b64Decode(jsonGroups[i] as String)
-                val parcel = Parcel.obtain()
-                parcel.unmarshall(data, 0, data.size)
-                parcel.setDataPosition(0)
-                groups.add(ProxyGroup.CREATOR.createFromParcel(parcel))
-                parcel.recycle()
+                val group = runCatching {
+                    val data = Util.b64Decode(jsonGroups[i] as String)
+                    val parcel = Parcel.obtain()
+                    try {
+                        parcel.unmarshall(data, 0, data.size)
+                        parcel.setDataPosition(0)
+                        ProxyGroup.CREATOR.createFromParcel(parcel)
+                    } finally {
+                        parcel.recycle()
+                    }
+                }.getOrNull()
+                if (group == null) {
+                    skippedRecords++
+                    continue
+                }
+                groups.add(group)
             }
             SagerDatabase.instance.runInTransaction {
                 SagerDatabase.proxyDao.reset()
@@ -335,12 +354,22 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             val rules = mutableListOf<RuleEntity>()
             val jsonRules = content.getJSONArray("rules")
             for (i in 0 until jsonRules.length()) {
-                val data = Util.b64Decode(jsonRules[i] as String)
-                val parcel = Parcel.obtain()
-                parcel.unmarshall(data, 0, data.size)
-                parcel.setDataPosition(0)
-                rules.add(ParcelizeBridge.createRule(parcel))
-                parcel.recycle()
+                val ruleEntity = runCatching {
+                    val data = Util.b64Decode(jsonRules[i] as String)
+                    val parcel = Parcel.obtain()
+                    try {
+                        parcel.unmarshall(data, 0, data.size)
+                        parcel.setDataPosition(0)
+                        ParcelizeBridge.createRule(parcel)
+                    } finally {
+                        parcel.recycle()
+                    }
+                }.getOrNull()
+                if (ruleEntity == null) {
+                    skippedRecords++
+                    continue
+                }
+                rules.add(ruleEntity)
             }
             SagerDatabase.instance.runInTransaction {
                 SagerDatabase.rulesDao.reset()
@@ -351,12 +380,22 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             val settings = mutableListOf<KeyValuePair>()
             val jsonSettings = content.getJSONArray("settings")
             for (i in 0 until jsonSettings.length()) {
-                val data = Util.b64Decode(jsonSettings[i] as String)
-                val parcel = Parcel.obtain()
-                parcel.unmarshall(data, 0, data.size)
-                parcel.setDataPosition(0)
-                settings.add(KeyValuePair.CREATOR.createFromParcel(parcel))
-                parcel.recycle()
+                val kvPair = runCatching {
+                    val data = Util.b64Decode(jsonSettings[i] as String)
+                    val parcel = Parcel.obtain()
+                    try {
+                        parcel.unmarshall(data, 0, data.size)
+                        parcel.setDataPosition(0)
+                        KeyValuePair.CREATOR.createFromParcel(parcel)
+                    } finally {
+                        parcel.recycle()
+                    }
+                }.getOrNull()
+                if (kvPair == null) {
+                    skippedRecords++
+                    continue
+                }
+                settings.add(kvPair)
             }
             PublicDatabase.instance.runInTransaction {
                 PublicDatabase.kvPairDao.reset()
@@ -373,7 +412,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                     SagerDatabase.groupDao.allGroups().firstOrNull()?.id ?: -1L
             }
         }
-        return skippedProfiles
+        return skippedRecords
     }
 
 }

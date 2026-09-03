@@ -108,10 +108,13 @@ class SagerNet : Application(),
         updateNotificationChannels()
     }
 
+    // Kept so WorkManager can initialize itself on demand in :bg, where
+    // RemoteWorkerService hosts the subscription worker. The schedulers stay in
+    // the main process: WorkManager's SystemJobService and ForceStopRunnable are
+    // declared there, so naming :bg as the default process only stopped the main
+    // process from rescheduling work after a force-stop.
     override val workManagerConfiguration: WorkConfiguration
-        get() = WorkConfiguration.Builder()
-            .setDefaultProcessName("${BuildConfig.APPLICATION_ID}:bg")
-            .build()
+        get() = WorkConfiguration.Builder().build()
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
