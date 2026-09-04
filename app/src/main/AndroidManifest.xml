@@ -215,20 +215,25 @@
         <activity
             android:name=".QuickToggleShortcut"
             android:excludeFromRecents="true"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/quick_toggle"
             android:launchMode="singleTask"
             android:process=":bg"
             android:taskAffinity=""
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity-alias
+            android:name=".QuickToggleShortcutCreator"
+            android:exported="true"
+            android:label="@string/quick_toggle"
+            android:targetActivity=".QuickToggleShortcut">
             <intent-filter>
                 <action android:name="android.intent.action.CREATE_SHORTCUT" />
             </intent-filter>
-        </activity>
+        </activity-alias>
         <activity
             android:name="io.nekohasekai.sagernet.ui.QuickEnableShortcut"
             android:excludeFromRecents="true"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/quick_enable"
             android:launchMode="singleTask"
             android:process=":bg"
@@ -237,7 +242,7 @@
         <activity
             android:name="io.nekohasekai.sagernet.ui.QuickDisableShortcut"
             android:excludeFromRecents="true"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/quick_disable"
             android:launchMode="singleTask"
             android:process=":bg"

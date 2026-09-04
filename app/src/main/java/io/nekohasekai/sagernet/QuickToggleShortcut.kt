@@ -53,14 +53,13 @@ class QuickToggleShortcut : Activity(), SagerConnection.Callback {
                     .build()))
             finish()
         } else {
+            // The exported creator alias only handles ACTION_CREATE_SHORTCUT.
+            // Actual toggle intents target this non-exported activity.
+            if (intent.component?.className != QuickToggleShortcut::class.java.name) {
+                finish()
+                return
+            }
             profileId = intent.getLongExtra("profile", -1L)
-            // This activity is exported, so any app can fire ACTION_MAIN at
-            // it. Honor the profile extra only for the current selection or
-            // a per-profile shortcut the user actually pinned from the
-            // profile screen — third-party launches may toggle the service
-            // but must not change DataStore.selectedProxy. (Pinned shortcuts
-            // are only queryable on API 25+; below that the extra is ignored
-            // unless it names the current selection.)
             connection.connect(this, this)
             if (profileId >= 0 && profileId != DataStore.selectedProxy &&
                 ShortcutManagerCompat.getShortcuts(this, ShortcutManagerCompat.FLAG_MATCH_PINNED)

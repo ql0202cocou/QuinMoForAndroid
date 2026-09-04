@@ -23,6 +23,7 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.nio.channels.FileLock
 import java.util.*
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
 @Suppress("EXPERIMENTAL_API_USAGE")
@@ -49,8 +50,10 @@ abstract class GroupUpdater {
         profiles: List<AbstractBean>, groupId: Long?, groupNameserver: String? = null
     ) {
         val ipv6Mode = DataStore.ipv6Mode
-        val lookupPool = newFixedThreadPoolContext(5, "DNS Lookup")
-        val lookupJobs = mutableListOf<Job>()
+        val lookupThreadIndex = AtomicInteger()
+        val lookupPool = Executors.newFixedThreadPool(5) { runnable ->
+            Thread(runnable, "DNS Lookup-${lookupThreadIndex.incrementAndGet()}")
+        }.asCoroutineDispatcher()
         val progress = Progress(profiles.size)
         if (groupId != null) {
             GroupUpdater.progress[groupId] = progress
@@ -58,46 +61,48 @@ abstract class GroupUpdater {
         }
         val ipv6First = ipv6Mode >= IPv6Mode.PREFER
 
-        for (profile in profiles) {
-            when (profile) {
-                // SNI rewrite unsupported
-                is NaiveBean -> continue
-            }
-
-            if (profile.serverAddress.isIpAddress()) continue
-
-            lookupJobs.add(GlobalScope.launch(lookupPool) {
-                try {
-                    val results = if (
-                        SagerNet.underlyingNetwork != null &&
-                        DataStore.enableFakeDns &&
-                        DataStore.serviceState.started &&
-                        DataStore.serviceMode == Key.MODE_VPN
-                    ) {
-                        // FakeDNS
-                        SagerNet.underlyingNetwork!!
-                            .getAllByName(profile.serverAddress)
-                            .filterNotNull()
-                    } else {
-                        // 分组指定了节点解析 DNS 时优先使用，失败回退系统 DNS
-                        // System DNS is enough (when VPN connected, it uses v2ray-core)
-                        lookupViaNameserver(groupNameserver, profile.serverAddress)
-                            ?: InetAddress.getAllByName(profile.serverAddress).filterNotNull()
-                    }
-                    if (results.isEmpty()) error("empty response")
-                    rewriteAddress(profile, results, ipv6First)
-                } catch (e: Exception) {
-                    Logs.d("Lookup ${profile.serverAddress} failed: ${e.readableMessage}", e)
-                }
-                if (groupId != null) {
-                    progress.progressAtomic.incrementAndGet()
-                    GroupManager.postReload(groupId)
-                }
-            })
-        }
-
         try {
-            lookupJobs.joinAll()
+            coroutineScope {
+                for (profile in profiles) {
+                    when (profile) {
+                        // SNI rewrite unsupported
+                        is NaiveBean -> continue
+                    }
+
+                    if (profile.serverAddress.isIpAddress()) continue
+
+                    launch(lookupPool) {
+                        try {
+                            val results = if (
+                                SagerNet.underlyingNetwork != null &&
+                                DataStore.enableFakeDns &&
+                                DataStore.serviceState.started &&
+                                DataStore.serviceMode == Key.MODE_VPN
+                            ) {
+                                // FakeDNS
+                                SagerNet.underlyingNetwork!!
+                                    .getAllByName(profile.serverAddress)
+                                    .filterNotNull()
+                            } else {
+                                // 分组指定了节点解析 DNS 时优先使用，失败回退系统 DNS
+                                // System DNS is enough (when VPN connected, it uses v2ray-core)
+                                lookupViaNameserver(groupNameserver, profile.serverAddress)
+                                    ?: InetAddress.getAllByName(profile.serverAddress).filterNotNull()
+                            }
+                            if (results.isEmpty()) error("empty response")
+                            rewriteAddress(profile, results, ipv6First)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Logs.d("Lookup ${profile.serverAddress} failed: ${e.readableMessage}", e)
+                        }
+                        if (groupId != null) {
+                            progress.progressAtomic.incrementAndGet()
+                            GroupManager.postReload(groupId)
+                        }
+                    }
+                }
+            }
         } finally {
             lookupPool.close()
         }
@@ -157,73 +162,74 @@ abstract class GroupUpdater {
                     return@coroutineScope false
                 }
 
-                // cross-process mutex: periodic WorkManager updates run in :bg while
-                // manual updates run in the main process
-                val lockPair = try {
-                    val channel = RandomAccessFile(
-                        File(SagerNet.application.filesDir, "group_update_${proxyGroup.id}.lock"), "rw"
-                    ).channel
-                    // tryLock can return null or throw (e.g. EMFILE); close the channel
-                    // unless we hand it out, or each failed attempt leaks an fd
-                    var lock: FileLock? = null
-                    try {
-                        lock = channel.tryLock()
-                    } finally {
-                        if (lock == null) channel.close()
-                    }
-                    lock?.let { channel to it }
-                } catch (e: Throwable) {
-                    Logs.w(e)
-                    null
-                }
-                if (lockPair == null) {
-                    // another process is updating this group
-                    finishUpdate(proxyGroup)
-                    return@coroutineScope false
-                }
-                val (lockChannel, fileLock) = lockPair
-
                 try {
-                    GroupManager.postReload(proxyGroup.id)
-
-                    val connected = DataStore.serviceState.connected
-                    val userInterface = GroupManager.userInterface
-                    val subscription = proxyGroup.subscription
-                    if (subscription == null) {
-                        // a corrupted backup restore can leave a subscription group without one
-                        Logs.w("Group ${proxyGroup.id} has no subscription")
-                        userInterface?.onUpdateFailure(proxyGroup, "group has no subscription")
-                        finishUpdate(proxyGroup)
-                        return@coroutineScope false
-                    }
-
-                    if (byUser && (subscription.link?.startsWith("http://") == true || subscription.updateWhenConnectedOnly) && !connected) {
-                        if (userInterface == null || !userInterface.confirm(app.getString(R.string.update_subscription_warning))) {
-                            // no cancel() here: cancelling this scope makes
-                            // coroutineScope throw on the way out, so the caller
-                            // never sees the value below. Nothing else is running
-                            // in the scope, so there is nothing to cancel.
-                            finishUpdate(proxyGroup)
-                            return@coroutineScope true
+                    // cross-process mutex: periodic WorkManager updates run in :bg while
+                    // manual updates run in the main process
+                    val lockPair = try {
+                        val channel = RandomAccessFile(
+                            File(SagerNet.application.filesDir, "group_update_${proxyGroup.id}.lock"), "rw"
+                        ).channel
+                        // tryLock can return null or throw (e.g. EMFILE); close the channel
+                        // unless we hand it out, or each failed attempt leaks an fd
+                        var lock: FileLock? = null
+                        try {
+                            lock = channel.tryLock()
+                        } finally {
+                            if (lock == null) channel.close()
                         }
-                    }
-
-                    try {
-                        RawUpdater.doUpdate(proxyGroup, subscription, userInterface, byUser)
-                        true
-                    } catch (e: CancellationException) {
-                        // don't swallow cancellation (nor report it as a failure)
-                        finishUpdate(proxyGroup)
-                        throw e
+                        lock?.let { channel to it }
                     } catch (e: Throwable) {
                         Logs.w(e)
-                        userInterface?.onUpdateFailure(proxyGroup, e.readableMessage)
-                        finishUpdate(proxyGroup)
-                        false
+                        null
+                    }
+                    if (lockPair == null) {
+                        // another process is updating this group
+                        return@coroutineScope false
+                    }
+                    val (lockChannel, fileLock) = lockPair
+
+                    try {
+                        GroupManager.postReload(proxyGroup.id)
+
+                        val connected = DataStore.serviceState.connected
+                        val userInterface = GroupManager.userInterface
+                        val subscription = proxyGroup.subscription
+                        if (subscription == null) {
+                            // a corrupted backup restore can leave a subscription group without one
+                            Logs.w("Group ${proxyGroup.id} has no subscription")
+                            userInterface?.onUpdateFailure(proxyGroup, "group has no subscription")
+                            return@coroutineScope false
+                        }
+
+                        if (byUser && (subscription.link?.startsWith("http://") == true || subscription.updateWhenConnectedOnly) && !connected) {
+                            if (userInterface == null || !userInterface.confirm(app.getString(R.string.update_subscription_warning))) {
+                                return@coroutineScope true
+                            }
+                        }
+
+                        try {
+                            RawUpdater.doUpdate(proxyGroup, subscription, userInterface, byUser)
+                            true
+                        } catch (e: CancellationException) {
+                            // don't swallow cancellation (nor report it as a failure)
+                            throw e
+                        } catch (e: Throwable) {
+                            Logs.w(e)
+                            userInterface?.onUpdateFailure(proxyGroup, e.readableMessage)
+                            false
+                        }
+                    } finally {
+                        runCatching { fileLock.release() }
+                        runCatching { lockChannel.close() }
                     }
                 } finally {
-                    runCatching { fileLock.release() }
-                    runCatching { lockChannel.close() }
+                    withContext(NonCancellable) {
+                        try {
+                            finishUpdate(proxyGroup)
+                        } catch (e: Throwable) {
+                            Logs.w(e)
+                        }
+                    }
                 }
             }
         }

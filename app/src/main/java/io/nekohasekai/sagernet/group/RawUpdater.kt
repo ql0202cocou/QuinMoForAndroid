@@ -313,8 +313,6 @@ object RawUpdater : GroupUpdater() {
                 SagerDatabase.groupDao.updateGroup(current)
             }
         }
-        finishUpdate(proxyGroup)
-
         userInterface?.onUpdateSuccess(
             proxyGroup, changed, added, updated, deleted, duplicate, byUser
         )

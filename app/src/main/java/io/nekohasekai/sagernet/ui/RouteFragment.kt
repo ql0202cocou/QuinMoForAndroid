@@ -250,25 +250,27 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
 
             fun bind(ruleEntity: RuleEntity) {
                 rule = ruleEntity
-                profileName.text = rule.displayName()
-                profileType.text = rule.mkSummary()
-                routeOutbound.text = rule.displayOutbound()
+                profileName.text = ruleEntity.displayName()
+                profileType.text = ruleEntity.mkSummary()
+                routeOutbound.text = ruleEntity.displayOutbound()
                 itemView.setOnClickListener {
                     enableSwitch.performClick()
                 }
-                enableSwitch.isChecked = rule.enabled
+                enableSwitch.setOnCheckedChangeListener(null)
+                enableSwitch.isChecked = ruleEntity.enabled
                 enableSwitch.setOnCheckedChangeListener { _, isChecked ->
+                    val ruleId = ruleEntity.id
+                    ruleEntity.enabled = isChecked
                     runOnDefaultDispatcher {
-                        rule.enabled = isChecked
-                        SagerDatabase.rulesDao.updateRule(rule)
+                        SagerDatabase.rulesDao.updateEnabled(ruleId, isChecked)
                         onMainDispatcher {
-                            needReload()
+                            if (isAdded) needReload()
                         }
                     }
                 }
                 editButton.setOnClickListener {
                     startActivity(Intent(it.context, RouteSettingsActivity::class.java).apply {
-                        putExtra(RouteSettingsActivity.EXTRA_ROUTE_ID, rule.id)
+                        putExtra(RouteSettingsActivity.EXTRA_ROUTE_ID, ruleEntity.id)
                     })
                 }
             }

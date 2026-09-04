@@ -592,18 +592,21 @@ fun buildConfig(
                     // Only the first hop of another member's chain has a global
                     // outbound of its own (globalOutbounds is filled at
                     // profileList.lastIndex, which resolveChain reverses to the
-                    // hop dialed first); a middle hop has none and genuinely
-                    // cannot be selected on its own.
-                    globalOutbounds[it.id]?.let { tag -> tagMap[it.id] = tag }
-                    return@forEach
+                    // hop dialed first).
+                    val globalTag = globalOutbounds[it.id]
+                    if (globalTag != null) {
+                        tagMap[it.id] = globalTag
+                        return@forEach
+                    }
+                    // A middle hop only has a chain-scoped tag. Build a
+                    // standalone global outbound so the group member remains
+                    // selectable and can be targeted by route rules.
                 }
                 tagMap[it.id] = buildChain(it.id, it)
             }
             outbounds.add(0, Outbound_SelectorOptions().apply {
                 type = "selector"
                 tag = TAG_PROXY
-                // null only for the middle-hop case above; sing-box then selects
-                // outbounds[0], which is what any fallback here would pick too
                 default_ = tagMap[proxy.id]
                 // a chain whose exit node is also a group member maps to that
                 // member's tag via the globalOutbounds dedup — list it once
@@ -616,7 +619,15 @@ fun buildConfig(
         extraProxies.forEach { (key, p) ->
             // already built as a selector member or inside another chain:
             // rebuilding would duplicate its outbound/inbound tags
-            if (builtProfiles.contains(key)) return@forEach
+            if (builtProfiles.contains(key)) {
+                val globalTag = globalOutbounds[key]
+                if (globalTag != null) {
+                    tagMap[key] = globalTag
+                    return@forEach
+                }
+                // Middle chain hops have no reusable global tag. Give route
+                // rules a standalone outbound instead of dropping the rule.
+            }
             tagMap[key] = buildChain(key, p)
         }
 

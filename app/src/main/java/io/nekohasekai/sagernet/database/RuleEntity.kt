@@ -89,6 +89,9 @@ data class RuleEntity(
         @Update
         fun updateRule(rule: RuleEntity)
 
+        @Query("UPDATE rules SET enabled = :enabled WHERE id = :ruleId")
+        fun updateEnabled(ruleId: Long, enabled: Boolean)
+
         @Update
         fun updateRules(rules: List<RuleEntity>)
 

@@ -12,7 +12,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.jakewharton.processphoenix.ProcessPhoenix
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
@@ -264,11 +263,11 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                                     ).show()
                                 }
                             }
-                            triggerFullRestart(requireContext())
+                            triggerFullRestart(app)
                         }.onFailure {
                             Logs.w(it)
                             onMainDispatcher {
-                                alert(it.readableMessage).tryToShow()
+                                if (isAdded) alert(it.readableMessage).tryToShow()
                             }
                         }
 
@@ -286,11 +285,31 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
         content: JSONObject, profile: Boolean, rule: Boolean, setting: Boolean
     ): Int {
         var skippedRecords = 0
-        if (profile && content.has("profiles")) {
-            val profiles = mutableListOf<ProxyEntity>()
-            val jsonProfiles = content.getJSONArray("profiles")
-            for (i in 0 until jsonProfiles.length()) {
-                val entity = unmarshal(jsonProfiles[i] as String) {
+
+        fun <T> decodeArray(key: String, decode: (String) -> T?): List<T> {
+            val result = mutableListOf<T>()
+            val array = content.getJSONArray(key)
+            for (i in 0 until array.length()) {
+                val encoded = array.get(i)
+                require(encoded is String) { "$key[$i] is not an encoded record" }
+                val item = decode(encoded)
+                if (item == null) {
+                    skippedRecords++
+                } else {
+                    result.add(item)
+                }
+            }
+            require(array.length() == 0 || result.isNotEmpty()) {
+                "$key contains no valid records"
+            }
+            return result
+        }
+
+        // Decode and validate every selected section before touching either
+        // database. A malformed later section must not erase earlier data.
+        val profiles = if (profile && content.has("profiles")) {
+            decodeArray("profiles") { encoded ->
+                unmarshal(encoded) {
                     ProxyEntity.CREATOR.createFromParcel(it).also { entity ->
                         // Unknown types leave every bean null (putByteArray has no
                         // else); the configuration list would crash in requireBean()
@@ -298,71 +317,79 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                         entity.requireBean()
                     }
                 }
-                if (entity == null) {
-                    skippedRecords++
-                    continue
-                }
-                profiles.add(entity)
             }
+        } else null
+        val groups = if (profiles != null) {
+            decodeArray("groups") { encoded ->
+                unmarshal(encoded, ProxyGroup.CREATOR::createFromParcel)
+            }
+        } else null
+        val rules = if (rule && content.has("rules")) {
+            decodeArray("rules") { encoded ->
+                unmarshal(encoded, ParcelizeBridge::createRule)
+            }
+        } else null
+        val settings = if (setting && content.has("settings")) {
+            decodeArray("settings") { encoded ->
+                unmarshal(encoded, KeyValuePair.CREATOR::createFromParcel)
+            }
+        } else null
 
-            val groups = mutableListOf<ProxyGroup>()
-            val jsonGroups = content.getJSONArray("groups")
-            for (i in 0 until jsonGroups.length()) {
-                val group = unmarshal(jsonGroups[i] as String, ProxyGroup.CREATOR::createFromParcel)
-                if (group == null) {
-                    skippedRecords++
-                    continue
-                }
-                groups.add(group)
-            }
+        val oldProfiles = profiles?.let { SagerDatabase.proxyDao.getAll() }
+        val oldGroups = groups?.let { SagerDatabase.groupDao.allGroups() }
+        val oldRules = rules?.let { SagerDatabase.rulesDao.allRules() }
+
+        fun replaceSagerData(
+            newProfiles: List<ProxyEntity>?,
+            newGroups: List<ProxyGroup>?,
+            newRules: List<RuleEntity>?,
+        ) {
             SagerDatabase.instance.runInTransaction {
-                SagerDatabase.proxyDao.reset()
-                SagerDatabase.proxyDao.insert(profiles)
-                SagerDatabase.groupDao.reset()
-                SagerDatabase.groupDao.insert(groups)
+                if (newProfiles != null && newGroups != null) {
+                    SagerDatabase.proxyDao.reset()
+                    SagerDatabase.proxyDao.insert(newProfiles)
+                    SagerDatabase.groupDao.reset()
+                    SagerDatabase.groupDao.insert(newGroups)
+                }
+                if (newRules != null) {
+                    SagerDatabase.rulesDao.reset()
+                    SagerDatabase.rulesDao.insert(newRules)
+                }
             }
         }
-        if (rule && content.has("rules")) {
-            val rules = mutableListOf<RuleEntity>()
-            val jsonRules = content.getJSONArray("rules")
-            for (i in 0 until jsonRules.length()) {
-                val ruleEntity = unmarshal(jsonRules[i] as String, ParcelizeBridge::createRule)
-                if (ruleEntity == null) {
-                    skippedRecords++
-                    continue
+
+        var sagerCommitted = false
+        try {
+            if (profiles != null || rules != null) {
+                replaceSagerData(profiles, groups, rules)
+                sagerCommitted = true
+            }
+            if (settings != null) {
+                PublicDatabase.instance.runInTransaction {
+                    PublicDatabase.kvPairDao.reset()
+                    PublicDatabase.kvPairDao.insert(settings)
+                    // The imported PROFILE_GROUP may reference a group that does not
+                    // exist here (e.g. a settings-only import); currentGroupId() trusts
+                    // any positive value and the configuration page would stay blank.
+                    if (DataStore.selectedGroup > 0L &&
+                        SagerDatabase.groupDao.getById(DataStore.selectedGroup) == null
+                    ) {
+                        DataStore.selectedGroup =
+                            SagerDatabase.groupDao.allGroups().firstOrNull()?.id ?: -1L
+                    }
                 }
-                rules.add(ruleEntity)
             }
-            SagerDatabase.instance.runInTransaction {
-                SagerDatabase.rulesDao.reset()
-                SagerDatabase.rulesDao.insert(rules)
-            }
-        }
-        if (setting && content.has("settings")) {
-            val settings = mutableListOf<KeyValuePair>()
-            val jsonSettings = content.getJSONArray("settings")
-            for (i in 0 until jsonSettings.length()) {
-                val kvPair = unmarshal(jsonSettings[i] as String, KeyValuePair.CREATOR::createFromParcel)
-                if (kvPair == null) {
-                    skippedRecords++
-                    continue
+        } catch (failure: Throwable) {
+            // Room makes each database transaction atomic. Compensate the
+            // already-committed other database if the second commit fails.
+            if (sagerCommitted) {
+                try {
+                    replaceSagerData(oldProfiles, oldGroups, oldRules)
+                } catch (rollbackFailure: Throwable) {
+                    failure.addSuppressed(rollbackFailure)
                 }
-                settings.add(kvPair)
             }
-            PublicDatabase.instance.runInTransaction {
-                PublicDatabase.kvPairDao.reset()
-                PublicDatabase.kvPairDao.insert(settings)
-            }
-            // The imported PROFILE_GROUP may reference a group that does not
-            // exist here (e.g. a settings-only import); currentGroupId() trusts
-            // any positive value and the configuration page would stay blank.
-            // Same fallback as GroupManager.resetSelectedGroup().
-            if (DataStore.selectedGroup > 0L &&
-                SagerDatabase.groupDao.getById(DataStore.selectedGroup) == null
-            ) {
-                DataStore.selectedGroup =
-                    SagerDatabase.groupDao.allGroups().firstOrNull()?.id ?: -1L
-            }
+            throw failure
         }
         return skippedRecords
     }
