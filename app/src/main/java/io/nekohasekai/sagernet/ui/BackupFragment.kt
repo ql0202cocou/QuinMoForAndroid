@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
@@ -23,7 +24,9 @@ import io.nekohasekai.sagernet.databinding.LayoutBackupBinding
 import io.nekohasekai.sagernet.databinding.LayoutImportBinding
 import io.nekohasekai.sagernet.databinding.LayoutProgressBinding
 import io.nekohasekai.sagernet.ktx.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import moe.matsuri.nb4a.utils.Util
 import org.json.JSONArray
 import org.json.JSONObject
@@ -40,7 +43,9 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
         registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { data ->
             if (data != null) {
                 // Process death with the picker foreground loses content
-                runOnDefaultDispatcher { writeToDocument(data, content) }
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                    writeToDocument(data, content)
+                }
             }
         }
 
@@ -61,13 +66,13 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
         }
 
         binding.actionExport.setOnClickListener {
-            runOnDefaultDispatcher {
-                content = doBackup(
-                    binding.backupConfigurations.isChecked,
-                    binding.backupRules.isChecked,
-                    binding.backupSettings.isChecked
-                )
+            val profile = binding.backupConfigurations.isChecked
+            val rule = binding.backupRules.isChecked
+            val setting = binding.backupSettings.isChecked
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
+                val backup = doBackup(profile, rule, setting)
                 onMainDispatcher {
+                    content = backup
                     startFilesForResult(
                         exportSettings,
                         "nekobox_backup_${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.json"
@@ -77,18 +82,17 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
         }
 
         binding.actionShare.setOnClickListener {
-            runOnDefaultDispatcher {
-                content = doBackup(
-                    binding.backupConfigurations.isChecked,
-                    binding.backupRules.isChecked,
-                    binding.backupSettings.isChecked
-                )
+            val profile = binding.backupConfigurations.isChecked
+            val rule = binding.backupRules.isChecked
+            val setting = binding.backupSettings.isChecked
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
+                val backup = doBackup(profile, rule, setting)
                 app.cacheDir.mkdirs()
                 val cacheFile = File(
                     app.cacheDir,
                     "nekobox_backup_${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.json"
                 )
-                cacheFile.writeText(content)
+                cacheFile.writeText(backup)
                 onMainDispatcher {
                     startActivity(
                         Intent.createChooser(
@@ -171,17 +175,15 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
 
     val importFile = registerForActivityResult(ActivityResultContracts.GetContent()) { file ->
         if (file != null) {
-            runOnDefaultDispatcher {
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
                 startImport(file)
             }
         }
     }
 
     suspend fun startImport(file: Uri) {
-        // The fragment may already be detached by the time this coroutine
-        // runs (user picked a file and left immediately); bail out then.
         val fileName = try {
-            requireContext().contentResolver.query(file, null, null, null, null)
+            app.contentResolver.query(file, null, null, null, null)
                 ?.use { cursor ->
                     cursor.moveToFirst()
                     cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
@@ -202,13 +204,11 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
         }
 
         suspend fun invalid() = onMainDispatcher {
-            onMainDispatcher {
-                snackbar(getString(R.string.invalid_backup_file)).show()
-            }
+            snackbar(getString(R.string.invalid_backup_file)).show()
         }
 
         val content = try {
-            JSONObject((requireContext().contentResolver.openInputStream(file) ?: return).use {
+            JSONObject((app.contentResolver.openInputStream(file) ?: return).use {
                 it.bufferedReader().readText()
             })
         } catch (e: Exception) {
@@ -246,7 +246,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                         .setView(binding.root)
                         .setCancelable(false)
                         .show()
-                    runOnDefaultDispatcher {
+                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
                         runCatching {
                             val skipped = finishImport(
                                 content,

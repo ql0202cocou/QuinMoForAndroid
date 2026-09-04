@@ -95,12 +95,37 @@ object GroupManager {
         return group
     }
 
-    suspend fun updateGroup(group: ProxyGroup) {
-        SagerDatabase.groupDao.updateGroup(group)
-        iterator { groupUpdated(group) }
+    suspend fun updateGroup(group: ProxyGroup, preserveSubscriptionRuntime: Boolean = false) {
+        var updated: ProxyGroup? = null
+        SagerDatabase.instance.runInTransaction {
+            val current = SagerDatabase.groupDao.getById(group.id) ?: return@runInTransaction
+            // The editor does not own list position or the ungrouped marker.
+            group.userOrder = current.userOrder
+            group.ungrouped = current.ungrouped
+            if (preserveSubscriptionRuntime) {
+                val currentSubscription = current.subscription
+                group.subscription?.apply {
+                    lastUpdated = currentSubscription?.lastUpdated ?: lastUpdated
+                    subscriptionUserinfo =
+                        currentSubscription?.subscriptionUserinfo ?: subscriptionUserinfo
+                    bytesUsed = currentSubscription?.bytesUsed ?: bytesUsed
+                    bytesRemaining = currentSubscription?.bytesRemaining ?: bytesRemaining
+                    expiryDate = currentSubscription?.expiryDate ?: expiryDate
+                }
+            }
+            SagerDatabase.groupDao.updateGroup(group)
+            updated = group
+        }
+        val current = updated ?: return
+        iterator { groupUpdated(current) }
         // 分组类型可能在订阅与基本之间切换：不再订阅的分组要取消周期任务，
         // 新订阅的分组要排上；reconfigureUpdater 内部先 cancel 再按现状重排
         SubscriptionUpdater.reconfigureUpdater()
+    }
+
+    suspend fun updateSortOrder(groupId: Long, order: Int) {
+        if (SagerDatabase.groupDao.updateSortOrder(groupId, order) == 0) return
+        postUpdate(groupId)
     }
 
     suspend fun deleteGroup(groupId: Long) {
@@ -140,18 +165,10 @@ object GroupManager {
     // group's frontProxy/landingProxy; ConfigBuilder.resolveChain would get
     // null from getById and silently drop the user's front/landing proxy.
     fun resetDanglingGroupProxies() {
-        SagerDatabase.groupDao.allGroups().forEach { group ->
-            var changed = false
-            if (group.frontProxy > 0L && SagerDatabase.proxyDao.getById(group.frontProxy) == null) {
-                group.frontProxy = -1L
-                changed = true
-            }
-            if (group.landingProxy > 0L && SagerDatabase.proxyDao.getById(group.landingProxy) == null) {
-                group.landingProxy = -1L
-                changed = true
-            }
-            if (changed) SagerDatabase.groupDao.updateGroup(group)
-        }
+        // SQL-only column updates avoid writing stale subscription fields from
+        // group snapshots while the :bg updater is persisting fresh metadata.
+        SagerDatabase.groupDao.resetDanglingFrontProxies()
+        SagerDatabase.groupDao.resetDanglingLandingProxies()
     }
 
     // Mirrors the fallback in DataStore.currentGroup(): fall back to the first

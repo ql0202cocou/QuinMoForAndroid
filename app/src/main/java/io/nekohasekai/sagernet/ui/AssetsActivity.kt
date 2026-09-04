@@ -8,6 +8,7 @@ import android.view.MenuItem
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isInvisible
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
@@ -20,6 +21,8 @@ import io.nekohasekai.sagernet.widget.UndoSnackbarManager
 import libcore.Libcore
 import moe.matsuri.nb4a.utils.Util
 import org.json.JSONObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -224,6 +227,7 @@ class AssetsActivity : ThemedActivity() {
     }
 
     val updating = AtomicInteger()
+    private val updatingAssets = Collections.synchronizedSet(mutableSetOf<String>())
 
     inner class AssetHolder(val binding: LayoutAssetItemBinding) :
         RecyclerView.ViewHolder(binding.root) {
@@ -252,24 +256,35 @@ class AssetsActivity : ThemedActivity() {
 
             binding.assetStatus.text = getString(R.string.route_asset_status, localVersion)
 
-            binding.rulesUpdate.isInvisible = file.name !in assetNames
+            val isUpdating = file.absolutePath in updatingAssets
+            binding.subscriptionUpdateProgress.isInvisible = !isUpdating
+            binding.rulesUpdate.isInvisible = file.name !in assetNames || isUpdating
             binding.rulesUpdate.setOnClickListener {
+                val targetFile = file
+                if (!updatingAssets.add(targetFile.absolutePath)) return@setOnClickListener
                 updating.incrementAndGet()
                 layout.refreshLayout.isEnabled = false
                 binding.subscriptionUpdateProgress.isInvisible = false
                 binding.rulesUpdate.isInvisible = true
-                runOnDefaultDispatcher {
+                lifecycleScope.launch(Dispatchers.Default) {
                     runCatching {
-                        updateAsset(file, versionFile, localVersion)
+                        updateAsset(targetFile, versionFile, localVersion)
                     }.onFailure {
                         onMainDispatcher {
-                            alert(it.readableMessage).tryToShow()
+                            if (!isFinishing && !isDestroyed) {
+                                alert(it.readableMessage).tryToShow()
+                            }
                         }
                     }
 
                     onMainDispatcher {
-                        binding.rulesUpdate.isInvisible = false
-                        binding.subscriptionUpdateProgress.isInvisible = true
+                        updatingAssets.remove(targetFile.absolutePath)
+                        adapter.reloadAssets()
+                        // This holder may now represent another file.
+                        if (this@AssetHolder.file == targetFile) {
+                            binding.rulesUpdate.isInvisible = targetFile.name !in assetNames
+                            binding.subscriptionUpdateProgress.isInvisible = true
+                        }
                         if (updating.decrementAndGet() == 0) {
                             layout.refreshLayout.isEnabled = true
                         }
@@ -354,8 +369,6 @@ class AssetsActivity : ThemedActivity() {
             }
 
             versionFile.writeText(tagName)
-
-            adapter.reloadAssets()
 
             onMainDispatcher {
                 snackbar(R.string.route_asset_updated).show()

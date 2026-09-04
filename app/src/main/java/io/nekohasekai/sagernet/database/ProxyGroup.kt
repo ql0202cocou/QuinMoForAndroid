@@ -137,6 +137,26 @@ data class ProxyGroup(
         @Update
         fun updateGroup(group: ProxyGroup)
 
+        @Query("UPDATE proxy_groups SET userOrder = :order WHERE id = :id")
+        fun updateUserOrder(id: Long, order: Long)
+
+        @Query("UPDATE proxy_groups SET `order` = :order WHERE id = :id")
+        fun updateSortOrder(id: Long, order: Int): Int
+
+        @Query(
+            "UPDATE proxy_groups SET frontProxy = -1 " +
+                    "WHERE frontProxy > 0 AND NOT EXISTS " +
+                    "(SELECT 1 FROM proxy_entities WHERE id = proxy_groups.frontProxy)"
+        )
+        fun resetDanglingFrontProxies(): Int
+
+        @Query(
+            "UPDATE proxy_groups SET landingProxy = -1 " +
+                    "WHERE landingProxy > 0 AND NOT EXISTS " +
+                    "(SELECT 1 FROM proxy_entities WHERE id = proxy_groups.landingProxy)"
+        )
+        fun resetDanglingLandingProxies(): Int
+
         @Query("DELETE FROM proxy_groups")
         fun reset()
 

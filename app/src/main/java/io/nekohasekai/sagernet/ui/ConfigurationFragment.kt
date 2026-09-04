@@ -1165,7 +1165,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (proxyGroup.order == order) return
                 runOnDefaultDispatcher {
                     proxyGroup.order = order
-                    GroupManager.updateGroup(proxyGroup)
+                    GroupManager.updateSortOrder(proxyGroup.id, order)
                 }
             }
 

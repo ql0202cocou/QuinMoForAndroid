@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -19,6 +20,8 @@ import io.nekohasekai.sagernet.databinding.LayoutRouteItemBinding
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItemClickListener {
 
@@ -169,10 +172,14 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             // to `updated` there while the write below iterates it
             val updated = HashSet(updated)
             this.updated.clear()
-            runOnDefaultDispatcher {
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
                 if (updated.isNotEmpty()) {
-                    SagerDatabase.rulesDao.updateRules(updated.toList())
-                    needReload()
+                    SagerDatabase.instance.runInTransaction {
+                        updated.forEach {
+                            SagerDatabase.rulesDao.updateOrder(it.id, it.userOrder)
+                        }
+                    }
+                    onMainDispatcher { needReload() }
                 }
             }
         }

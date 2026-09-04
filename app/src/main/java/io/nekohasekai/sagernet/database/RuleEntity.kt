@@ -95,6 +95,9 @@ data class RuleEntity(
         @Update
         fun updateRules(rules: List<RuleEntity>)
 
+        @Query("UPDATE rules SET userOrder = :order WHERE id = :id")
+        fun updateOrder(id: Long, order: Long)
+
         @Query("DELETE FROM rules")
         fun reset()
 

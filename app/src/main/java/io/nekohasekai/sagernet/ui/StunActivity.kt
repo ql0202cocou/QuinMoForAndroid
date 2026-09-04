@@ -4,17 +4,22 @@ import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutStunBinding
-import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.readableMessage
-import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.widget.ListListener
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import libcore.Libcore
 
 class StunActivity : ThemedActivity() {
 
     private lateinit var binding: LayoutStunBinding
+    private var testJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,18 +38,28 @@ class StunActivity : ThemedActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout, ListListener)
     }
 
-    fun doTest() {
+    private fun doTest() {
+        if (testJob?.isActive == true) return
+        val server = binding.natStunServer.text.toString()
         binding.waitLayout.isVisible = true
-        runOnDefaultDispatcher {
+        binding.stunTest.isEnabled = false
+        testJob = lifecycleScope.launch {
             val result = try {
-                val _result = Libcore.stunTest(binding.natStunServer.text.toString())
-                if (_result!!.success) {
-                    _result.text
-                } else {
-                    throw Exception(_result.text)
+                withContext(Dispatchers.Default) {
+                    val response = Libcore.stunTest(server) ?: error("Empty STUN response")
+                    if (response.success) {
+                        response.text
+                    } else {
+                        throw Exception(response.text)
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                onMainDispatcher {
+                if (!isFinishing && !isDestroyed) {
+                    binding.waitLayout.isVisible = false
+                    binding.stunTest.isEnabled = true
+                    testJob = null
                     AlertDialog.Builder(this@StunActivity)
                         .setTitle(R.string.error_title)
                         .setMessage(e.readableMessage)
@@ -56,12 +71,12 @@ class StunActivity : ThemedActivity() {
                         }
                         .runCatching { show() }
                 }
-                return@runOnDefaultDispatcher
+                return@launch
             }
-            onMainDispatcher {
-                binding.waitLayout.isVisible = false
-                binding.natResult.text = result
-            }
+            binding.waitLayout.isVisible = false
+            binding.natResult.text = result
+            binding.stunTest.isEnabled = true
+            testJob = null
         }
     }
 

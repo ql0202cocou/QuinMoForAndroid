@@ -232,7 +232,11 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             val updated = HashSet(updated)
             this.updated.clear()
             runOnDefaultDispatcher {
-                updated.forEach { SagerDatabase.groupDao.updateGroup(it) }
+                SagerDatabase.instance.runInTransaction {
+                    updated.forEach {
+                        SagerDatabase.groupDao.updateUserOrder(it.id, it.userOrder)
+                    }
+                }
             }
         }
 

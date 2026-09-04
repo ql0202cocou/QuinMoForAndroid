@@ -379,8 +379,9 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                                         runOnDefaultDispatcher {
                                             val oldGroupId = ent.groupId
                                             val newGroupId = group.id
-                                            ent.groupId = newGroupId
-                                            ProfileManager.updateProfile(ent)
+                                            val moved = ProfileManager.moveProfile(ent.id, newGroupId)
+                                                ?: return@runOnDefaultDispatcher
+                                            activity.proxyEntity?.groupId = moved.groupId
                                             GroupManager.postUpdate(oldGroupId) // reload
                                             GroupManager.postUpdate(newGroupId)
                                             DataStore.editingGroup = newGroupId // post switch animation

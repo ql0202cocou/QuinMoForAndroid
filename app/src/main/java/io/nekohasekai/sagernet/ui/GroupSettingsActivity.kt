@@ -296,7 +296,9 @@ class GroupSettingsActivity(
                 // 新链接的首次自动更新会按旧链接的时间点被推迟
                 entity.subscription?.lastUpdated = 0
             }
-            GroupManager.updateGroup(entity.apply { serialize() })
+            GroupManager.updateGroup(
+                entity.apply { serialize() }, preserveSubscriptionRuntime = keepUserInfo
+            )
         }
 
         finish()

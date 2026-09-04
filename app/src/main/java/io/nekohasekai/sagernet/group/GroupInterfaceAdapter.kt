@@ -14,8 +14,6 @@ import io.nekohasekai.sagernet.ui.ThemedActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interface {
 
@@ -59,70 +57,83 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
         byUser: Boolean
     ) {
         if (changed == 0 && duplicate.isEmpty()) {
-            if (byUser) context.snackbar(
-                    context.getString(
-                            R.string.group_no_difference, group.displayName()
-                    )
-            ).show()
-        } else {
-            context.snackbar(context.getString(R.string.group_updated, group.name, changed)).show()
-
-            var status = ""
-            if (added.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_added, added.joinToString("\n", postfix = "\n\n")
-                )
+            if (byUser) onMainDispatcher {
+                if (!context.isFinishing && !context.isDestroyed) {
+                    context.snackbar(
+                        context.getString(R.string.group_no_difference, group.displayName())
+                    ).show()
+                }
             }
-            if (updated.isNotEmpty()) {
-                status += context.getString(R.string.group_changed,
-                        updated.map { it }.joinToString("\n", postfix = "\n\n") {
-                            if (it.key == it.value) it.key else "${it.key} => ${it.value}"
-                        })
-            }
-            if (deleted.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_deleted, deleted.joinToString("\n", postfix = "\n\n")
-                )
-            }
-            if (duplicate.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_duplicate, duplicate.joinToString("\n", postfix = "\n\n")
-                )
-            }
-
-            onMainDispatcher {
-                delay(1000L)
-
-                // Showing a dialog on a destroyed activity throws BadTokenException;
-                // don't let it bubble up and misreport the successful update as failed.
-                if (context.isFinishing || context.isDestroyed) return@onMainDispatcher
-                runCatching {
-                    MaterialAlertDialogBuilder(context).setTitle(
-                            context.getString(
-                                    R.string.group_diff, group.displayName()
-                            )
-                    ).setMessage(status.trim()).setPositiveButton(android.R.string.ok, null).show()
-                }.onFailure { Logs.w(it) }
-            }
-
+            return
         }
 
+        var status = ""
+        if (added.isNotEmpty()) {
+            status += context.getString(
+                R.string.group_added, added.joinToString("\n", postfix = "\n\n")
+            )
+        }
+        if (updated.isNotEmpty()) {
+            status += context.getString(R.string.group_changed,
+                updated.map { it }.joinToString("\n", postfix = "\n\n") {
+                    if (it.key == it.value) it.key else "${it.key} => ${it.value}"
+                })
+        }
+        if (deleted.isNotEmpty()) {
+            status += context.getString(
+                R.string.group_deleted, deleted.joinToString("\n", postfix = "\n\n")
+            )
+        }
+        if (duplicate.isNotEmpty()) {
+            status += context.getString(
+                R.string.group_duplicate, duplicate.joinToString("\n", postfix = "\n\n")
+            )
+        }
+
+        onMainDispatcher {
+            if (context.isFinishing || context.isDestroyed) return@onMainDispatcher
+            context.snackbar(
+                context.getString(R.string.group_updated, group.name, changed)
+            ).show()
+            delay(1000L)
+
+            // Showing a dialog on a destroyed activity throws BadTokenException;
+            // don't let it bubble up and misreport the successful update as failed.
+            if (context.isFinishing || context.isDestroyed) return@onMainDispatcher
+            runCatching {
+                MaterialAlertDialogBuilder(context).setTitle(
+                    context.getString(R.string.group_diff, group.displayName())
+                ).setMessage(status.trim()).setPositiveButton(android.R.string.ok, null).show()
+            }.onFailure { Logs.w(it) }
+        }
     }
 
     override suspend fun onUpdateFailure(group: ProxyGroup, message: String) {
         onMainDispatcher {
-            context.snackbar(message).show()
+            if (!context.isFinishing && !context.isDestroyed) {
+                context.snackbar(message).show()
+            }
         }
     }
 
     override suspend fun alert(message: String) {
-        return suspendCoroutine {
+        return suspendCancellableCoroutine { c ->
+            val cont = c as Continuation<Unit>
             runOnMainDispatcher {
+                if (context.isFinishing || context.isDestroyed) {
+                    cont.tryResume(Unit)
+                    return@runOnMainDispatcher
+                }
                 MaterialAlertDialogBuilder(context).setTitle(R.string.ooc_warning)
                     .setMessage(message)
-                    .setPositiveButton(android.R.string.ok) { _, _ -> it.resume(Unit) }
-                    .setOnCancelListener { _ -> it.resume(Unit) }
+                    .setPositiveButton(android.R.string.ok) { _, _ -> cont.tryResume(Unit) }
+                    .setOnDismissListener { _ -> cont.tryResume(Unit) }
                     .show()
+                context.lifecycle.addObserver(object : DefaultLifecycleObserver {
+                    override fun onDestroy(owner: LifecycleOwner) {
+                        cont.tryResume(Unit)
+                    }
+                })
             }
         }
     }

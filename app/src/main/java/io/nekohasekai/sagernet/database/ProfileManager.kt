@@ -87,8 +87,16 @@ object ProfileManager {
     }
 
     suspend fun updateProfile(profile: ProxyEntity) {
-        SagerDatabase.proxyDao.updateProxy(profile)
-        iterator { onUpdated(profile, false) }
+        if (SagerDatabase.proxyDao.updateEditableFields(ProxyEditableFields(profile)) == 0) return
+        val current = SagerDatabase.proxyDao.getById(profile.id) ?: return
+        iterator { onUpdated(current, false) }
+    }
+
+    suspend fun moveProfile(profileId: Long, groupId: Long): ProxyEntity? {
+        if (SagerDatabase.proxyDao.updateGroup(profileId, groupId) == 0) return null
+        val current = SagerDatabase.proxyDao.getById(profileId) ?: return null
+        iterator { onUpdated(current, false) }
+        return current
     }
 
     // Snapshot-safe partial writes: the entity may have been read at VPN/test

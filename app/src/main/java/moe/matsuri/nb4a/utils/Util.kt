@@ -17,6 +17,10 @@ import java.util.zip.Inflater
 
 object Util {
 
+    // Universal links are intended to carry one profile or one portable group,
+    // not arbitrary archives. Bound inflation before a small link can exhaust the heap.
+    private const val MAX_UNIVERSAL_PAYLOAD_SIZE = 8 * 1024 * 1024
+
     // Base64 for all
 
     fun b64EncodeUrlSafe(s: String): String {
@@ -85,6 +89,11 @@ object Util {
                 while (!inflater.finished()) {
                     val count = inflater.inflate(buffer)
                     if (count == 0) throw DataFormatException("invalid or truncated zlib data")
+                    if (outputStream.size() > MAX_UNIVERSAL_PAYLOAD_SIZE - count) {
+                        throw DataFormatException(
+                            "decompressed data exceeds $MAX_UNIVERSAL_PAYLOAD_SIZE bytes"
+                        )
+                    }
                     outputStream.write(buffer, 0, count)
                 }
 

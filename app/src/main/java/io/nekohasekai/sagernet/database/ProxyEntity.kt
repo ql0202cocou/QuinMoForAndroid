@@ -42,6 +42,54 @@ import moe.matsuri.nb4a.proxy.neko.*
 import moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSSettingsActivity
 import java.io.File
 
+// Fields owned by the profile editor. Room's partial-entity update keeps
+// runtime columns (order, traffic and test status) written while the editor is open.
+data class ProxyEditableFields(
+    val id: Long,
+    val type: Int,
+    val core: Int,
+    val socksBean: SOCKSBean?,
+    val httpBean: HttpBean?,
+    val ssBean: ShadowsocksBean?,
+    val vmessBean: VMessBean?,
+    val trojanBean: TrojanBean?,
+    val trojanGoBean: TrojanGoBean?,
+    val mieruBean: MieruBean?,
+    val naiveBean: NaiveBean?,
+    val hysteriaBean: HysteriaBean?,
+    val tuicBean: TuicBean?,
+    val sshBean: SSHBean?,
+    val wgBean: WireGuardBean?,
+    val shadowTLSBean: ShadowTLSBean?,
+    val anyTLSBean: AnyTLSBean?,
+    val chainBean: ChainBean?,
+    val nekoBean: NekoBean?,
+    val configBean: ConfigBean?,
+) {
+    constructor(entity: ProxyEntity) : this(
+        entity.id,
+        entity.type,
+        entity.core,
+        entity.socksBean,
+        entity.httpBean,
+        entity.ssBean,
+        entity.vmessBean,
+        entity.trojanBean,
+        entity.trojanGoBean,
+        entity.mieruBean,
+        entity.naiveBean,
+        entity.hysteriaBean,
+        entity.tuicBean,
+        entity.sshBean,
+        entity.wgBean,
+        entity.shadowTLSBean,
+        entity.anyTLSBean,
+        entity.chainBean,
+        entity.nekoBean,
+        entity.configBean,
+    )
+}
+
 @Entity(
     tableName = "proxy_entities", indices = [Index("groupId", name = "groupId")]
 )
@@ -565,6 +613,9 @@ data class ProxyEntity(
         @Update
         fun updateProxy(proxy: ProxyEntity): Int
 
+        @Update(entity = ProxyEntity::class)
+        fun updateEditableFields(fields: ProxyEditableFields): Int
+
         // tx/rx only: callers hold a snapshot read at VPN/test start, and a
         // full-row @Update would roll back concurrent edits on the other columns
         @Query("UPDATE proxy_entities SET tx = :tx, rx = :rx WHERE id = :id")
@@ -577,6 +628,9 @@ data class ProxyEntity(
         // @Update would roll back tx/rx persisted meanwhile by TrafficLooper
         @Query("UPDATE proxy_entities SET userOrder = :order WHERE id = :id")
         fun updateOrder(id: Long, order: Long)
+
+        @Query("UPDATE proxy_entities SET groupId = :groupId WHERE id = :id")
+        fun updateGroup(id: Long, groupId: Long): Int
 
         @Insert
         fun addProxy(proxy: ProxyEntity): Long
