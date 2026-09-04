@@ -804,7 +804,10 @@ fun buildConfig(
             dns.servers.add(makeDnsServer(
                 it ?: throw Exception("No direct DNS, check your settings!"), "dns-direct"
             ).apply {
-                detour = TAG_DIRECT
+                // sing-box 1.14: a typed DNS server with no detour dials directly
+                // with its own dialer, which is the intent here — an explicit
+                // detour to the empty direct outbound fails the whole box start
+                // ("detour to an empty direct outbound makes no sense")
                 domain_resolver = "dns-local"
             })
         }
@@ -814,6 +817,12 @@ fun buildConfig(
             if (!forTest) dns.servers.add(makeDnsServer(
                 it ?: throw Exception("No remote DNS, check your settings!"), "dns-remote"
             ).apply {
+                // remote DNS must leave through the tunnel like pre-1.14's
+                // default-outbound behavior: 1.14 would dial it directly
+                // (see dns-direct) — detour to the proxy outbound instead,
+                // which is never an empty direct outbound, so the start-time
+                // check above does not apply
+                detour = TAG_PROXY
                 domain_resolver = "dns-direct"
             })
         }
@@ -905,7 +914,9 @@ fun buildConfig(
                 val tag = "dns-group-$index"
                 val dnsServer = runCatching {
                     makeDnsServer(address, tag).apply {
-                        detour = TAG_DIRECT
+                        // no detour either (see dns-direct): 1.14 dials directly
+                        // by default and detouring to the empty direct outbound
+                        // kills the box at start
                         domain_resolver = "dns-local"
                     }
                 }.getOrElse {

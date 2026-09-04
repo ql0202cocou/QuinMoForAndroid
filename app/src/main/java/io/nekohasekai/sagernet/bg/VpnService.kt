@@ -133,6 +133,10 @@ class VpnService : BaseVpnService(),
                 }
             } else return super<BaseService.Interface>.onStartCommand(intent, flags, startId)
         }
+        // Reaching here means the VPN cannot run: permission was revoked
+        // (request notification posted above) or the service was started
+        // while not in VPN mode. Log it — this stop is silent otherwise.
+        Logs.w("VpnService cannot run (mode=${DataStore.serviceMode}), stopping")
         stopRunner()
         return Service.START_NOT_STICKY
     }
@@ -276,7 +280,13 @@ class VpnService : BaseVpnService(),
         }
     }
 
-    override fun onRevoke() = stopRunner()
+    // A system-side revoke (another VPN taking the slot, OEM VPN features,
+    // permission withdrawal) is otherwise a zero-trace stop: the exported log
+    // shows a clean teardown with no cause, like a user-initiated stop.
+    override fun onRevoke() {
+        Logs.w("VPN revoked by system")
+        stopRunner(false, getString(R.string.vpn_revoked))
+    }
 
     override fun onDestroy() {
         DataStore.vpnService = null

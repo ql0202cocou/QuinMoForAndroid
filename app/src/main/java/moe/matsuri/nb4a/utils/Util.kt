@@ -181,13 +181,13 @@ object Util {
     // JSON "key": "value" pairs whose value is a credential
     // (trailing ["] is a literal quote; a raw string cannot end with ")
     private val SENSITIVE_JSON_VALUE = Regex(
-        """("(?:password|uuid|private_key|pre_shared_key|auth|auth_str|token|secret|key|authorization|cookie)"\s*:\s*)"(?:\\.|[^"\\])*["]""",
+        """("(?:password|uuid|id|private_key|pre_shared_key|auth|auth_str|token|secret|key|authorization|cookie)"\s*:\s*)"(?:\\.|[^"\\])*["]""",
         RegexOption.IGNORE_CASE
     )
 
     // YAML "key: value" lines whose value is a credential (e.g. mihomo configs)
     private val SENSITIVE_YAML_VALUE = Regex(
-        """^(\s*(?:password|uuid|private-key|pre-shared-key|auth|auth-str|token|secret|key|authorization|cookie)\s*:\s*).+$""",
+        """^(\s*(?:password|uuid|id|private-key|pre-shared-key|auth|auth-str|token|secret|key|authorization|cookie)\s*:\s*).+$""",
         setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)
     )
 

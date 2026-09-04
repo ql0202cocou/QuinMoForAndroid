@@ -97,7 +97,12 @@ class BaseService {
                     }
                 }
 
-                else -> service.stopRunner()
+                // Action.CLOSE (notification button / tile / UI): log it, or an
+                // exported log shows a clean teardown with no identifiable cause
+                else -> {
+                    Logs.i("Broadcast ${intent.action}: stopping service")
+                    service.stopRunner()
+                }
             }
         }
         var closeReceiverRegistered = false
