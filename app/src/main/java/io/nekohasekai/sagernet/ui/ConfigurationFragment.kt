@@ -110,7 +110,6 @@ import moe.matsuri.nb4a.proxy.anytls.AnyTLSSettingsActivity
 import moe.matsuri.nb4a.proxy.config.ConfigSettingActivity
 import moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSSettingsActivity
 import moe.matsuri.nb4a.ui.ConnectionTestNotification
-import okhttp3.internal.closeQuietly
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.UnknownHostException
@@ -766,7 +765,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                                     profile.ping = (SystemClock.elapsedRealtime() - start).toInt()
                                     test.update(profile)
                                 } finally {
-                                    socket.closeQuietly()
+                                    // okhttp3.internal.closeQuietly is not public API in OkHttp 5
+                                    runCatching { socket.close() }
                                 }
                             }
                         } catch (e: Exception) {

@@ -152,7 +152,7 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
         val url = "$base/proxies/$MIHOMO_PROXY_NAME/delay" +
             "?url=${URLEncoder.encode(link, "UTF-8")}&timeout=$mihomoTimeout"
         client.newCall(newRequest(url)).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
+            val body = resp.body.string()
             if (resp.isSuccessful) return JSONObject(body).getInt("delay")
             val message = runCatching { JSONObject(body).getString("message") }.getOrNull()
             throw IOException(message ?: "mihomo delay test failed: HTTP ${resp.code}")
