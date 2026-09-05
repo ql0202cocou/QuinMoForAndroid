@@ -205,6 +205,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         groupPager = view.findViewById(R.id.group_pager)
         tabLayout = view.findViewById(R.id.group_tab)
+        // Side navigation bar / cutout in landscape: the AppBar padding above does not cover
+        // this sibling strip. Top/bottom stay untouched.
+        tabLayout.padForSystemBars(bottom = false)
 
         // onViewCreated can run again (rotation): unregister the previous
         // adapter before replacing it

@@ -20,8 +20,8 @@ class ToolsFragment : ToolbarFragment(R.layout.layout_tools) {
         tools.add(BackupFragment())
 
         val binding = LayoutToolsBinding.bind(view)
-        // Pad the pager so the pages clear the gesture pill on API 35+
-        binding.toolsPager.padForSystemBars()
+        // Side navigation bar / cutout in landscape; the pages own their own insets.
+        binding.toolsTab.padForSystemBars(bottom = false)
         binding.toolsPager.adapter = ToolsAdapter(tools)
 
         TabLayoutMediator(binding.toolsTab, binding.toolsPager) { tab, position ->

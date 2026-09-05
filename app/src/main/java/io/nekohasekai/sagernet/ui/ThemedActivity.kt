@@ -1,23 +1,20 @@
 package io.nekohasekai.sagernet.ui
 
 import android.content.res.Configuration
-import android.os.Build
+import android.graphics.Color
 import android.os.Bundle
-import android.view.View
-import android.view.ViewGroup
 import android.widget.TextView
+import androidx.activity.SystemBarStyle
 import androidx.activity.addCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updateLayoutParams
-import androidx.core.view.updatePadding
+import androidx.core.graphics.ColorUtils
 import androidx.fragment.app.DialogFragment
-import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.snackbar.Snackbar
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.ktx.showAllowingStateLoss
 import io.nekohasekai.sagernet.utils.Theme
 
@@ -29,9 +26,6 @@ abstract class ThemedActivity : AppCompatActivity {
     var uiMode = 0
     open val isDialog = false
 
-    // Navigation bar bottom inset, tracked on API 35+ to lift snackbars above the gesture pill
-    private var navigationBarInset = 0
-
     override fun onCreate(savedInstanceState: Bundle?) {
         if (!isDialog) {
             Theme.apply(this)
@@ -40,24 +34,23 @@ abstract class ThemedActivity : AppCompatActivity {
         }
         Theme.applyNightTheme()
 
+        if (!isDialog) {
+            // The status bar sits on the colorPrimary AppBar, whose colour does not follow
+            // day/night (Black theme is #2B2B2B in light mode, Yellow/Lime are light in dark
+            // mode), so pick the icon colour from that background instead of the UI mode.
+            // The navigation bar is over the themed surface, where the day/night default is right.
+            val appBarLuminance = ColorUtils.calculateLuminance(getColorAttr(R.attr.colorPrimary))
+            val statusBarStyle = if (appBarLuminance < 0.5) {
+                SystemBarStyle.dark(Color.TRANSPARENT)
+            } else {
+                // Pre-23 cannot draw dark icons: fall back to a scrim (matches enableEdgeToEdge's default).
+                SystemBarStyle.light(Color.TRANSPARENT, Color.argb(0x80, 0x1b, 0x1b, 0x1b))
+            }
+            enableEdgeToEdge(statusBarStyle = statusBarStyle)
+        }
         super.onCreate(savedInstanceState)
 
         uiMode = resources.configuration.uiMode
-
-        if (Build.VERSION.SDK_INT >= 35) {
-            ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { _, insets ->
-                val top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top
-                navigationBarInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-                findViewById<AppBarLayout>(R.id.appbar)?.apply {
-                    updatePadding(top = top)
-//                Logs.w("appbar $top")
-                }
-//            findViewById<NavigationView>(R.id.nav_view)?.apply {
-//                updatePadding(top = top)
-//            }
-                insets
-            }
-        }
     }
 
     override fun setTheme(resId: Int) {
@@ -79,21 +72,6 @@ abstract class ThemedActivity : AppCompatActivity {
     fun snackbar(text: CharSequence): Snackbar = snackbarInternal(text).apply {
         view.findViewById<TextView>(com.google.android.material.R.id.snackbar_text).apply {
             maxLines = 10
-        }
-        // Edge-to-edge on API 35+: lift the snackbar above the gesture pill.
-        // An anchored snackbar (MainActivity anchors to the FAB when shown)
-        // already clears it, so do not add the margin on top of the anchor.
-        if (navigationBarInset > 0 && anchorView == null) {
-            view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-                override fun onViewAttachedToWindow(v: View) {
-                    v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                        bottomMargin += navigationBarInset
-                    }
-                    v.removeOnAttachStateChangeListener(this)
-                }
-
-                override fun onViewDetachedFromWindow(v: View) {}
-            })
         }
     }
 

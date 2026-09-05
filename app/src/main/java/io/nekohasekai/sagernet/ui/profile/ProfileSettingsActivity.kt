@@ -20,7 +20,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
-import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
@@ -41,7 +40,7 @@ import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ThemedActivity
-import io.nekohasekai.sagernet.widget.ListListener
+import io.nekohasekai.sagernet.widget.padForSystemBars
 import kotlinx.parcelize.Parcelize
 import kotlin.properties.Delegates
 
@@ -49,6 +48,12 @@ import kotlin.properties.Delegates
 abstract class ProfileSettingsActivity<T : AbstractBean>(
     @LayoutRes resId: Int = R.layout.layout_config_settings,
 ) : ThemedActivity(resId), OnPreferenceDataStoreChangeListener {
+
+    /**
+     * Whether the preference list is the bottom-most scrollable view of the screen. Chain
+     * settings put a separate node list below it, which then owns the bottom inset instead.
+     */
+    open val preferenceListReachesBottom = true
 
     class UnsavedChangesDialogFragment : AlertDialogFragment<Empty, Empty>() {
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
@@ -247,7 +252,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
             super.onViewCreated(view, savedInstanceState)
 
-            ViewCompat.setOnApplyWindowInsetsListener(listView, ListListener)
+            listView.padForSystemBars(bottom = activity?.preferenceListReachesBottom ?: true)
 
             activity?.apply {
                 viewCreated(view, savedInstanceState)

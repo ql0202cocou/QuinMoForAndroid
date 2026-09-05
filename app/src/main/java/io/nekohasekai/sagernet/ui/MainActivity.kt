@@ -80,9 +80,7 @@ class MainActivity : ThemedActivity(),
         // extends under it. The FAB is anchored to the bar's top edge, which only moves
         // up as the bar grows.
         binding.statsContent.padForSystemBars()
-        // Drawer menus are full height: keep the first/last items clear of the status
-        // bar and the gesture pill.
-        navigation.padForSystemBars(statusBarTop = true)
+        // The drawer's NavigationView handles its own insets (fitsSystemWindows in layout_main).
 
         if (savedInstanceState == null) {
             displayFragmentWithId(R.id.nav_configuration)

@@ -1,41 +1,58 @@
 package io.nekohasekai.sagernet.widget
 
 import android.graphics.Rect
-import android.os.Build
 import android.view.View
-import androidx.core.view.OnApplyWindowInsetsListener
+import android.view.ViewGroup
+import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnAttach
 import androidx.core.view.updatePadding
 
-object ListListener : OnApplyWindowInsetsListener {
-    override fun onApplyWindowInsets(view: View, insets: WindowInsetsCompat) = insets.apply {
-        view.updatePadding(bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom)
-    }
-}
+/** The inset types a view must keep its content clear of: system bars and display cutouts. */
+val safeDrawingTypes = WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
 
 /**
- * Keep this view's content clear of the system bars, preserving the padding its layout
- * already declares (unlike [ListListener], which overwrites the bottom padding).
- *
- * Edge-to-edge is only forced from API 35, so nothing is installed below it and pre-35
- * layout stays exactly as it was.
+ * Keep this view's interactive content clear of system bars and display cutouts while
+ * preserving the padding declared by its layout. The view background still extends into
+ * the inset area, which keeps edge-to-edge layouts visually continuous.
  *
  * @param statusBarTop pad the top by the status bar inset too, for full-height views.
+ * @param bottom whether to apply the bottom system-bar inset. A scrollable [ViewGroup]
+ *   then also gets `clipToPadding = false` so its content scrolls through the inset area.
  * @param bottomAtLeast the declared bottom padding already reserves space (e.g. for a
  *   FAB): grow it to the navigation bar inset instead of adding the two together.
+ * @param consume forward the insets to children with the handled types zeroed. Only for a
+ *   view that owns its whole subtree (e.g. a WebView container): below API 30 consumed
+ *   insets also stop reaching later siblings.
  */
-fun View.padForSystemBars(statusBarTop: Boolean = false, bottomAtLeast: Boolean = false) {
-    if (Build.VERSION.SDK_INT < 35) return
+fun View.padForSystemBars(
+    statusBarTop: Boolean = false,
+    bottom: Boolean = true,
+    bottomAtLeast: Boolean = false,
+    consume: Boolean = false,
+) {
     val base = Rect(paddingLeft, paddingTop, paddingRight, paddingBottom)
+    if (bottom) (this as? ViewGroup)?.clipToPadding = false
     ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
-        val navigationBar = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+        val safeDrawing = insets.getInsets(safeDrawingTypes)
         v.updatePadding(
+            left = base.left + safeDrawing.left,
             top = if (statusBarTop) {
-                base.top + insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+                base.top + safeDrawing.top
             } else base.top,
-            bottom = if (bottomAtLeast) maxOf(base.bottom, navigationBar) else base.bottom + navigationBar
+            right = base.right + safeDrawing.right,
+            bottom = when {
+                !bottom -> base.bottom
+                bottomAtLeast -> maxOf(base.bottom, safeDrawing.bottom)
+                else -> base.bottom + safeDrawing.bottom
+            },
         )
-        insets
+        if (consume) {
+            WindowInsetsCompat.Builder(insets).setInsets(safeDrawingTypes, Insets.NONE).build()
+        } else insets
     }
+    // A view added after the window's initial dispatch (fragment swap) gets no insets
+    // until someone asks; ask as soon as it is attached.
+    doOnAttach { ViewCompat.requestApplyInsets(it) }
 }

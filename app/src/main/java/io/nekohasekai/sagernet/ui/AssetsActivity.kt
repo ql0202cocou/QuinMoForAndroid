@@ -18,6 +18,7 @@ import io.nekohasekai.sagernet.databinding.LayoutAssetItemBinding
 import io.nekohasekai.sagernet.databinding.LayoutAssetsBinding
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
+import io.nekohasekai.sagernet.widget.padForSystemBars
 import libcore.Libcore
 import moe.matsuri.nb4a.utils.Util
 import org.json.JSONObject
@@ -49,6 +50,7 @@ class AssetsActivity : ThemedActivity() {
         }
 
         binding.recyclerView.layoutManager = FixedLinearLayoutManager(binding.recyclerView)
+        binding.recyclerView.padForSystemBars()
         adapter = AssetAdapter()
         binding.recyclerView.adapter = adapter
 

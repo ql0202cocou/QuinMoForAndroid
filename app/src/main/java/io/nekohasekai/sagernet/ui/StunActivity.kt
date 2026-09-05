@@ -2,13 +2,12 @@ package io.nekohasekai.sagernet.ui
 
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutStunBinding
 import io.nekohasekai.sagernet.ktx.readableMessage
-import io.nekohasekai.sagernet.widget.ListListener
+import io.nekohasekai.sagernet.widget.padForSystemBars
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,7 +34,7 @@ class StunActivity : ThemedActivity() {
         binding.stunTest.setOnClickListener {
             doTest()
         }
-        ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout, ListListener)
+        binding.mainLayout.padForSystemBars()
     }
 
     private fun doTest() {

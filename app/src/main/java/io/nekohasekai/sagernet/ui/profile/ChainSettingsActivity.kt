@@ -27,11 +27,14 @@ import io.nekohasekai.sagernet.databinding.LayoutProfileBinding
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ProfileSelectActivity
+import io.nekohasekai.sagernet.widget.padForSystemBars
 import moe.matsuri.nb4a.Protocols.getProtocolColor
 
 class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout_chain_settings) {
 
     override fun createEntity() = ChainBean()
+
+    override val preferenceListReachesBottom = false
 
     val proxyList = ArrayList<ProxyEntity>()
 
@@ -75,6 +78,7 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
         supportActionBar!!.setTitle(R.string.chain_settings)
         replacing = savedInstanceState?.getInt("replacing") ?: 0
         configurationList = findViewById(R.id.configuration_list)
+        configurationList.padForSystemBars()
         layoutManager = FixedLinearLayoutManager(configurationList)
         configurationList.layoutManager = layoutManager
         configurationAdapter = ProxiesAdapter()

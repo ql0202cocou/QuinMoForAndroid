@@ -34,8 +34,11 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
 
         val binding = LayoutWebviewBinding.bind(view)
 
-        // Pad the root wrapper (not the WebView itself) against the gesture pill
-        view.padForSystemBars()
+        // The native container keeps the page clear of the system bars; the WebView itself
+        // must then see those insets as zero, or a dashboard using CSS safe-area-inset-*
+        // pads a second time (the AppBar already clears the status bar). IME insets still
+        // reach the WebView.
+        binding.webviewContainer.padForSystemBars(consume = true)
 
         // webview
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)

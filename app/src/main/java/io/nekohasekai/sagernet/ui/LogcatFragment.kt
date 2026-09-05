@@ -11,13 +11,12 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
-import androidx.core.view.ViewCompat
 import androidx.core.view.doOnLayout
 import androidx.lifecycle.lifecycleScope
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutLogcatBinding
 import io.nekohasekai.sagernet.ktx.*
-import io.nekohasekai.sagernet.widget.ListListener
+import io.nekohasekai.sagernet.widget.padForSystemBars
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,7 +42,7 @@ class LogcatFragment : ToolbarFragment(R.layout.layout_logcat),
             binding.textview.breakStrategy = 0 // simple
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root, ListListener)
+        binding.scroolview.padForSystemBars()
 
         reloadSession()
     }
