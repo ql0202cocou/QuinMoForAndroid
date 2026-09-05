@@ -58,7 +58,7 @@ dependencies {
     implementation("androidx.work:work-multiprocess:2.10.2")
 
     implementation("com.google.android.material:material:1.13.0")
-    implementation("com.google.code.gson:gson:2.13.2")
+    implementation("com.google.code.gson:gson:2.14.0")
 
     implementation("com.github.jenly1314:zxing-lite:2.1.1")
     implementation("com.blacksquircle.ui:editorkit:2.9.0")
