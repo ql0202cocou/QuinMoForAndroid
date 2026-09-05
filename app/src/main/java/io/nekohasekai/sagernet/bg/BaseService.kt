@@ -61,18 +61,16 @@ class BaseService {
                 Action.RELOAD -> service.reload()
                 // Action.SWITCH_WAKE_LOCK -> runOnDefaultDispatcher { service.switchWakeLock() }
                 PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        // box is lateinit: during Connecting data.proxy is
-                        // already set while proxy.init() has not finished
-                        val p = proxy
-                        if (p != null && p.isInitialized()) {
-                            if (SagerNet.power.isDeviceIdleMode) {
-                                p.box.sleep()
-                            } else {
-                                p.box.wake()
-                                if (DataStore.wakeResetConnections) {
-                                    Libcore.resetAllConnections(true)
-                                }
+                    // box is lateinit: during Connecting data.proxy is
+                    // already set while proxy.init() has not finished
+                    val p = proxy
+                    if (p != null && p.isInitialized()) {
+                        if (SagerNet.power.isDeviceIdleMode) {
+                            p.box.sleep()
+                        } else {
+                            p.box.wake()
+                            if (DataStore.wakeResetConnections) {
+                                Libcore.resetAllConnections(true)
                             }
                         }
                     }
@@ -407,9 +405,7 @@ class BaseService {
                     addAction(Intent.ACTION_SHUTDOWN)
                     addAction(Action.CLOSE)
                     // addAction(Action.SWITCH_WAKE_LOCK)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
-                    }
+                    addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
                     addAction(Action.RESET_UPSTREAM_CONNECTIONS)
                     addAction(Action.CLEAR_TRAFFIC_STATISTICS)
                 }

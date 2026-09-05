@@ -41,6 +41,8 @@
     <issue id="AndroidGradlePluginVersion" severity="ignore" />
     <!-- 分包代理与插件发现需要全量包可见性 -->
     <issue id="QueryAllPackagesPermission" severity="ignore" />
+    <!-- 不经 Play 分发；VPN 前台服务申请免电池优化是正当用例，Play 政策检查不适用 -->
+    <issue id="BatteryLife" severity="ignore" />
     <!-- 应用级签名权限是有意为之，勿改命名（AGENTS.md 安全节） -->
     <issue id="PermissionNamingConvention" severity="ignore" />
     <!-- 图标/矢量资源不重绘 -->
