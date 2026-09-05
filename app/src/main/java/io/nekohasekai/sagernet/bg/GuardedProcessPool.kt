@@ -52,7 +52,7 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
 
         fun destroy() = process.destroy()
 
-        @DelicateCoroutinesApi
+        @OptIn(DelicateCoroutinesApi::class)
         suspend fun looper(onRestartCallback: (suspend () -> Unit)?) {
             looperStarted = true
             var running = true

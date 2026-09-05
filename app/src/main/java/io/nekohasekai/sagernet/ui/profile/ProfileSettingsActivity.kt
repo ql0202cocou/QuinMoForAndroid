@@ -42,7 +42,6 @@ import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ThemedActivity
 import io.nekohasekai.sagernet.widget.padForSystemBars
 import kotlinx.parcelize.Parcelize
-import kotlin.properties.Delegates
 
 @Suppress("UNCHECKED_CAST")
 abstract class ProfileSettingsActivity<T : AbstractBean>(
@@ -95,7 +94,6 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     abstract fun T.serialize()
 
     val proxyEntity by lazy { SagerDatabase.proxyDao.getById(DataStore.editingId) }
-    protected var isSubscription by Delegates.notNull<Boolean>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,7 +112,6 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         // editor would save a garbage profile.
         if (savedInstanceState == null || DataStore.profileCacheStore.getString(Key.PROFILE_CORE) == null) {
             val editingId = intent.getLongExtra(EXTRA_PROFILE_ID, 0L)
-            isSubscription = intent.getBooleanExtra(EXTRA_IS_SUBSCRIPTION, false)
             DataStore.editingId = editingId
             runOnDefaultDispatcher {
                 if (editingId == 0L) {

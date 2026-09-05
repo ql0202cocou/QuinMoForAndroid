@@ -244,7 +244,7 @@ abstract class BoxInstance(
         if (::box.isInitialized) runCatching { box.close() }
     }
 
-    @Suppress("EXPERIMENTAL_API_USAGE")
+    @OptIn(DelicateCoroutinesApi::class)
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
 

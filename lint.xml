@@ -33,7 +33,6 @@
     <issue id="RestrictedApi" severity="ignore" />
 
     <issue id="InvalidPackage" severity="ignore" />
-    <issue id="TrustAllX509TrustManager" severity="ignore" />
 
     <!-- 依赖刻意钉版（见 AGENTS.md 依赖封顶说明），不报新版本提醒 -->
     <issue id="NewerVersionAvailable" severity="ignore" />

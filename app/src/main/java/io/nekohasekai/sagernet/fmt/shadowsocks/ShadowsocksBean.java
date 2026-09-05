@@ -24,7 +24,6 @@ public class ShadowsocksBean extends AbstractBean {
         super.initializeDefaultValues();
 
         if (JavaUtil.isNullOrBlank(method)) method = "aes-256-gcm";
-        if (method == null) method = "";
         if (password == null) password = "";
         if (plugin == null) plugin = "";
         if (sUoT == null) sUoT = false;

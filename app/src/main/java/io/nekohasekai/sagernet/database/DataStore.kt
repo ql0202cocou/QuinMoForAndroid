@@ -20,6 +20,7 @@ import io.nekohasekai.sagernet.ktx.string
 import io.nekohasekai.sagernet.ktx.stringToInt
 import io.nekohasekai.sagernet.ktx.stringToIntIfExists
 import moe.matsuri.nb4a.TempDatabase
+import java.util.concurrent.atomic.AtomicBoolean
 
 object DataStore : OnPreferenceDataStoreChangeListener {
 
@@ -45,7 +46,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     // main
 
-    var runningTest = false
+    // pingTest/urlTest set it on the main thread and clear it on a background
+    // dispatcher; the CAS keeps two quick taps from starting two tests
+    val runningTest = AtomicBoolean(false)
 
     @Synchronized
     fun currentGroupId(): Long {

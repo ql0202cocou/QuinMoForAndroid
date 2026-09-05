@@ -693,7 +693,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     @OptIn(DelicateCoroutinesApi::class)
     @Suppress("EXPERIMENTAL_API_USAGE")
     fun pingTest(icmpPing: Boolean) {
-        if (DataStore.runningTest) return else DataStore.runningTest = true
+        if (!DataStore.runningTest.compareAndSet(false, true)) return
         val test = TestDialog()
         val dialog = test.builder.show()
         val testJobs = mutableListOf<Job>()
@@ -832,7 +832,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
                 GroupManager.postReload(DataStore.currentGroupId())
-                DataStore.runningTest = false
+                DataStore.runningTest.set(false)
             }
         }
         test.minimize = {
@@ -847,7 +847,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     @OptIn(DelicateCoroutinesApi::class)
     fun urlTest() {
-        if (DataStore.runningTest) return else DataStore.runningTest = true
+        if (!DataStore.runningTest.compareAndSet(false, true)) return
         val test = TestDialog()
         val dialog = test.builder.show()
         val testJobs = mutableListOf<Job>()
@@ -905,7 +905,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
                 GroupManager.postReload(DataStore.currentGroupId())
-                DataStore.runningTest = false
+                DataStore.runningTest.set(false)
             }
         }
         test.minimize = {

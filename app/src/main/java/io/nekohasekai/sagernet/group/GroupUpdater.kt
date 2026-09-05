@@ -162,32 +162,35 @@ abstract class GroupUpdater {
                     return@coroutineScope false
                 }
 
-                try {
-                    // cross-process mutex: periodic WorkManager updates run in :bg while
-                    // manual updates run in the main process
-                    val lockPair = try {
-                        val channel = RandomAccessFile(
-                            File(SagerNet.application.filesDir, "group_update_${proxyGroup.id}.lock"), "rw"
-                        ).channel
-                        // tryLock can return null or throw (e.g. EMFILE); close the channel
-                        // unless we hand it out, or each failed attempt leaks an fd
-                        var lock: FileLock? = null
-                        try {
-                            lock = channel.tryLock()
-                        } finally {
-                            if (lock == null) channel.close()
-                        }
-                        lock?.let { channel to it }
-                    } catch (e: Throwable) {
-                        Logs.w(e)
-                        null
+                // cross-process mutex: periodic WorkManager updates run in :bg while
+                // manual updates run in the main process
+                val lockPair = try {
+                    val channel = RandomAccessFile(
+                        File(SagerNet.application.filesDir, "group_update_${proxyGroup.id}.lock"), "rw"
+                    ).channel
+                    // tryLock can return null or throw (e.g. EMFILE); close the channel
+                    // unless we hand it out, or each failed attempt leaks an fd
+                    var lock: FileLock? = null
+                    try {
+                        lock = channel.tryLock()
+                    } finally {
+                        if (lock == null) channel.close()
                     }
-                    if (lockPair == null) {
-                        // another process is updating this group
-                        return@coroutineScope false
-                    }
-                    val (lockChannel, fileLock) = lockPair
+                    lock?.let { channel to it }
+                } catch (e: Throwable) {
+                    Logs.w(e)
+                    null
+                }
+                if (lockPair == null) {
+                    // another process is updating this group: nothing happened here, so
+                    // only drop the in-process marker — finishUpdate would also broadcast
+                    // a spurious "update finished" to the UI
+                    updating.remove(proxyGroup.id)
+                    return@coroutineScope false
+                }
+                val (lockChannel, fileLock) = lockPair
 
+                try {
                     try {
                         GroupManager.postReload(proxyGroup.id)
 

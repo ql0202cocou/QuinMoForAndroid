@@ -9,6 +9,15 @@ set -e
 XRAY_VERSION="v26.3.27"
 MIHOMO_VERSION="v1.19.30"
 
+# sha256 of the extracted binaries (exactly what ships in the APK), frozen when
+# the versions above were bumped — recompute and update them together. Guards
+# against a release asset being swapped under the same tag: mihomo publishes no
+# checksums at all, and Xray's .dgst sits next to the asset it describes.
+XRAY_SHA256_arm64_v8a=19101a8191d6d606da975f719c8cdb80b8710b87ab17edc00ef74b9e39588714
+XRAY_SHA256_x86_64=26b2ac1e596242847a247df9e932ac480bf6072c5c686517f5a3017320895814
+MIHOMO_SHA256_arm64_v8a=94344144936968f25e7089bbeac2d87f3caf67574ba433511424724ad7435dad
+MIHOMO_SHA256_x86_64=07f38978fae8067d110acdd78a02af6d37ef8b8719ef67d4f9c0d6c22b9e7781
+
 ABIS="arm64-v8a x86_64"
 DIR=app/executableSo
 STAMP="$DIR/.versions"
@@ -47,6 +56,15 @@ check_elf() {
   is_elf "$1" || { echo "$1 is not an ELF binary"; exit 1; }
 }
 
+check_pinned() {
+  # $1: file, $2: core (XRAY|MIHOMO), $3: abi
+  local var="$2_SHA256_${3//-/_}"
+  local expect="${!var}"
+  [ -n "$expect" ] || { echo "no pinned sha256 for $2 $3"; exit 1; }
+  local actual=$(shasum -a 256 "$1" | awk '{print $1}')
+  [ "$actual" = "$expect" ] || { echo "pinned sha256 mismatch for $1: $actual != $expect"; exit 1; }
+}
+
 upstream_arch() {
   # $1: abi, $2: the upstream's name for arm64-v8a (both use amd64 for x86_64)
   if [ "$1" = x86_64 ]; then echo amd64; else echo "$2"; fi
@@ -61,12 +79,13 @@ fetch_xray() {
     check_sha256 "$zip" "$dgst"
     unzip -o -q "$zip" xray
     check_elf xray
+    check_pinned xray XRAY "$abi"
     cp xray "$OLDPWD/$DIR/$abi/libxray.so"
     rm -f xray "$zip"
   done
 }
 
-# upstream publishes no checksums; verify gzip integrity + ELF magic instead
+# upstream publishes no checksums; gzip integrity + ELF magic + the pinned sha256
 fetch_mihomo() {
   local abi gz bin
   for abi in $ABIS; do
@@ -76,6 +95,7 @@ fetch_mihomo() {
     gunzip -f "$gz"
     bin="${gz%.gz}"
     check_elf "$bin"
+    check_pinned "$bin" MIHOMO "$abi"
     cp "$bin" "$OLDPWD/$DIR/$abi/libmihomo.so"
     rm -f "$bin"
   done

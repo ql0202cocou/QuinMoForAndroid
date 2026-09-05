@@ -105,11 +105,9 @@ private fun makeDnsServer(address: String, tag: String): DNSServerOptions {
                 }
             }
 
-            "dhcp" -> {
-                type = scheme
-                if (rest != "auto") _hack_config_map["interface"] = rest
-            }
-
+            // dhcp is deliberately absent: libcore registers no dhcp transport (no
+            // with_dhcp tag, see box_include.go), so mapping it would only turn a
+            // clear build error into an opaque box start failure
             else -> throw Exception("unsupported DNS server address: $address")
         }
     }
@@ -408,7 +406,7 @@ fun buildConfig(
                     // pastInboundTag is only assigned when the past profile got a
                     // mapping inbound, which also requires canMapping() (NekoBean /
                     // hy1 faketcp can't); those chain via detour like internal nodes
-                    if (pastEntity!!.needExternal() && pastEntity!!.requireBean().canMapping()) {
+                    if (pastEntity!!.needExternal() && pastEntity.requireBean().canMapping()) {
                         route.rules.add(Rule_DefaultOptions().apply {
                             inbound = listOf(pastInboundTag)
                             outbound = tagOut
@@ -636,18 +634,18 @@ fun buildConfig(
             if (rule.packages.isNotEmpty()) {
                 PackageCache.awaitLoadSync()
             }
-            val uidList = rule.packages.map {
-                if (!isVPN) {
-                    // buildConfig runs on a Looper-less background thread in the
-                    // :bg process; a Toast must be posted from the main thread.
-                    runOnMainDispatcher {
-                        Toast.makeText(
-                            SagerNet.application,
-                            SagerNet.application.getString(R.string.route_need_vpn, rule.displayName()),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+            if (!isVPN && rule.packages.isNotEmpty()) {
+                // once per rule, not per package; buildConfig runs on a Looper-less
+                // background thread in the :bg process, so post the Toast to main
+                runOnMainDispatcher {
+                    Toast.makeText(
+                        SagerNet.application,
+                        SagerNet.application.getString(R.string.route_need_vpn, rule.displayName()),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
+            }
+            val uidList = rule.packages.map {
                 PackageCache[it]?.takeIf { uid -> uid >= 1000 }
             }.toHashSet().filterNotNull()
             val ruleSets = mutableListOf<RuleSet>()

@@ -10,11 +10,14 @@ import android.os.Looper
 import androidx.annotation.RequiresApi
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.ktx.Logs
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.runBlocking
 
+@OptIn(DelicateCoroutinesApi::class, ObsoleteCoroutinesApi::class)
 object DefaultNetworkListener {
     private sealed class NetworkMessage {
         class Start(val key: Any, val listener: (Network?) -> Unit) : NetworkMessage()

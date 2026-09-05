@@ -133,16 +133,13 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
             // close the reader and reap the child even when readLine throws
             try {
                 BufferedReader(InputStreamReader(process.inputStream)).use { bufferedReader ->
-                    var line: String?
-                    var key: String
-                    var value: String
-                    while (bufferedReader.readLine().also { line = it } != null) {
+                    while (true) {
+                        val line = bufferedReader.readLine() ?: break
                         val matcher = propertiesPattern.matcher(line)
                         if (matcher.matches()) {
-                            key = matcher.group(1)
-                            value = matcher.group(2)
-                            if (key != null && value != null && !key.isEmpty() && !value.isEmpty()) systemProperties[key] =
-                                value
+                            val key = matcher.group(1)
+                            val value = matcher.group(2)
+                            if (!key.isNullOrEmpty() && !value.isNullOrEmpty()) systemProperties[key] = value
                         }
                     }
                 }

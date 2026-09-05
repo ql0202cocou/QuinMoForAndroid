@@ -50,10 +50,20 @@ fun buildXrayConfig(bean: VMessBean, port: Int): String {
         if (!bean.isVisionFlow && (bean.enableMux || bean.packetEncoding == 2)) {
             put("mux", JSONObject().apply {
                 put("enabled", true)
-                put("concurrency", if (bean.muxConcurrency > 0) bean.muxConcurrency else 8)
+                // -1 leaves TCP un-muxed, so packetEncoding=xudp alone only moves UDP
+                // onto xudp (sing-box packet_encoding semantics); mux.cool for TCP
+                // needs an explicit enableMux
+                put(
+                    "concurrency",
+                    if (bean.enableMux) (if (bean.muxConcurrency > 0) bean.muxConcurrency else 8) else -1
+                )
                 if (bean.packetEncoding == 2) {
                     put("xudpConcurrency", 16)
-                    put("xudpProxyUDP443", "reject")
+                    // "allow": UDP/443 rides xudp like every other UDP flow, the same
+                    // as sing-box's packet_encoding=xudp. Whether QUIC is blocked is
+                    // the route rules' call (the default "Block QUIC" rule), not the
+                    // core's — Xray's default "reject" silently overrode that here.
+                    put("xudpProxyUDP443", "allow")
                 }
             })
         }

@@ -48,15 +48,16 @@ object RawUpdater : GroupUpdater() {
 
         val link = subscription.link
         var proxies: List<AbstractBean>
-        var subscriptionText: String? = null
+        val subscriptionText: String
         var remoteGroupName: String? = null
         if (link.startsWith("content://")) {
             val contentText = app.contentResolver.openInputStream(link.toUri())
                 ?.bufferedReader()
                 ?.use { it.readText() }
+                ?: error(app.getString(R.string.no_proxies_found_in_subscription))
 
             subscriptionText = contentText
-            proxies = contentText?.let { parseRaw(it) }
+            proxies = parseRaw(contentText)
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
 
@@ -111,9 +112,9 @@ object RawUpdater : GroupUpdater() {
         // 订阅下发的节点解析 DNS，自动写入分组设置（在 forceResolve 之前生效）。
         // clash/YAML 订阅撤下该键时同步清空残留值；base64/分享链接订阅本就
         // 没有此键（parseProxyServerNameserver 对非 YAML 也返回 null），不能误清
-        val subscriptionNameserver = subscriptionText?.let { parseProxyServerNameserver(it) }
+        val subscriptionNameserver = parseProxyServerNameserver(subscriptionText)
         val clearSubscriptionNameserver = subscriptionNameserver == null &&
-                subscriptionText?.contains("proxies:") == true
+                subscriptionText.contains("proxies:")
         if (subscriptionNameserver != null) {
             proxyGroup.proxyServerNameserver = subscriptionNameserver
         } else if (clearSubscriptionNameserver) {
@@ -568,10 +569,16 @@ object RawUpdater : GroupUpdater() {
                                                             ?.toString()
 
                                                     "headers" -> {
-                                                        (httpOpt.value as? Map<Any, List<Any>>)?.forEach { (key, value) ->
+                                                        // Map<*, *>: a typed value cast is erased and the
+                                                        // destructuring checkcasts it, so a scalar
+                                                        // "Host: example.com" would drop the whole node
+                                                        (httpOpt.value as? Map<*, *>)?.forEach { (key, value) ->
                                                             when (key.toString().lowercase()) {
-                                                                "host" -> {
-                                                                    bean.host = value.joinToString("\n")
+                                                                "host" -> bean.host = when (value) {
+                                                                    is List<*> -> value.mapNotNull { it?.toString() }
+                                                                        .joinToString("\n")
+
+                                                                    else -> value?.toString()
                                                                 }
                                                             }
                                                         }

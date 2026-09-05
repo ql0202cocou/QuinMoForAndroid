@@ -71,7 +71,10 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
         return PackageCache[packageName] ?: -1
     }
 
-    // TODO: 'getter for connectionInfo: WifiInfo!' is deprecated
+    // connectionInfo is deprecated since API 31 in favour of a NetworkCallback with
+    // FLAG_INCLUDE_LOCATION_INFO; sing-box pulls WIFIState() synchronously, so the
+    // getter is kept until the callback-based replacement is wired up
+    @Suppress("DEPRECATION")
     override fun wifiState(): String {
         val wifiManager =
             app.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager

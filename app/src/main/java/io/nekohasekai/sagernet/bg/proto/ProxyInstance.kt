@@ -50,6 +50,9 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     }
 
     override fun launch() {
+        // same guard as BoxInstance.launch: a closed instance must not become the
+        // main instance (and start the protect server) on its way out
+        if (isClosed()) return
         box.setAsMain()
         super.launch() // start box
         runOnDefaultDispatcher {
