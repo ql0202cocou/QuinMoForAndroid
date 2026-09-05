@@ -196,7 +196,7 @@ fun Project.setupApp() {
         }
 
         for (abi in listOf("Arm64", "X64")) {
-            tasks.create("assemble" + abi + "FdroidRelease") {
+            tasks.register("assemble" + abi + "FdroidRelease") {
                 // Historical task name kept for existing callers: it builds the full
                 // fdroid release (all ABI splits), not just the ABI in the name.
                 description = "Builds the full fdroid release (all ABIs); the ABI in the task name is historical."

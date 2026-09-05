@@ -4,7 +4,8 @@ allprojects {
 }
 
 tasks.register<Delete>("clean") {
-    delete(rootProject.buildDir)
+    // Project.buildDir is deprecated (removed in Gradle 9)
+    delete(rootProject.layout.buildDirectory)
 }
 
 plugins {
