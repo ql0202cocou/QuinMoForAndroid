@@ -1,11 +1,20 @@
+import com.android.build.api.artifact.ArtifactTransformationRequest
+import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.dsl.ApplicationExtension
-import com.android.build.gradle.AbstractAppExtension
-import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import org.gradle.api.DefaultTask
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.getByName
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
+import org.gradle.kotlin.dsl.register
+import java.io.File
 import java.util.Base64
 import java.util.Properties
 import kotlin.system.exitProcess
@@ -42,12 +51,10 @@ fun Project.setupCommon() {
                 isMinifyEnabled = true
             }
         }
+        // built-in Kotlin (AGP 9) takes its jvmTarget from targetCompatibility
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_1_8
             targetCompatibility = JavaVersion.VERSION_1_8
-        }
-        this@setupCommon.extensions.getByName<KotlinAndroidProjectExtension>("kotlin").compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_1_8)
         }
         lint {
             showAll = true
@@ -72,20 +79,18 @@ fun Project.setupCommon() {
                 )
             )
         }
-        (this as? AbstractAppExtension)?.apply {
-            buildTypes {
-                getByName("release") {
-                    isShrinkResources = true
-                    if (System.getenv("nkmr_minify") == "0") {
-                        isShrinkResources = false
-                        isMinifyEnabled = false
-                    }
+        buildTypes {
+            getByName("release") {
+                isShrinkResources = true
+                if (System.getenv("nkmr_minify") == "0") {
+                    isShrinkResources = false
+                    isMinifyEnabled = false
                 }
-                getByName("debug") {
-                    applicationIdSuffix = "debug"
-                    debuggable(true)
-                    jniDebuggable(true)
-                }
+            }
+            getByName("debug") {
+                applicationIdSuffix = "debug"
+                isDebuggable = true
+                isJniDebuggable = true
             }
         }
     }
@@ -141,8 +146,6 @@ fun Project.setupApp() {
     setupAppCommon()
 
     android.apply {
-        this as AbstractAppExtension
-
         buildTypes {
             getByName("release") {
                 proguardFiles(
@@ -175,26 +178,6 @@ fun Project.setupApp() {
             }
         }
 
-        applicationVariants.all {
-            outputs.all {
-                this as BaseVariantOutputImpl
-                val isPreview = outputFileName.contains("-preview")
-                outputFileName = if (isPreview) {
-                    outputFileName.replace(
-                        project.name,
-                        "NekoBox-" + requireNotNull(requireMetadata().getProperty("PRE_VERSION_NAME")) {
-                            "PRE_VERSION_NAME is missing in nb4a.properties"
-                        }
-                    ).replace("-preview", "")
-                        .replace("-release", "")
-                } else {
-                    outputFileName.replace(project.name, "NekoBox-$versionName")
-                        .replace("-release", "")
-                        .replace("-oss", "")
-                }
-            }
-        }
-
         for (abi in listOf("Arm64", "X64")) {
             tasks.register("assemble" + abi + "FdroidRelease") {
                 // Historical task name kept for existing callers: it builds the full
@@ -205,7 +188,58 @@ fun Project.setupApp() {
         }
 
         sourceSets.getByName("main").apply {
-            jniLibs.srcDir("executableSo")
+            jniLibs.directories += "executableSo"
+        }
+    }
+
+    // AGP 9 removed applicationVariants/outputFileName; the APKs are renamed by a
+    // SingleArtifact.APK transform instead, so build/outputs/apk keeps the same names.
+    extensions.getByName<ApplicationAndroidComponentsExtension>("androidComponents").onVariants { variant ->
+        val rename = tasks.register<RenameApksTask>("rename${variant.name.replaceFirstChar { it.uppercase() }}Apks") {
+            val preVersionName = requireNotNull(requireMetadata().getProperty("PRE_VERSION_NAME")) {
+                "PRE_VERSION_NAME is missing in nb4a.properties"
+            }
+            projectName.set(project.name)
+            newBaseName.set(
+                if (variant.flavorName == "preview") "NekoBox-$preVersionName"
+                else "NekoBox-$verName"
+            )
+        }
+        val request = variant.artifacts.use(rename)
+            .wiredWithDirectories(RenameApksTask::inputDir, RenameApksTask::outputDir)
+            .toTransformMany(SingleArtifact.APK)
+        rename.configure { transformationRequest.set(request) }
+    }
+}
+
+abstract class RenameApksTask : DefaultTask() {
+    @get:InputFiles
+    abstract val inputDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Internal
+    abstract val transformationRequest: Property<ArtifactTransformationRequest<RenameApksTask>>
+
+    @get:Input
+    abstract val projectName: Property<String>
+
+    @get:Input
+    abstract val newBaseName: Property<String>
+
+    @TaskAction
+    fun run() {
+        // app-oss-arm64-v8a-release.apk -> NekoBox-<ver>-arm64-v8a.apk (preview: NekoBox-<pre>-arm64-v8a.apk)
+        transformationRequest.get().submit(this) { artifact ->
+            val input = File(artifact.outputFile)
+            val name = input.name.replace(projectName.get(), newBaseName.get())
+                .replace("-preview", "")
+                .replace("-release", "")
+                .replace("-oss", "")
+            val output = File(outputDir.get().asFile, name)
+            input.copyTo(output, overwrite = true)
+            output
         }
     }
 }

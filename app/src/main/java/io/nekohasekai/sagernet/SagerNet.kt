@@ -51,6 +51,10 @@ class SagerNet : Application(),
     private val isMainProcess = process == BuildConfig.APPLICATION_ID
     val isBgProcess = process.endsWith(":bg")
 
+    // CrashHandler deliberately replaces the platform handler: it logs the crash and
+    // restarts the process into the log-sharing screen via ProcessPhoenix, which never
+    // returns, so there is no point at which the previous handler could be delegated to
+    @SuppressLint("DefaultUncaughtExceptionDelegation")
     override fun onCreate() {
         super.onCreate()
 

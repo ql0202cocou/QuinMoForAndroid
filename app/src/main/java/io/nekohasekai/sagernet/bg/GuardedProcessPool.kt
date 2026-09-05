@@ -134,7 +134,7 @@ class GuardedProcessPool(private val onFatal: suspend (IOException) -> Unit) : C
         Guard(cmd, env).apply {
             start() // if start fails, IOException will be thrown directly
             guards.add(this)
-            if (!coroutineContext[Job]!!.isActive) {
+            if (!coroutineContext.isActive) {
                 // close() already cancelled this pool: the looper launch below
                 // would never run and nothing else would kill this process
                 destroy()
