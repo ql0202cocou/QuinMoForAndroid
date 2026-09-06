@@ -21,6 +21,13 @@ object LocalResolverImpl : LocalDNSTransport {
 
     private const val RCODE_NXDOMAIN = 3
 
+    // API 37 deprecates getInstance() in favour of DnsResolver(Context, Looper); the old
+    // entry point is the only one below 37 and still works there, so keep it until the
+    // Looper semantics of the constructor are documented
+    @Suppress("DEPRECATION")
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun resolver(): DnsResolver = DnsResolver.getInstance()
+
     override fun raw(): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
     }
@@ -65,7 +72,7 @@ object LocalResolverImpl : LocalDNSTransport {
             }
         }
 
-        DnsResolver.getInstance().rawQuery(
+        resolver().rawQuery(
             SagerNet.underlyingNetwork,
             message,
             DnsResolver.FLAG_NO_RETRY,
@@ -116,7 +123,7 @@ object LocalResolverImpl : LocalDNSTransport {
                 else -> null
             }
             if (type != null) {
-                DnsResolver.getInstance().query(
+                resolver().query(
                     SagerNet.underlyingNetwork,
                     domain,
                     type,
@@ -126,7 +133,7 @@ object LocalResolverImpl : LocalDNSTransport {
                     callback
                 )
             } else {
-                DnsResolver.getInstance().query(
+                resolver().query(
                     SagerNet.underlyingNetwork,
                     domain,
                     DnsResolver.FLAG_NO_RETRY,

@@ -41,7 +41,7 @@ fun Project.requireLocalProperties(): Properties = Properties().apply {
 fun Project.setupCommon() {
     android.apply {
         buildToolsVersion = "36.0.0"
-        compileSdk = 36
+        compileSdk = 37
         defaultConfig {
             minSdk = 23
             targetSdk = 36
@@ -51,10 +51,12 @@ fun Project.setupCommon() {
                 isMinifyEnabled = true
             }
         }
-        // built-in Kotlin (AGP 9) takes its jvmTarget from targetCompatibility
+        // built-in Kotlin (AGP 9) takes its jvmTarget from targetCompatibility; core 1.19's
+        // inline functions are JVM 11 bytecode, so the target cannot stay at 1.8 (AGP 9's
+        // default is 11 as well; D8 desugars it for minSdk 23)
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_1_8
-            targetCompatibility = JavaVersion.VERSION_1_8
+            sourceCompatibility = JavaVersion.VERSION_11
+            targetCompatibility = JavaVersion.VERSION_11
         }
         lint {
             showAll = true

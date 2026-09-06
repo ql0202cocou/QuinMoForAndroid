@@ -34,6 +34,7 @@ import moe.matsuri.nb4a.utils.JavaUtil
 import moe.matsuri.nb4a.utils.cleanWebview
 import java.io.File
 import androidx.work.Configuration as WorkConfiguration
+import okhttp3.OkHttp
 
 class SagerNet : Application(),
     WorkConfiguration.Provider {
@@ -59,6 +60,10 @@ class SagerNet : Application(),
         super.onCreate()
 
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler)
+        // okhttp-android 5.5 reads the application Context (public-suffix list from its
+        // assets); its App Startup initializer is dropped together with the
+        // InitializationProvider and would only ever run in the main process anyway
+        OkHttp.initialize(this)
 
         if (isMainProcess || isBgProcess) {
             externalAssets.mkdirs()
