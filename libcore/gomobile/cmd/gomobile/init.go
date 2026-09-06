@@ -78,9 +78,15 @@ func runInit(cmd *command) error {
 		removeAll(tmpdir)
 	}()
 
-	// Make sure gobind is up to date.
-	if err := goInstall([]string{"golang.org/x/mobile/cmd/gobind@latest"}, nil); err != nil {
-		return err
+	// Make sure gobind is up to date. When the caller provides its own gobind via
+	// GOBIND (libcore/init.sh installs the vendored one as gobind-matsuri) the
+	// upstream binary is never used, and installing it needs whatever Go version
+	// upstream x/mobile currently requires (>= 1.26 as of 2026-09), which fails
+	// under GOTOOLCHAIN=local.
+	if os.Getenv("GOBIND") == "" {
+		if err := goInstall([]string{"golang.org/x/mobile/cmd/gobind@latest"}, nil); err != nil {
+			return err
+		}
 	}
 
 	if buildN {
